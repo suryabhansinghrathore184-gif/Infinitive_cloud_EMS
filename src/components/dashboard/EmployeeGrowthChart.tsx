@@ -11,11 +11,11 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { mockGrowthData } from '@/data/dashboard';
-import { TrendingUp, Filter } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 
 export const EmployeeGrowthChart: React.FC = () => {
   return (
-    <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="flex h-full w-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
         <div>
@@ -37,7 +37,7 @@ export const EmployeeGrowthChart: React.FC = () => {
       </div>
 
       {/* Chart Container */}
-      <div className="mt-4 h-64 w-full">
+      <div className="mt-4 flex-1 min-h-[220px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={mockGrowthData}

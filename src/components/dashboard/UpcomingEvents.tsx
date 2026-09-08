@@ -44,15 +44,15 @@ export const UpcomingEvents: React.FC = () => {
   };
 
   // Fetch holidays dynamically from API / Service for active year
-  const loadHolidays = async () => {
+  const loadHolidays = React.useCallback(async () => {
     const selectedYear = activeMonthDate.getFullYear();
     const data = await holidayService.getHolidays(selectedYear, { country: 'IN' });
     setHolidays(data);
-  };
+  }, [activeMonthDate]);
 
   useEffect(() => {
     loadHolidays();
-  }, [activeMonthDate]);
+  }, [loadHolidays]);
 
   const calendarGrid: CalendarDayCell[] = getCalendarGrid(activeMonthDate, holidays);
 
@@ -99,7 +99,7 @@ export const UpcomingEvents: React.FC = () => {
   const weekDayNames = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
   return (
-    <div className="relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="relative flex h-full w-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="absolute right-6 top-4 z-30 flex items-center gap-2 rounded-xl bg-slate-900 px-3.5 py-2 text-xs text-white shadow-xl animate-fade-in">

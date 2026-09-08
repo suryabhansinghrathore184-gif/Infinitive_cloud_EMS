@@ -224,3 +224,6 @@ export interface IntegrationCard {
   isConnected: boolean;
   statusText: string;
 }
+
+export type { RecentActivityItem, AnnouncementItem } from './dashboard';
+

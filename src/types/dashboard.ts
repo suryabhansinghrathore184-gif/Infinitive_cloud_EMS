@@ -38,7 +38,7 @@ export interface LeaveRequest {
 export interface HolidayEvent {
   id: string;
   name: string;
-  category: 'National Holiday' | 'Public Holiday' | 'Company Festival' | 'Mandatory Holiday';
+  category: 'National Holiday' | 'Public Holiday' | 'Company Festival' | 'Mandatory Holiday' | 'Optional Holiday' | 'Company Event';
   date: string;
   relativeLabel?: string;
   dayOfWeek: string;

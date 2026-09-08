@@ -8,11 +8,13 @@ import {
   Location,
   AttendanceRecord,
   LeaveRequestAdmin,
+  RecentActivityItem,
+  AnnouncementItem,
 } from '@/types/admin';
 import { HolidayEvent } from '@/types/dashboard';
 import { mockEmployees, mockDepartments, mockDesignations, mockLocations } from '@/data/employees';
 import { mockAttendanceRecords, mockAdminLeaveRequests } from '@/data/attendance';
-import { mockHolidayEvents } from '@/data/dashboard';
+import { mockHolidayEvents, mockAnnouncements, mockRecentActivities } from '@/data/dashboard';
 
 export interface CompanyInfo {
   name: string;
@@ -26,25 +28,15 @@ export interface CompanyInfo {
   workingDays: string;
   contactEmail: string;
   contactPhone: string;
-  isDemo: boolean;
 }
 
-const defaultCompanyInfo: CompanyInfo = {
-  name: 'Infinitive Cloud Enterprise Solutions',
-  logo: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=100&auto=format&fit=crop&q=80',
-  address: 'Tech Park Tower B, 5th Floor, Powai',
-  city: 'Mumbai',
-  state: 'Maharashtra',
-  country: 'India',
-  timezone: 'Asia/Kolkata (IST +05:30)',
-  currency: 'INR (₹)',
-  workingDays: '5 Days (Monday - Friday)',
-  contactEmail: 'hr@infinitivecloud.com',
-  contactPhone: '+91 22 6789 0000',
-  isDemo: true,
-};
-
-const STORAGE_KEY = 'ems_hrms_master_data_v1';
+export interface LeaveTypeConfig {
+  id: string;
+  name: string;
+  description: string;
+  allowanceDays: number;
+  isPaid: boolean;
+}
 
 export interface EmsDataState {
   company: CompanyInfo;
@@ -54,9 +46,41 @@ export interface EmsDataState {
   locations: Location[];
   attendance: AttendanceRecord[];
   leaves: LeaveRequestAdmin[];
+  leaveTypes: LeaveTypeConfig[];
   holidays: HolidayEvent[];
+  announcements: AnnouncementItem[];
+  activities: RecentActivityItem[];
   isDemoData: boolean;
 }
+
+const STORAGE_KEY = 'ems_hrms_master_data_v2';
+
+const cleanInitialState: EmsDataState = {
+  company: {
+    name: 'My New Enterprise Organization',
+    logo: '',
+    address: 'Enterprise HQ',
+    city: 'Mumbai',
+    state: 'Maharashtra',
+    country: 'India',
+    timezone: 'Asia/Kolkata (IST +05:30)',
+    currency: 'INR (₹)',
+    workingDays: '5 Days (Mon - Fri)',
+    contactEmail: 'admin@organization.com',
+    contactPhone: '+91 22 1000 2000',
+  },
+  employees: [],
+  departments: [],
+  designations: [],
+  locations: [],
+  attendance: [],
+  leaves: [],
+  leaveTypes: [],
+  holidays: [],
+  announcements: [],
+  activities: [],
+  isDemoData: false,
+};
 
 export function getInitialEmsState(): EmsDataState {
   if (typeof window !== 'undefined') {
@@ -69,18 +93,7 @@ export function getInitialEmsState(): EmsDataState {
       }
     }
   }
-
-  return {
-    company: defaultCompanyInfo,
-    employees: mockEmployees,
-    departments: mockDepartments,
-    designations: mockDesignations,
-    locations: mockLocations,
-    attendance: mockAttendanceRecords,
-    leaves: mockAdminLeaveRequests,
-    holidays: mockHolidayEvents,
-    isDemoData: true,
-  };
+  return cleanInitialState;
 }
 
 export function useEmsStore() {
@@ -92,6 +105,23 @@ export function useEmsStore() {
     }
   }, [state]);
 
+  // Activity logger helper
+  const logActivity = (user: string, action: string, category: RecentActivityItem['category'] = 'employee') => {
+    const newAct: RecentActivityItem = {
+      id: `act-${Date.now()}`,
+      user,
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
+      action,
+      timestamp: 'Just now',
+      category,
+    };
+    setState((prev) => ({
+      ...prev,
+      activities: [newAct, ...prev.activities],
+    }));
+  };
+
+  // 1. ADD EMPLOYEE
   const addEmployee = (newEmp: Omit<Employee, 'id'>): { success: boolean; message: string } => {
     const existsId = state.employees.some(
       (e) => e.employeeId.trim().toLowerCase() === newEmp.employeeId.trim().toLowerCase()
@@ -115,76 +145,69 @@ export function useEmsStore() {
     setState((prev) => ({
       ...prev,
       employees: [created, ...prev.employees],
+      activities: [
+        {
+          id: `act-${Date.now()}`,
+          user: 'Admin',
+          avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
+          action: `added new employee ${created.firstName} ${created.lastName} (${created.employeeId})`,
+          timestamp: 'Just now',
+          category: 'employee',
+        },
+        ...prev.activities,
+      ],
     }));
 
-    return { success: true, message: `Employee ${created.firstName} ${created.lastName} (${created.employeeId}) created successfully!` };
-  };
-
-  const updateEmployee = (id: string, updated: Partial<Employee>) => {
-    setState((prev) => ({
-      ...prev,
-      employees: prev.employees.map((e) => (e.id === id ? { ...e, ...updated } : e)),
-    }));
+    return { success: true, message: `Employee ${created.firstName} ${created.lastName} (${created.employeeId}) added successfully!` };
   };
 
   const deactivateEmployee = (id: string) => {
-    setState((prev) => ({
-      ...prev,
-      employees: prev.employees.map((e) =>
-        e.id === id ? { ...e, status: 'Terminated' as const } : e
-      ),
-    }));
-  };
-
-  const importEmployees = (
-    incoming: Omit<Employee, 'id'>[]
-  ): { added: number; skippedDuplicates: number; message: string } => {
-    let addedCount = 0;
-    let duplicateCount = 0;
-    const newItems: Employee[] = [];
-
-    const existingIds = new Set(state.employees.map((e) => e.employeeId.trim().toLowerCase()));
-
-    incoming.forEach((item, index) => {
-      const idKey = item.employeeId.trim().toLowerCase();
-      if (existingIds.has(idKey)) {
-        duplicateCount++;
-      } else {
-        existingIds.add(idKey);
-        addedCount++;
-        newItems.push({
-          ...item,
-          id: `emp-imp-${Date.now()}-${index}`,
-        });
-      }
-    });
-
-    if (newItems.length > 0) {
+    const target = state.employees.find((e) => e.id === id);
+    if (target) {
       setState((prev) => ({
         ...prev,
-        employees: [...newItems, ...prev.employees],
+        employees: prev.employees.map((e) => (e.id === id ? { ...e, status: 'Terminated' as const } : e)),
       }));
+      logActivity('Admin', `deactivated employee record ${target.employeeId}`);
     }
-
-    return {
-      added: addedCount,
-      skippedDuplicates: duplicateCount,
-      message: `Successfully imported ${addedCount} new employees (${duplicateCount} duplicate IDs skipped).`,
-    };
   };
 
-  const addDepartment = (dept: Omit<Department, 'id' | 'employeeCount'>) => {
+  // 2. ADD DEPARTMENT
+  const addDepartment = (dept: { name: string; head?: string; description?: string }) => {
     const created: Department = {
-      ...dept,
       id: `dept-${Date.now()}`,
+      name: dept.name,
+      code: dept.name.substring(0, 3).toUpperCase(),
+      head: dept.head || 'Unassigned',
       employeeCount: 0,
+      description: dept.description || 'Department Unit',
+      status: 'Active',
     };
     setState((prev) => ({
       ...prev,
       departments: [...prev.departments, created],
     }));
+    logActivity('Admin', `created new department "${created.name}"`);
   };
 
+  // 3. ADD DESIGNATION
+  const addDesignation = (desg: { title: string; department: string }) => {
+    const created: Designation = {
+      id: `des-${Date.now()}`,
+      title: desg.title,
+      code: desg.title.substring(0, 3).toUpperCase(),
+      department: desg.department,
+      level: 'L3',
+      employeeCount: 0,
+    };
+    setState((prev) => ({
+      ...prev,
+      designations: [...prev.designations, created],
+    }));
+    logActivity('Admin', `created new designation "${created.title}"`);
+  };
+
+  // 4. ADD HOLIDAY
   const addHoliday = (holiday: Omit<HolidayEvent, 'id'>) => {
     const created: HolidayEvent = {
       ...holiday,
@@ -194,57 +217,122 @@ export function useEmsStore() {
       ...prev,
       holidays: [...prev.holidays, created],
     }));
+    logActivity('Admin', `added company holiday "${created.name}" (${created.date})`);
   };
 
-  const updateCompanyInfo = (info: Partial<CompanyInfo>) => {
+  // 5. CREATE ANNOUNCEMENT
+  const createAnnouncement = (ann: { title: string; content: string; category: string; isImportant?: boolean }) => {
+    const created: AnnouncementItem = {
+      id: `ann-${Date.now()}`,
+      title: ann.title,
+      content: ann.content,
+      category: ann.category,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+      isImportant: ann.isImportant || false,
+    };
     setState((prev) => ({
       ...prev,
-      company: { ...prev.company, ...info, isDemo: false },
+      announcements: [created, ...prev.announcements],
     }));
+    logActivity('Admin', `published announcement "${created.title}"`, 'policy');
   };
 
-  const clearSeedData = () => {
+  // 6. ADD LEAVE TYPE
+  const addLeaveType = (leaveType: { name: string; description: string; allowanceDays: number; isPaid: boolean }) => {
+    const created: LeaveTypeConfig = {
+      id: `lt-${Date.now()}`,
+      ...leaveType,
+    };
+    setState((prev) => ({
+      ...prev,
+      leaveTypes: [...prev.leaveTypes, created],
+    }));
+    logActivity('Admin', `configured leave type "${created.name}" (${created.allowanceDays} Days)`);
+  };
+
+  const importEmployees = (batch: Omit<Employee, 'id'>[]): { added: number; skippedDuplicates: number; message: string } => {
+    let importedCount = 0;
+    let skippedDuplicates = 0;
+    const newRecords: Employee[] = [];
+
+    batch.forEach((emp, index) => {
+      const existsId = state.employees.some((e) => e.employeeId.trim().toLowerCase() === emp.employeeId.trim().toLowerCase());
+      if (existsId) {
+        skippedDuplicates++;
+        return;
+      }
+
+      const created: Employee = {
+        ...emp,
+        id: `emp-imp-${Date.now()}-${index}`,
+      };
+      newRecords.push(created);
+      importedCount++;
+    });
+
+    if (importedCount > 0) {
+      setState((prev) => ({
+        ...prev,
+        employees: [...newRecords, ...prev.employees],
+        activities: [
+          {
+            id: `act-${Date.now()}`,
+            user: 'Admin',
+            avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
+            action: `batch imported ${importedCount} employee records via CSV`,
+            timestamp: 'Just now',
+            category: 'employee',
+          },
+          ...prev.activities,
+        ],
+      }));
+    }
+
+    return {
+      added: importedCount,
+      skippedDuplicates,
+      message: `Successfully imported ${importedCount} employees. (${skippedDuplicates} duplicates skipped)`,
+    };
+  };
+
+  // Reset & Seed Controls
+  const clearAllData = () => {
+    setState(cleanInitialState);
+  };
+
+  const loadSampleDemoData = () => {
     setState({
       company: {
-        name: 'New Company Name',
+        name: 'Infinitive Cloud Enterprise Solutions',
         logo: '',
-        address: '',
-        city: '',
-        state: '',
+        address: 'Tech Park B, Powai',
+        city: 'Mumbai',
+        state: 'Maharashtra',
         country: 'India',
-        timezone: 'Asia/Kolkata (IST +05:30)',
+        timezone: 'Asia/Kolkata',
         currency: 'INR (₹)',
-        workingDays: '5 Days (Monday - Friday)',
-        contactEmail: 'admin@company.com',
-        contactPhone: '',
-        isDemo: false,
+        workingDays: '5 Days (Mon - Fri)',
+        contactEmail: 'hr@infinitivecloud.com',
+        contactPhone: '+91 22 6789 0000',
       },
-      employees: [],
-      departments: [],
-      designations: [],
-      locations: [],
-      attendance: [],
-      leaves: [],
-      holidays: [],
-      isDemoData: false,
-    });
-  };
-
-  const resetToDemoData = () => {
-    const defaultState: EmsDataState = {
-      company: defaultCompanyInfo,
       employees: mockEmployees,
       departments: mockDepartments,
       designations: mockDesignations,
       locations: mockLocations,
       attendance: mockAttendanceRecords,
       leaves: mockAdminLeaveRequests,
+      leaveTypes: [
+        { id: 'lt-1', name: 'Casual Leave (CL)', description: 'Casual time off', allowanceDays: 12, isPaid: true },
+        { id: 'lt-2', name: 'Sick Leave (SL)', description: 'Medical sick leave', allowanceDays: 10, isPaid: true },
+      ],
       holidays: mockHolidayEvents,
+      announcements: mockAnnouncements,
+      activities: mockRecentActivities,
       isDemoData: true,
-    };
-    setState(defaultState);
+    });
   };
 
+  // Derived Dynamic Statistics (NEVER hardcoded)
   const totalEmployeesCount = state.employees.length;
   const activeEmployeesCount = state.employees.filter((e) => e.status === 'Active' || e.status === 'Probation').length;
   const onLeaveCount = state.employees.filter((e) => e.status === 'On Leave').length;
@@ -263,13 +351,17 @@ export function useEmsStore() {
     onLeaveCount,
     newEmployeesCount,
     addEmployee,
-    updateEmployee,
     deactivateEmployee,
-    importEmployees,
     addDepartment,
+    addDesignation,
     addHoliday,
-    updateCompanyInfo,
-    clearSeedData,
-    resetToDemoData,
+    createAnnouncement,
+    addLeaveType,
+    importEmployees,
+    clearAllData,
+    clearSeedData: clearAllData,
+    loadSampleDemoData,
+    resetToDemoData: loadSampleDemoData,
   };
 }
+
