@@ -2,31 +2,40 @@
 
 import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
-import { mockEmployees } from '@/data/employees';
+import { useEmsStore } from '@/store/emsStore';
 import { Employee, EmploymentStatus } from '@/types/admin';
+import { AddEmployeeModal } from '@/components/employees/AddEmployeeModal';
+import { ImportEmployeesModal } from '@/components/employees/ImportEmployeesModal';
 import {
   Search,
   Filter,
   UserPlus,
+  FileSpreadsheet,
   Download,
   Eye,
   Edit,
-  Trash2,
   Lock,
   ChevronLeft,
   ChevronRight,
   X,
   CheckCircle2,
-  ShieldAlert,
+  Trash2,
 } from 'lucide-react';
 
 export default function EmployeesPage() {
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
+  const {
+    state,
+    addEmployee,
+    deactivateEmployee,
+    importEmployees,
+  } = useEmsStore();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'personal' | 'employment' | 'emergency' | 'bank' | 'govt'>('personal');
 
@@ -35,7 +44,11 @@ export default function EmployeesPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const filteredEmployees = employees.filter((emp) => {
+  const departmentNames = state.departments.map((d) => d.name);
+  const designationNames = state.designations.map((d) => d.title);
+  const existingEmployeeIds = new Set(state.employees.map((e) => e.employeeId.trim().toLowerCase()));
+
+  const filteredEmployees = state.employees.filter((emp) => {
     const matchesSearch =
       emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -80,23 +93,26 @@ export default function EmployeesPage() {
       {/* Action Header Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Employee Directory</h2>
+          <h2 className="text-xl font-bold text-slate-900">Employee Master Directory</h2>
           <p className="text-xs text-slate-500">
-            Manage organization staff, profiles, and employment status ({filteredEmployees.length} total)
+            Source of Truth for organization staff ({filteredEmployees.length} total registered)
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-blue-600/20 transition-all hover:bg-blue-700 active:scale-95"
+            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-blue-600/20 hover:bg-blue-700 active:scale-95"
           >
             <UserPlus className="h-4 w-4" />
             <span>Add New Employee</span>
           </button>
-          <button className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50">
-            <Download className="h-4 w-4 text-slate-500" />
-            <span>Export CSV</span>
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+            <span>Import CSV</span>
           </button>
         </div>
       </div>
@@ -124,10 +140,11 @@ export default function EmployeesPage() {
             className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 focus:border-blue-500 focus:outline-none"
           >
             <option value="All">All Departments</option>
-            <option value="Engineering & IT">Engineering & IT</option>
-            <option value="Human Resources">Human Resources</option>
-            <option value="Finance & Accounts">Finance & Accounts</option>
-            <option value="Sales & Business Dev">Sales & Business Dev</option>
+            {departmentNames.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
           </select>
 
           {/* Status Filter */}
@@ -140,106 +157,123 @@ export default function EmployeesPage() {
             <option value="Active">Active</option>
             <option value="Probation">Probation</option>
             <option value="On Leave">On Leave</option>
-            <option value="Resigned">Resigned</option>
+            <option value="Terminated">Terminated</option>
           </select>
         </div>
       </div>
 
       {/* Employees Data Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/70 text-slate-500">
-                <th className="px-4 py-3.5 font-semibold">Employee</th>
-                <th className="px-4 py-3.5 font-semibold">Department & Role</th>
-                <th className="px-4 py-3.5 font-semibold">Location</th>
-                <th className="px-4 py-3.5 font-semibold">Joining Date</th>
-                <th className="px-4 py-3.5 font-semibold">Status</th>
-                <th className="px-4 py-3.5 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredEmployees.map((emp) => (
-                <tr key={emp.id} className="transition-colors hover:bg-slate-50/60">
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={emp.avatar}
-                        alt={emp.firstName}
-                        className="h-9 w-9 rounded-full object-cover ring-1 ring-slate-200"
-                      />
-                      <div>
-                        <p className="font-bold text-slate-900">
-                          {emp.firstName} {emp.lastName}
-                        </p>
-                        <p className="text-[10px] text-slate-400">{emp.employeeId} • {emp.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <p className="font-semibold text-slate-800">{emp.designation}</p>
-                    <p className="text-[10px] text-slate-400">{emp.department}</p>
-                  </td>
-                  <td className="px-4 py-3.5 text-slate-700 font-medium">
-                    {emp.location}
-                  </td>
-                  <td className="px-4 py-3.5 text-slate-700 font-medium">
-                    {emp.joiningDate}
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <span
-                      className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${getStatusBadge(
-                        emp.status
-                      )}`}
-                    >
-                      {emp.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => setSelectedEmployee(emp)}
-                        className="rounded-lg p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-600"
-                        title="View Full Profile"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => showToast(`Editing ${emp.firstName}'s profile`)}
-                        className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                        title="Edit Profile"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
+        {filteredEmployees.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/70 text-slate-500">
+                  <th className="px-4 py-3.5 font-semibold">Employee</th>
+                  <th className="px-4 py-3.5 font-semibold">Department & Role</th>
+                  <th className="px-4 py-3.5 font-semibold">Location</th>
+                  <th className="px-4 py-3.5 font-semibold">Joining Date</th>
+                  <th className="px-4 py-3.5 font-semibold">Status</th>
+                  <th className="px-4 py-3.5 font-semibold text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Footer */}
-        <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
-          <span>Showing 1 to {filteredEmployees.length} of {employees.length} entries</span>
-          <div className="flex items-center gap-1">
-            <button className="rounded-lg border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:opacity-50">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button className="rounded-lg bg-blue-600 px-3 py-1 font-semibold text-white">1</button>
-            <button className="rounded-lg border border-slate-200 px-2 py-1 hover:bg-slate-50">
-              <ChevronRight className="h-4 w-4" />
-            </button>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredEmployees.map((emp) => (
+                  <tr key={emp.id} className="transition-colors hover:bg-slate-50/60">
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={emp.avatar}
+                          alt={emp.firstName}
+                          className="h-9 w-9 rounded-full object-cover ring-1 ring-slate-200"
+                        />
+                        <div>
+                          <p className="font-bold text-slate-900">
+                            {emp.firstName} {emp.lastName}
+                          </p>
+                          <p className="text-[10px] text-slate-400">{emp.employeeId} • {emp.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <p className="font-semibold text-slate-800">{emp.designation}</p>
+                      <p className="text-[10px] text-slate-400">{emp.department}</p>
+                    </td>
+                    <td className="px-4 py-3.5 text-slate-700 font-medium">{emp.location}</td>
+                    <td className="px-4 py-3.5 text-slate-700 font-medium">{emp.joiningDate}</td>
+                    <td className="px-4 py-3.5">
+                      <span
+                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${getStatusBadge(
+                          emp.status
+                        )}`}
+                      >
+                        {emp.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => setSelectedEmployee(emp)}
+                          className="rounded-lg p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-600"
+                          title="View Full Profile"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            deactivateEmployee(emp.id);
+                            showToast(`Deactivated employee ${emp.firstName} ${emp.lastName}`);
+                          }}
+                          className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
+                          title="Deactivate Employee"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+        ) : (
+          <div className="p-8 text-center text-xs text-slate-500">
+            No employees registered yet. Click &quot;Add New Employee&quot; or &quot;Import CSV&quot; to populate your database.
+          </div>
+        )}
       </div>
+
+      {/* ADD EMPLOYEE MODAL */}
+      <AddEmployeeModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSave={(newEmp) => {
+          const res = addEmployee(newEmp);
+          if (res.success) {
+            showToast(res.message);
+          }
+          return res;
+        }}
+        departments={departmentNames}
+        designations={designationNames}
+      />
+
+      {/* IMPORT EMPLOYEES MODAL */}
+      <ImportEmployeesModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onConfirmImport={(incoming) => {
+          const res = importEmployees(incoming);
+          showToast(res.message);
+          return res;
+        }}
+        existingEmployeeIds={existingEmployeeIds}
+      />
 
       {/* VIEW PROFILE MODAL */}
       {selectedEmployee && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl animate-fade-in">
-            {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 p-4 text-white">
               <div className="flex items-center gap-3">
                 <img
@@ -264,7 +298,6 @@ export default function EmployeesPage() {
               </button>
             </div>
 
-            {/* Profile Navigation Tabs */}
             <div className="flex border-b border-slate-200 bg-slate-50 px-4 text-xs font-semibold">
               {[
                 { key: 'personal', label: 'Personal Info' },
@@ -287,7 +320,6 @@ export default function EmployeesPage() {
               ))}
             </div>
 
-            {/* Modal Tab Content */}
             <div className="p-6 text-xs text-slate-700">
               {activeTab === 'personal' && (
                 <div className="grid grid-cols-2 gap-4">
@@ -323,7 +355,7 @@ export default function EmployeesPage() {
                 <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
                   <div className="flex items-center gap-2 font-bold text-amber-900 mb-2">
                     <Lock className="h-4 w-4 text-amber-600" />
-                    <span>Confidential Salary & Bank Information</span>
+                    <span>Confidential Bank Information</span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-slate-800">
                     <div><span className="font-semibold">Bank Name:</span> {selectedEmployee.bankName}</div>
@@ -343,7 +375,6 @@ export default function EmployeesPage() {
               )}
             </div>
 
-            {/* Modal Footer */}
             <div className="flex justify-end border-t border-slate-100 p-4">
               <button
                 onClick={() => setSelectedEmployee(null)}

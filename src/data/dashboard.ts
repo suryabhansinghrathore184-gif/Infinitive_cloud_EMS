@@ -12,7 +12,7 @@ export const mockUserData = {
   name: 'Admin',
   role: 'HR Administrator',
   email: 'admin@enterprise-hrms.com',
-  avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+  // avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
 };
 
 export const mockKpiMetrics: KpiMetric[] = [
@@ -134,7 +134,7 @@ export const mockHolidayEvents: HolidayEvent[] = [
     id: 'hol-1',
     name: 'Ganesh Chaturthi',
     category: 'Public Holiday',
-    date: '27 Aug 2026',
+    date: '14 sep 2026',
     dayOfWeek: 'Thursday',
     relativeLabel: 'Upcoming',
   },

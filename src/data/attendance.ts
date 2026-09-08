@@ -4,7 +4,7 @@ export const mockAttendanceRecords: AttendanceRecord[] = [
   {
     id: 'att-1',
     employeeId: 'EMP1001',
-    employeeName: 'Aarav Sharma',
+    employeeName: 'Suryabhan Singh Rathore',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
     date: '2026-09-08',
     checkIn: '09:02 AM',
@@ -18,7 +18,7 @@ export const mockAttendanceRecords: AttendanceRecord[] = [
   {
     id: 'att-2',
     employeeId: 'EMP1002',
-    employeeName: 'Sneha Kapur',
+    employeeName: 'Lubhanshi Rathore',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
     date: '2026-09-08',
     checkIn: '09:45 AM',
@@ -32,7 +32,7 @@ export const mockAttendanceRecords: AttendanceRecord[] = [
   {
     id: 'att-3',
     employeeId: 'EMP1003',
-    employeeName: 'Rohan Verma',
+    employeeName: 'Usha',
     avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&auto=format&fit=crop&q=80',
     date: '2026-09-08',
     checkIn: '-',
@@ -43,41 +43,15 @@ export const mockAttendanceRecords: AttendanceRecord[] = [
     method: 'Web',
     location: 'Gurgaon Corporate Office',
   },
-  {
-    id: 'att-4',
-    employeeId: 'EMP1004',
-    employeeName: 'Ananya Roy',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&auto=format&fit=crop&q=80',
-    date: '2026-09-08',
-    checkIn: '08:55 AM',
-    checkOut: '06:00 PM',
-    breakDuration: '50 mins',
-    workingHours: '8h 15m',
-    status: 'Present',
-    method: 'Biometric',
-    location: 'Bangalore R&D Center',
-  },
-  {
-    id: 'att-5',
-    employeeId: 'EMP1005',
-    employeeName: 'Vikram Patel',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-    date: '2026-09-08',
-    checkIn: '09:10 AM',
-    checkOut: '06:00 PM',
-    breakDuration: '60 mins',
-    workingHours: '7h 50m',
-    status: 'Work From Home',
-    method: 'Web',
-    location: 'Home / Remote',
-  },
+  
+    
 ];
 
 export const mockAdminLeaveRequests: LeaveRequestAdmin[] = [
   {
     id: 'LR-1001',
     employeeId: 'EMP1001',
-    employeeName: 'Aarav Sharma',
+    employeeName: 'Suryabhan Singh Rathore',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
     leaveType: 'Casual Leave',
     startDate: '2026-09-12',
