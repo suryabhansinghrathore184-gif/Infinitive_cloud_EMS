@@ -2,10 +2,11 @@
 
 import React from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
-import { mockPerformanceReviews } from '@/data/modulesData';
-import { TrendingUp, Star, Award, Target } from 'lucide-react';
+import { Star, Target } from 'lucide-react';
 
 export default function PerformancePage() {
+  const reviews: any[] = [];
+
   return (
     <AdminLayout
       pageTitle="Performance Management"
@@ -39,38 +40,46 @@ export default function PerformancePage() {
         </div>
       </div>
 
-      {/* Reviews Table */}
+      {/* Reviews Table vs Empty State */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50 text-slate-500 font-semibold">
-              <th className="px-4 py-3.5">Employee</th>
-              <th className="px-4 py-3.5">Review Cycle</th>
-              <th className="px-4 py-3.5">Self Rating</th>
-              <th className="px-4 py-3.5">Manager Rating</th>
-              <th className="px-4 py-3.5">Final Score</th>
-              <th className="px-4 py-3.5">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {mockPerformanceReviews.map((rev) => (
-              <tr key={rev.id} className="hover:bg-slate-50/60">
-                <td className="px-4 py-3.5 font-bold text-slate-900">{rev.employeeName}</td>
-                <td className="px-4 py-3.5 text-slate-700">{rev.cycle}</td>
-                <td className="px-4 py-3.5 text-slate-700 font-medium">{rev.selfRating} / 5.0</td>
-                <td className="px-4 py-3.5 text-slate-700 font-medium">{rev.managerRating} / 5.0</td>
-                <td className="px-4 py-3.5 font-extrabold text-emerald-600 flex items-center gap-1">
-                  <Star className="h-3.5 w-3.5 fill-emerald-600 text-emerald-600" /> {rev.finalRating}
-                </td>
-                <td className="px-4 py-3.5">
-                  <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200">
-                    {rev.status}
-                  </span>
-                </td>
+        {reviews.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+              <Target className="h-6 w-6" />
+            </div>
+            <h4 className="mt-3 text-sm font-bold text-slate-800">No performance records yet</h4>
+            <p className="mt-1 max-w-xs text-xs text-slate-500">
+              Goal assessments, performance reviews, and manager rating cycles created by HR will appear here.
+            </p>
+          </div>
+        ) : (
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50 text-slate-500 font-semibold">
+                <th className="px-4 py-3.5">Employee</th>
+                <th className="px-4 py-3.5">Review Cycle</th>
+                <th className="px-4 py-3.5">Self Rating</th>
+                <th className="px-4 py-3.5">Manager Rating</th>
+                <th className="px-4 py-3.5">Final Score</th>
+                <th className="px-4 py-3.5">Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {reviews.map((rev) => (
+                <tr key={rev.id} className="hover:bg-slate-50/60">
+                  <td className="px-4 py-3.5 font-bold text-slate-900">{rev.employeeName}</td>
+                  <td className="px-4 py-3.5 text-slate-700">{rev.cycle}</td>
+                  <td className="px-4 py-3.5 text-slate-700 font-medium">{rev.selfRating} / 5.0</td>
+                  <td className="px-4 py-3.5 text-slate-700 font-medium">{rev.managerRating} / 5.0</td>
+                  <td className="px-4 py-3.5 font-extrabold text-emerald-600 flex items-center gap-1">
+                    <Star className="h-3.5 w-3.5 fill-emerald-600 text-emerald-600" /> {rev.finalRating}
+                  </td>
+                  <td className="px-4 py-3.5">{rev.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </AdminLayout>
   );

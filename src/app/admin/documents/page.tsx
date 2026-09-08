@@ -2,16 +2,21 @@
 
 import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
-import { mockEmployeeDocuments } from '@/data/modulesData';
-import { FileText, Lock, Upload, Download, Eye, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { useEmsStore } from '@/store/emsStore';
+import { FileText, Lock, Upload, Download, CheckCircle2 } from 'lucide-react';
+import { UploadDocumentModal } from '@/components/modals/UploadDocumentModal';
 
 export default function DocumentsPage() {
+  const { state, addDocument } = useEmsStore();
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
+
+  const documents = state.documents || [];
 
   return (
     <AdminLayout
@@ -36,61 +41,85 @@ export default function DocumentsPage() {
         </div>
 
         <button
-          onClick={() => showToast('Opening secure document upload dialog...')}
-          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-blue-700"
+          onClick={() => setIsUploadModalOpen(true)}
+          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-blue-700 active:scale-95"
         >
           <Upload className="h-4 w-4" />
           <span>Upload Document</span>
         </button>
       </div>
 
-      {/* Documents Table */}
+      {/* Documents Table vs Empty State */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50 text-slate-500 font-semibold">
-              <th className="px-4 py-3.5">Document Title</th>
-              <th className="px-4 py-3.5">Employee</th>
-              <th className="px-4 py-3.5">Category</th>
-              <th className="px-4 py-3.5">File Size</th>
-              <th className="px-4 py-3.5">Upload Date</th>
-              <th className="px-4 py-3.5">Access Role</th>
-              <th className="px-4 py-3.5 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {mockEmployeeDocuments.map((doc) => (
-              <tr key={doc.id} className="hover:bg-slate-50/60">
-                <td className="px-4 py-3.5 font-bold text-slate-900 flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-blue-600" />
-                  {doc.title}
-                </td>
-                <td className="px-4 py-3.5 text-slate-700 font-medium">{doc.employeeName}</td>
-                <td className="px-4 py-3.5">
-                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
-                    {doc.category}
-                  </span>
-                </td>
-                <td className="px-4 py-3.5 text-slate-500">{doc.fileSize}</td>
-                <td className="px-4 py-3.5 text-slate-500">{doc.uploadDate}</td>
-                <td className="px-4 py-3.5">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 border border-amber-200">
-                    <Lock className="h-2.5 w-2.5" /> {doc.accessRole}
-                  </span>
-                </td>
-                <td className="px-4 py-3.5 text-right">
-                  <button
-                    onClick={() => showToast(`Generating presigned URL for ${doc.fileName}...`)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <Download className="h-3.5 w-3.5 text-blue-600" /> Download
-                  </button>
-                </td>
+        {documents.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+              <FileText className="h-6 w-6" />
+            </div>
+            <h4 className="mt-3 text-sm font-bold text-slate-800">No documents uploaded yet</h4>
+            <p className="mt-1 max-w-xs text-xs text-slate-500">
+              Uploaded employee offer letters, appointment letters, and HR verification files will appear here.
+            </p>
+          </div>
+        ) : (
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50 text-slate-500 font-semibold">
+                <th className="px-4 py-3.5">Document Title</th>
+                <th className="px-4 py-3.5">Employee</th>
+                <th className="px-4 py-3.5">Category</th>
+                <th className="px-4 py-3.5">File Name</th>
+                <th className="px-4 py-3.5">File Size</th>
+                <th className="px-4 py-3.5">Upload Date</th>
+                <th className="px-4 py-3.5">Access Role</th>
+                <th className="px-4 py-3.5 text-right">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {documents.map((doc) => (
+                <tr key={doc.id} className="hover:bg-slate-50/60">
+                  <td className="px-4 py-3.5 font-bold text-slate-900 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-blue-600" />
+                    {doc.title}
+                  </td>
+                  <td className="px-4 py-3.5 text-slate-700 font-medium">{doc.employeeName}</td>
+                  <td className="px-4 py-3.5">
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                      {doc.category}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5 text-slate-600 font-mono text-[11px]">{doc.fileName}</td>
+                  <td className="px-4 py-3.5 text-slate-500">{doc.fileSize}</td>
+                  <td className="px-4 py-3.5 text-slate-500">{doc.uploadDate}</td>
+                  <td className="px-4 py-3.5">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 border border-amber-200">
+                      <Lock className="h-2.5 w-2.5" /> {doc.accessRole}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5 text-right">
+                    <button
+                      onClick={() => showToast(`Downloading ${doc.fileName}...`)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <Download className="h-3.5 w-3.5 text-blue-600" /> Download
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
+
+      <UploadDocumentModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        employees={state.employees}
+        onSave={(doc) => {
+          addDocument(doc);
+          showToast(`Document "${doc.title}" uploaded to vault successfully!`);
+        }}
+      />
     </AdminLayout>
   );
 }

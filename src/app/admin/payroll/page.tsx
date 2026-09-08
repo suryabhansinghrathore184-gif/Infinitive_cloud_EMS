@@ -2,12 +2,11 @@
 
 import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
-import { mockPayrollRecords } from '@/data/modulesData';
-import { PayrollRecord } from '@/types/admin';
-import { CreditCard, Lock, CheckCircle2, FileText, Download, Play } from 'lucide-react';
+import { useEmsStore } from '@/store/emsStore';
+import { Lock, CheckCircle2, FileText, Play, CreditCard } from 'lucide-react';
 
 export default function PayrollPage() {
-  const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>(mockPayrollRecords);
+  const { state } = useEmsStore();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -15,7 +14,8 @@ export default function PayrollPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const totalDisbursed = payrollRecords.reduce((acc, curr) => acc + curr.netSalary, 0);
+  const employees = state.employees;
+  const totalDisbursed = 0;
 
   return (
     <AdminLayout
@@ -46,7 +46,7 @@ export default function PayrollPage() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => showToast('Initiated August 2026 Payroll Calculation Engine...')}
+            onClick={() => showToast('Initiating Payroll Calculation Engine...')}
             className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-blue-700"
           >
             <Play className="h-4 w-4" />
@@ -78,81 +78,77 @@ export default function PayrollPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <span className="text-xs font-semibold text-slate-500">TOTAL NET PAYROLL</span>
           <p className="mt-2 text-2xl font-extrabold text-slate-900">₹{totalDisbursed.toLocaleString('en-IN')}</p>
-          <span className="text-[10px] text-slate-400">Pay Period: August 2026</span>
+          <span className="text-[10px] text-slate-400">Current Cycle</span>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <span className="text-xs font-semibold text-slate-500">STATUTORY DEDUCTIONS</span>
-          <p className="mt-2 text-2xl font-extrabold text-slate-900">₹73,000</p>
+          <p className="mt-2 text-2xl font-extrabold text-slate-900">₹0</p>
           <span className="text-[10px] text-slate-400">PF + PT + TDS Income Tax</span>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <span className="text-xs font-semibold text-slate-500">PAYSLIPS GENERATED</span>
-          <p className="mt-2 text-2xl font-extrabold text-emerald-600">1,248 / 1,248</p>
-          <span className="text-[10px] text-emerald-600 font-semibold">100% Ready for Disbursal</span>
+          <p className="mt-2 text-2xl font-extrabold text-emerald-600">0 / {employees.length}</p>
+          <span className="text-[10px] text-slate-400">Ready for Disbursal</span>
         </div>
       </div>
 
-      {/* Payroll Table */}
+      {/* Payroll Table vs Empty State */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50 text-slate-500 font-semibold">
-              <th className="px-4 py-3.5">Employee</th>
-              <th className="px-4 py-3.5">Basic + HRA</th>
-              <th className="px-4 py-3.5">Allowances & Overtime</th>
-              <th className="px-4 py-3.5">Gross Salary</th>
-              <th className="px-4 py-3.5">Total Deductions</th>
-              <th className="px-4 py-3.5">Net Disbursed</th>
-              <th className="px-4 py-3.5">Status</th>
-              <th className="px-4 py-3.5 text-right">Payslip</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {payrollRecords.map((pay) => (
-              <tr key={pay.id} className="hover:bg-slate-50/60">
-                <td className="px-4 py-3.5">
-                  <div className="flex items-center gap-3">
-                    <img src={pay.avatar} alt={pay.employeeName} className="h-8 w-8 rounded-full object-cover" />
-                    <div>
-                      <p className="font-bold text-slate-900">{pay.employeeName}</p>
-                      <p className="text-[10px] text-slate-400">{pay.employeeId}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3.5 font-medium text-slate-800">
-                  ₹{(pay.basicSalary + pay.hra).toLocaleString('en-IN')}
-                </td>
-                <td className="px-4 py-3.5 text-slate-700">
-                  ₹{(pay.allowances + pay.overtimePay).toLocaleString('en-IN')}
-                </td>
-                <td className="px-4 py-3.5 font-bold text-slate-900">
-                  ₹{pay.grossSalary.toLocaleString('en-IN')}
-                </td>
-                <td className="px-4 py-3.5 text-rose-600 font-semibold">
-                  -₹{(pay.pfDeduction + pay.ptDeduction + pay.taxDeduction).toLocaleString('en-IN')}
-                </td>
-                <td className="px-4 py-3.5 font-extrabold text-emerald-600">
-                  ₹{pay.netSalary.toLocaleString('en-IN')}
-                </td>
-                <td className="px-4 py-3.5">
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-200">
-                    {pay.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3.5 text-right">
-                  <button
-                    onClick={() => showToast(`Downloading Payslip for ${pay.employeeName}`)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <FileText className="h-3.5 w-3.5 text-blue-600" /> PDF
-                  </button>
-                </td>
+        {employees.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+              <CreditCard className="h-6 w-6" />
+            </div>
+            <h4 className="mt-3 text-sm font-bold text-slate-800">No payroll records yet</h4>
+            <p className="mt-1 max-w-xs text-xs text-slate-500">
+              Add employees and process salary runs to generate monthly payroll records and payslips.
+            </p>
+          </div>
+        ) : (
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50 text-slate-500 font-semibold">
+                <th className="px-4 py-3.5">Employee</th>
+                <th className="px-4 py-3.5">Department</th>
+                <th className="px-4 py-3.5">Designation</th>
+                <th className="px-4 py-3.5">Status</th>
+                <th className="px-4 py-3.5 text-right">Payslip</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {employees.map((emp) => (
+                <tr key={emp.id} className="hover:bg-slate-50/60">
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <img src={emp.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80'} alt={emp.firstName} className="h-8 w-8 rounded-full object-cover" />
+                      <div>
+                        <p className="font-bold text-slate-900">{emp.firstName} {emp.lastName}</p>
+                        <p className="text-[10px] text-slate-400">{emp.employeeId}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3.5 text-slate-700">{emp.department}</td>
+                  <td className="px-4 py-3.5 text-slate-700">{emp.designation}</td>
+                  <td className="px-4 py-3.5">
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-200">
+                      {emp.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5 text-right">
+                    <button
+                      onClick={() => showToast(`Generating Payslip for ${emp.firstName} ${emp.lastName}`)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <FileText className="h-3.5 w-3.5 text-blue-600" /> PDF
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </AdminLayout>
   );

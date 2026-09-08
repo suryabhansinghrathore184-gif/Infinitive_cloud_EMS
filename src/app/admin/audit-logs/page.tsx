@@ -2,10 +2,13 @@
 
 import React from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
-import { mockAuditLogs } from '@/data/modulesData';
-import { ShieldAlert, Lock, Search, Filter } from 'lucide-react';
+import { useEmsStore } from '@/store/emsStore';
+import { Lock, Inbox } from 'lucide-react';
 
 export default function AuditLogsPage() {
+  const { state } = useEmsStore();
+  const activities = state.activities;
+
   return (
     <AdminLayout
       pageTitle="System Audit Logs"
@@ -25,43 +28,40 @@ export default function AuditLogsPage() {
         </div>
       </div>
 
-      {/* Audit Log Table */}
+      {/* Audit Log Table vs Empty State */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-900 text-slate-200 font-semibold">
-              <th className="px-4 py-3.5">Timestamp</th>
-              <th className="px-4 py-3.5">User</th>
-              <th className="px-4 py-3.5">Action & Module</th>
-              <th className="px-4 py-3.5">Target Entity</th>
-              <th className="px-4 py-3.5">Change Value (Old → New)</th>
-              <th className="px-4 py-3.5 text-right">IP Address</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {mockAuditLogs.map((log) => (
-              <tr key={log.id} className="hover:bg-slate-50/60 font-mono text-[11px]">
-                <td className="px-4 py-3.5 text-slate-500">{log.timestamp}</td>
-                <td className="px-4 py-3.5 font-bold text-slate-900">{log.user}</td>
-                <td className="px-4 py-3.5">
-                  <p className="font-bold text-blue-600">{log.action}</p>
-                  <p className="text-[10px] text-slate-400 font-sans">{log.module}</p>
-                </td>
-                <td className="px-4 py-3.5 text-slate-800 font-sans font-medium">{log.entity}</td>
-                <td className="px-4 py-3.5">
-                  {log.oldValue ? (
-                    <span className="text-slate-600">
-                      <span className="text-rose-600">{log.oldValue}</span> → <span className="text-emerald-600">{log.newValue}</span>
-                    </span>
-                  ) : (
-                    <span className="text-slate-400 font-sans italic">Read/Access Event</span>
-                  )}
-                </td>
-                <td className="px-4 py-3.5 text-right text-slate-500">{log.ipAddress}</td>
+        {activities.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+              <Inbox className="h-6 w-6" />
+            </div>
+            <h4 className="mt-3 text-sm font-bold text-slate-800">No activity recorded yet</h4>
+            <p className="mt-1 max-w-xs text-xs text-slate-500">
+              Admin operations, employee data changes, and system audit events will stream live here.
+            </p>
+          </div>
+        ) : (
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-900 text-slate-200 font-semibold">
+                <th className="px-4 py-3.5">Timestamp</th>
+                <th className="px-4 py-3.5">User</th>
+                <th className="px-4 py-3.5">Action & Module</th>
+                <th className="px-4 py-3.5">Category</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {activities.map((act) => (
+                <tr key={act.id} className="hover:bg-slate-50/60 font-mono text-[11px]">
+                  <td className="px-4 py-3.5 text-slate-500">{act.timestamp}</td>
+                  <td className="px-4 py-3.5 font-bold text-slate-900">{act.user}</td>
+                  <td className="px-4 py-3.5 font-bold text-blue-600 font-sans">{act.action}</td>
+                  <td className="px-4 py-3.5 text-slate-500 font-sans uppercase text-[10px]">{act.category}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </AdminLayout>
   );

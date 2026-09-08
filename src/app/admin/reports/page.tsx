@@ -2,33 +2,31 @@
 
 import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
-import { BarChart3, Download, FileSpreadsheet, FileText, Filter, PieChart as PieIcon, TrendingUp } from 'lucide-react';
+import { useEmsStore } from '@/store/emsStore';
+import { Download, FileSpreadsheet, FileText, BarChart3 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts';
 
-const deptDistribution = [
-  { name: 'Engineering & IT', count: 420, color: '#2563eb' },
-  { name: 'Sales & BD', count: 310, color: '#10b981' },
-  { name: 'Operations', count: 268, color: '#f59e0b' },
-  { name: 'Marketing', count: 120, color: '#8b5cf6' },
-  { name: 'Finance', count: 85, color: '#ec4899' },
-  { name: 'HR', count: 45, color: '#06b6d4' },
-];
-
-const salaryRangeData = [
-  { range: '0-3L', count: 120 },
-  { range: '3-6L', count: 340 },
-  { range: '6-10L', count: 410 },
-  { range: '10-15L', count: 220 },
-  { range: '15L+', count: 158 },
-];
+const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
 
 export default function ReportsPage() {
+  const { state } = useEmsStore();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const triggerExport = (format: string, reportName: string) => {
     setToastMessage(`Exporting ${reportName} in ${format} format...`);
     setTimeout(() => setToastMessage(null), 3000);
   };
+
+  const departments = state.departments;
+  const employees = state.employees;
+
+  const deptDistribution = departments.map((d, index) => ({
+    name: d.name,
+    count: employees.filter((e) => e.department === d.name).length,
+    color: COLORS[index % COLORS.length],
+  }));
+
+  const hasData = employees.length > 0 || departments.length > 0;
 
   return (
     <AdminLayout
@@ -90,50 +88,62 @@ export default function ReportsPage() {
         ))}
       </div>
 
-      {/* Analytics Charts Grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Chart 1: Department Distribution */}
-        <div className="lg:col-span-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-900 mb-1">Department Distribution</h3>
-          <p className="text-xs text-slate-500 mb-4">Headcount breakdown per business unit</p>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={deptDistribution}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={85}
-                  paddingAngle={3}
-                  dataKey="count"
-                >
-                  {deptDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+      {/* Analytics Charts Grid vs Empty State */}
+      {!hasData ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-xs text-slate-500">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 mx-auto">
+            <BarChart3 className="h-6 w-6" />
           </div>
+          <h4 className="mt-3 text-sm font-bold text-slate-800">No data available for this report</h4>
+          <p className="mt-1 max-w-xs mx-auto text-xs text-slate-500">
+            Add company employees and organization units to visualize analytics and executive reporting charts.
+          </p>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* Chart 1: Department Distribution */}
+          <div className="lg:col-span-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 mb-1">Department Distribution</h3>
+            <p className="text-xs text-slate-500 mb-4">Headcount breakdown per business unit</p>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={deptDistribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={85}
+                    paddingAngle={3}
+                    dataKey="count"
+                  >
+                    {deptDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
 
-        {/* Chart 2: Salary Distribution */}
-        <div className="lg:col-span-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-900 mb-1">Salary Range Distribution</h3>
-          <p className="text-xs text-slate-500 mb-4">Employee count across CTC bands</p>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={salaryRangeData}>
-                <XAxis dataKey="range" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#2563eb" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          {/* Chart 2: Salary Distribution */}
+          <div className="lg:col-span-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 mb-1">Headcount by Department</h3>
+            <p className="text-xs text-slate-500 mb-4">Real department employee count</p>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={deptDistribution}>
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#2563eb" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </AdminLayout>
   );
 }

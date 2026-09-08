@@ -10,11 +10,13 @@ import {
   LeaveRequestAdmin,
   RecentActivityItem,
   AnnouncementItem,
+  EmployeeDocument,
 } from '@/types/admin';
 import { HolidayEvent } from '@/types/dashboard';
 import { mockEmployees, mockDepartments, mockDesignations, mockLocations } from '@/data/employees';
 import { mockAttendanceRecords, mockAdminLeaveRequests } from '@/data/attendance';
 import { mockHolidayEvents, mockAnnouncements, mockRecentActivities } from '@/data/dashboard';
+import { mockEmployeeDocuments } from '@/data/modulesData';
 
 export interface CompanyInfo {
   name: string;
@@ -50,6 +52,7 @@ export interface EmsDataState {
   holidays: HolidayEvent[];
   announcements: AnnouncementItem[];
   activities: RecentActivityItem[];
+  documents: EmployeeDocument[];
   isDemoData: boolean;
 }
 
@@ -79,6 +82,7 @@ const cleanInitialState: EmsDataState = {
   holidays: [],
   announcements: [],
   activities: [],
+  documents: [],
   isDemoData: false,
 };
 
@@ -250,6 +254,20 @@ export function useEmsStore() {
     logActivity('Admin', `configured leave type "${created.name}" (${created.allowanceDays} Days)`);
   };
 
+  // 7. ADD DOCUMENT
+  const addDocument = (doc: Omit<EmployeeDocument, 'id' | 'uploadDate'>) => {
+    const created: EmployeeDocument = {
+      ...doc,
+      id: `doc-${Date.now()}`,
+      uploadDate: new Date().toISOString().split('T')[0],
+    };
+    setState((prev) => ({
+      ...prev,
+      documents: [created, ...(prev.documents || [])],
+    }));
+    logActivity('Admin', `uploaded document "${created.title}" for ${created.employeeName}`, 'policy');
+  };
+
   const importEmployees = (batch: Omit<Employee, 'id'>[]): { added: number; skippedDuplicates: number; message: string } => {
     let importedCount = 0;
     let skippedDuplicates = 0;
@@ -328,6 +346,7 @@ export function useEmsStore() {
       holidays: mockHolidayEvents,
       announcements: mockAnnouncements,
       activities: mockRecentActivities,
+      documents: mockEmployeeDocuments,
       isDemoData: true,
     });
   };
@@ -357,6 +376,7 @@ export function useEmsStore() {
     addHoliday,
     createAnnouncement,
     addLeaveType,
+    addDocument,
     importEmployees,
     clearAllData,
     clearSeedData: clearAllData,
