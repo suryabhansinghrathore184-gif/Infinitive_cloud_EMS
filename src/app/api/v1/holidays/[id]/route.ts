@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { HolidayController } from '@/modules/holidays/holiday.controller';
 
+export const dynamic = 'force-dynamic';
+
 const controller = new HolidayController();
 
 // GET /api/v1/holidays/:id

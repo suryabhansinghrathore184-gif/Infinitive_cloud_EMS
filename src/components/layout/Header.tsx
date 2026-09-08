@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import {
   Search,
   Bell,
@@ -11,17 +12,24 @@ import {
   Settings,
   LogOut,
   ShieldCheck,
-  Check,
 } from 'lucide-react';
-import { mockUserData } from '@/data/dashboard';
+import { useEmsStore } from '@/store/emsStore';
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
+  const { state } = useEmsStore();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  const adminUser = state.adminUser || {
+    name: 'Admin',
+    email: 'admin@organization.com',
+    role: 'HR Administrator',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6">
@@ -57,14 +65,6 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
       {/* Right Actions */}
       <div className="flex items-center gap-3">
-        {/* Mobile Search Icon Button */}
-        <button
-          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 md:hidden"
-          aria-label="Search"
-        >
-          <Search className="h-5 w-5" />
-        </button>
-
         {/* Help Icon */}
         <button
           className="relative rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
@@ -92,24 +92,10 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-slate-200 bg-white py-2 shadow-xl">
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
                 <span className="text-sm font-semibold text-slate-800">Notifications</span>
-                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600">3 New</span>
+                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600">Live</span>
               </div>
-              <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 text-xs">
-                <div className="p-3 hover:bg-slate-50">
-                  <p className="font-medium text-slate-800">Leave Request Approved</p>
-                  <p className="text-slate-500">Rajesh approved Sneha&apos;s sick leave request.</p>
-                  <span className="mt-1 block text-[10px] text-slate-400">10m ago</span>
-                </div>
-                <div className="p-3 hover:bg-slate-50">
-                  <p className="font-medium text-slate-800">New Employee Joined</p>
-                  <p className="text-slate-500">Ananya Roy onboarded to Engineering department.</p>
-                  <span className="mt-1 block text-[10px] text-slate-400">1h ago</span>
-                </div>
-                <div className="p-3 hover:bg-slate-50">
-                  <p className="font-medium text-slate-800">Attendance Report Ready</p>
-                  <p className="text-slate-500">Monthly attendance summary generated.</p>
-                  <span className="mt-1 block text-[10px] text-slate-400">3h ago</span>
-                </div>
+              <div className="p-4 text-center text-xs text-slate-500">
+                System notifications will stream live here as events occur.
               </div>
             </div>
           )}
@@ -125,20 +111,19 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           >
             {/* Avatar */}
             <div className="relative h-9 w-9 overflow-hidden rounded-full ring-2 ring-blue-500/30">
-              {/* eslint-disable-next-html-loader */}
               <img
-                src={mockUserData.avatar}
-                alt={mockUserData.name}
+                src={adminUser.avatar}
+                alt={adminUser.name}
                 className="h-full w-full object-cover"
               />
               <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
             </div>
             <div className="hidden text-left sm:block">
               <div className="flex items-center gap-1">
-                <span className="text-sm font-semibold text-slate-900">{mockUserData.name}</span>
+                <span className="text-sm font-semibold text-slate-900">{adminUser.name}</span>
                 <ShieldCheck className="h-4 w-4 text-blue-600" />
               </div>
-              <p className="text-xs text-slate-500">{mockUserData.role}</p>
+              <p className="text-xs text-slate-500">{adminUser.role}</p>
             </div>
             <ChevronDown className="hidden h-4 w-4 text-slate-400 sm:block" />
           </button>
@@ -147,24 +132,26 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           {isProfileOpen && (
             <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
               <div className="border-b border-slate-100 px-3 py-2">
-                <p className="text-xs font-semibold text-slate-900">{mockUserData.name}</p>
-                <p className="text-[11px] text-slate-500">{mockUserData.email}</p>
+                <p className="text-xs font-semibold text-slate-900">{adminUser.name}</p>
+                <p className="text-[11px] text-slate-500">{adminUser.email}</p>
               </div>
               <div className="py-1 text-xs text-slate-700">
-                <button
+                <Link
+                  href="/admin/settings"
                   onClick={() => setIsProfileOpen(false)}
                   className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 hover:bg-slate-100"
                 >
                   <User className="h-4 w-4 text-slate-500" />
-                  <span>My Profile</span>
-                </button>
-                <button
+                  <span>My Profile & Photo</span>
+                </Link>
+                <Link
+                  href="/admin/settings"
                   onClick={() => setIsProfileOpen(false)}
                   className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 hover:bg-slate-100"
                 >
                   <Settings className="h-4 w-4 text-slate-500" />
                   <span>Account Settings</span>
-                </button>
+                </Link>
               </div>
               <div className="border-t border-slate-100 pt-1 text-xs text-rose-600">
                 <button

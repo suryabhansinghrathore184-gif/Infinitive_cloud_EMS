@@ -11,12 +11,14 @@ import {
   RecentActivityItem,
   AnnouncementItem,
   EmployeeDocument,
+  JobOpening,
+  Candidate,
 } from '@/types/admin';
 import { HolidayEvent } from '@/types/dashboard';
 import { mockEmployees, mockDepartments, mockDesignations, mockLocations } from '@/data/employees';
 import { mockAttendanceRecords, mockAdminLeaveRequests } from '@/data/attendance';
 import { mockHolidayEvents, mockAnnouncements, mockRecentActivities } from '@/data/dashboard';
-import { mockEmployeeDocuments } from '@/data/modulesData';
+import { mockEmployeeDocuments, mockJobOpenings, mockCandidates } from '@/data/modulesData';
 
 export interface CompanyInfo {
   name: string;
@@ -40,8 +42,17 @@ export interface LeaveTypeConfig {
   isPaid: boolean;
 }
 
+export interface AdminUserProfile {
+  name: string;
+  email: string;
+  role: string;
+  avatar: string;
+  phone: string;
+}
+
 export interface EmsDataState {
   company: CompanyInfo;
+  adminUser: AdminUserProfile;
   employees: Employee[];
   departments: Department[];
   designations: Designation[];
@@ -53,6 +64,8 @@ export interface EmsDataState {
   announcements: AnnouncementItem[];
   activities: RecentActivityItem[];
   documents: EmployeeDocument[];
+  jobs: JobOpening[];
+  candidates: Candidate[];
   isDemoData: boolean;
 }
 
@@ -72,6 +85,13 @@ const cleanInitialState: EmsDataState = {
     contactEmail: 'admin@organization.com',
     contactPhone: '+91 22 1000 2000',
   },
+  adminUser: {
+    name: 'Admin',
+    email: 'admin@organization.com',
+    role: 'HR Administrator',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
+    phone: '+91 98765 43210',
+  },
   employees: [],
   departments: [],
   designations: [],
@@ -83,6 +103,8 @@ const cleanInitialState: EmsDataState = {
   announcements: [],
   activities: [],
   documents: [],
+  jobs: [],
+  candidates: [],
   isDemoData: false,
 };
 
@@ -282,6 +304,24 @@ export function useEmsStore() {
     logActivity('Admin', `logged attendance for ${rec.employeeName} (${rec.status})`, 'employee');
   };
 
+  // 9. UPDATE ADMIN PROFILE
+  const updateAdminProfile = (updated: Partial<AdminUserProfile>) => {
+    setState((prev) => ({
+      ...prev,
+      adminUser: {
+        ...(prev.adminUser || {
+          name: 'Admin',
+          email: 'admin@organization.com',
+          role: 'HR Administrator',
+          avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
+          phone: '+91 98765 43210',
+        }),
+        ...updated,
+      },
+    }));
+    logActivity('Admin', 'updated Admin profile photo & account details');
+  };
+
   const importEmployees = (batch: Omit<Employee, 'id'>[]): { added: number; skippedDuplicates: number; message: string } => {
     let importedCount = 0;
     let skippedDuplicates = 0;
@@ -327,6 +367,41 @@ export function useEmsStore() {
     };
   };
 
+  const addJobOpening = (newJob: Omit<JobOpening, 'id' | 'postedDate' | 'candidatesCount'>) => {
+    const created: JobOpening = {
+      ...newJob,
+      id: `job-${Date.now()}`,
+      postedDate: new Date().toISOString().split('T')[0],
+      candidatesCount: 0,
+    };
+    setState((prev) => ({
+      ...prev,
+      jobs: [created, ...(prev.jobs || [])],
+    }));
+    logActivity('Admin', `created job requisition "${created.jobTitle}" in ${created.department}`);
+    return created;
+  };
+
+  const addCandidate = (newCand: Omit<Candidate, 'id' | 'appliedDate'>) => {
+    const created: Candidate = {
+      ...newCand,
+      id: `cand-${Date.now()}`,
+      appliedDate: new Date().toISOString().split('T')[0],
+    };
+    setState((prev) => {
+      const updatedJobs = (prev.jobs || []).map((j) =>
+        j.id === created.jobId ? { ...j, candidatesCount: (j.candidatesCount || 0) + 1 } : j
+      );
+      return {
+        ...prev,
+        jobs: updatedJobs,
+        candidates: [created, ...(prev.candidates || [])],
+      };
+    });
+    logActivity('Admin', `added candidate ${created.name} for ${created.jobTitle}`, 'employee');
+    return created;
+  };
+
   // Reset & Seed Controls
   const clearAllData = () => {
     setState(cleanInitialState);
@@ -347,6 +422,13 @@ export function useEmsStore() {
         contactEmail: 'hr@infinitivecloud.com',
         contactPhone: '+91 22 6789 0000',
       },
+      adminUser: {
+        name: 'Admin',
+        email: 'admin@infinitivecloud.com',
+        role: 'HR Administrator',
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
+        phone: '+91 22 6789 0000',
+      },
       employees: mockEmployees,
       departments: mockDepartments,
       designations: mockDesignations,
@@ -361,6 +443,8 @@ export function useEmsStore() {
       announcements: mockAnnouncements,
       activities: mockRecentActivities,
       documents: mockEmployeeDocuments,
+      jobs: mockJobOpenings,
+      candidates: mockCandidates,
       isDemoData: true,
     });
   };
@@ -392,6 +476,9 @@ export function useEmsStore() {
     addLeaveType,
     addDocument,
     addAttendanceRecord,
+    addJobOpening,
+    addCandidate,
+    updateAdminProfile,
     importEmployees,
     clearAllData,
     clearSeedData: clearAllData,
