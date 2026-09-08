@@ -3,21 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import {
   Calendar as CalendarIcon,
-  Flag,
-  Sparkles,
-  Building2,
   ChevronLeft,
   ChevronRight,
-  CalendarDays,
-  ListFilter,
   Plus,
   Trash2,
-  Edit,
   CheckCircle2,
-  Filter,
   X,
+  Sparkles,
+  Flag,
+  Building2,
 } from 'lucide-react';
-import { format, addMonths, subMonths, parseISO } from 'date-fns';
+import { format, addMonths, subMonths } from 'date-fns';
 import { holidayService } from '@/services/holidayService';
 import { ApiHolidayResponseItem, HolidayCategoryType } from '@/modules/holidays/holiday.entity';
 import { getCalendarGrid, CalendarDayCell } from '@/utils/dateUtils';
@@ -26,11 +22,9 @@ import { CreateHolidayDto } from '@/modules/holidays/holiday.dto';
 export const UpcomingEvents: React.FC = () => {
   const [activeMonthDate, setActiveMonthDate] = useState<Date>(new Date());
   const [holidays, setHolidays] = useState<ApiHolidayResponseItem[]>([]);
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [selectedDateEvents, setSelectedDateEvents] = useState<ApiHolidayResponseItem[] | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   // Admin Add Holiday Form State
   const [newHoliday, setNewHoliday] = useState<CreateHolidayDto>({
@@ -51,21 +45,14 @@ export const UpcomingEvents: React.FC = () => {
 
   // Fetch holidays dynamically from API / Service for active year
   const loadHolidays = async () => {
-    setIsLoading(true);
     const selectedYear = activeMonthDate.getFullYear();
     const data = await holidayService.getHolidays(selectedYear, { country: 'IN' });
     setHolidays(data);
-    setIsLoading(false);
   };
 
   useEffect(() => {
     loadHolidays();
   }, [activeMonthDate]);
-
-  const filteredHolidays = holidays.filter((h) => {
-    if (selectedCategory === 'ALL') return true;
-    return h.category === selectedCategory;
-  });
 
   const calendarGrid: CalendarDayCell[] = getCalendarGrid(activeMonthDate, holidays);
 
@@ -104,36 +91,8 @@ export const UpcomingEvents: React.FC = () => {
     const res = await holidayService.deleteHoliday(id);
     if (res.success) {
       showToast(`Deleted "${name}" from holiday schedule.`);
+      setSelectedDateEvents(null);
       loadHolidays();
-    }
-  };
-
-  const getCategoryBadgeStyle = (category: string) => {
-    switch (category) {
-      case 'NATIONAL_HOLIDAY':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'COMPANY_FESTIVAL':
-        return 'bg-purple-50 text-purple-700 border-purple-200';
-      case 'COMPANY_HOLIDAY':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'OPTIONAL_HOLIDAY':
-        return 'bg-slate-100 text-slate-700 border-slate-200';
-      case 'PUBLIC_HOLIDAY':
-      default:
-        return 'bg-blue-50 text-blue-700 border-blue-200';
-    }
-  };
-
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'NATIONAL_HOLIDAY':
-        return <Flag className="h-4 w-4 text-emerald-600" />;
-      case 'COMPANY_FESTIVAL':
-        return <Sparkles className="h-4 w-4 text-purple-600" />;
-      case 'COMPANY_HOLIDAY':
-        return <Building2 className="h-4 w-4 text-amber-600" />;
-      default:
-        return <CalendarIcon className="h-4 w-4 text-blue-600" />;
     }
   };
 
@@ -149,41 +108,23 @@ export const UpcomingEvents: React.FC = () => {
         </div>
       )}
 
-      {/* Card Header & Controls */}
+      {/* Card Header */}
       <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-4 gap-2">
         <div>
-          <h3 className="text-base font-bold text-slate-900">Upcoming Holidays & Festivals</h3>
+          <h3 className="text-base font-bold text-slate-900">Holiday Calendar</h3>
           <p className="text-xs text-slate-500">
-            Official company calendar for {format(activeMonthDate, 'MMMM yyyy')}
+            {format(activeMonthDate, 'MMMM yyyy')} • {holidays.length} Scheduled Holidays
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-blue-700"
-            title="Add New Holiday"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add</span>
-          </button>
-          <button
-            onClick={() => setViewMode(viewMode === 'list' ? 'calendar' : 'list')}
-            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-          >
-            {viewMode === 'list' ? (
-              <>
-                <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
-                <span>Calendar</span>
-              </>
-            ) : (
-              <>
-                <ListFilter className="h-3.5 w-3.5 text-blue-600" />
-                <span>List View</span>
-              </>
-            )}
-          </button>
-        </div>
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 active:scale-95"
+          title="Add New Holiday"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          <span>Add Holiday</span>
+        </button>
       </div>
 
       {/* Month Navigation Control Bar */}
@@ -215,125 +156,94 @@ export const UpcomingEvents: React.FC = () => {
         </button>
       </div>
 
-      {/* Category Filter Bar */}
-      <div className="mt-3 flex items-center gap-1.5 overflow-x-auto text-[11px]">
-        {['ALL', 'PUBLIC_HOLIDAY', 'NATIONAL_HOLIDAY', 'COMPANY_FESTIVAL', 'OPTIONAL_HOLIDAY'].map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`rounded-lg px-2.5 py-1 font-semibold whitespace-nowrap transition-colors ${
-              selectedCategory === cat
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {cat.replace('_', ' ')}
-          </button>
-        ))}
-      </div>
-
-      {/* VIEW 1: MONTH CALENDAR GRID */}
-      {viewMode === 'calendar' ? (
-        <div className="mt-4">
-          <div className="grid grid-cols-7 text-center text-[11px] font-bold text-slate-400">
-            {weekDayNames.map((day) => (
-              <div key={day} className="py-1">
-                {day}
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-1 grid grid-cols-7 gap-1 text-center text-xs">
-            {calendarGrid.map((cell, idx) => (
-              <div
-                key={idx}
-                className={`relative flex flex-col items-center justify-center rounded-xl p-2 ${
-                  cell.isToday
-                    ? 'bg-blue-600 text-white font-bold shadow-md ring-2 ring-blue-400/50'
-                    : cell.isCurrentMonth
-                    ? 'text-slate-800 hover:bg-slate-100'
-                    : 'text-slate-300'
-                }`}
-              >
-                <span>{cell.dayNumber}</span>
-                {cell.hasEvent && (
-                  <span
-                    className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
-                      cell.isToday ? 'bg-white' : 'bg-purple-600'
-                    }`}
-                  ></span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        /* VIEW 2: HOLIDAY EVENTS LIST (Dynamic API Data) */
-        <div className="mt-4 space-y-3">
-          {isLoading ? (
-            <div className="p-6 text-center text-xs text-slate-400 animate-pulse">
-              Loading API Holiday Schedule...
+      {/* MONTH CALENDAR GRID ONLY (List Removed) */}
+      <div className="mt-4">
+        {/* Weekday Headers */}
+        <div className="grid grid-cols-7 text-center text-[11px] font-bold text-slate-400">
+          {weekDayNames.map((day) => (
+            <div key={day} className="py-1">
+              {day}
             </div>
-          ) : filteredHolidays.length > 0 ? (
-            filteredHolidays.map((event) => (
-              <div
-                key={event.id}
-                className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 p-3 transition-all hover:bg-slate-100/70"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white border border-slate-200">
-                    {getCategoryIcon(event.category)}
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">{event.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span
-                        className={`inline-flex items-center rounded-md border px-1.5 py-0.2 text-[10px] font-semibold ${getCategoryBadgeStyle(
-                          event.category
-                        )}`}
-                      >
-                        {event.category.replace('_', ' ')}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-medium">
-                        {event.dayOfWeek}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+          ))}
+        </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="text-right">
-                    <span className="block rounded-lg border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-900">
-                      {event.date}
-                    </span>
-                    <span className="mt-0.5 block text-[10px] font-semibold text-blue-600">
-                      {event.relativeLabel}
-                    </span>
+        {/* Days Grid */}
+        <div className="mt-1 grid grid-cols-7 gap-1 text-center text-xs">
+          {calendarGrid.map((cell, idx) => (
+            <button
+              key={idx}
+              onClick={() => {
+                if (cell.hasEvent) {
+                  const matched = holidays.filter(
+                    (h) => h.date.split('T')[0] === cell.dateString
+                  );
+                  setSelectedDateEvents(matched);
+                } else {
+                  setSelectedDateEvents(null);
+                }
+              }}
+              className={`relative flex flex-col items-center justify-center rounded-xl p-2.5 transition-all ${
+                cell.isToday
+                  ? 'bg-blue-600 text-white font-bold shadow-md ring-2 ring-blue-400/50'
+                  : cell.isCurrentMonth
+                  ? 'text-slate-800 hover:bg-slate-100'
+                  : 'text-slate-300'
+              }`}
+            >
+              <span>{cell.dayNumber}</span>
+              {cell.hasEvent && (
+                <span
+                  className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
+                    cell.isToday ? 'bg-white' : 'bg-purple-600 animate-pulse'
+                  }`}
+                ></span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Selected Date Event Popover */}
+        {selectedDateEvents && selectedDateEvents.length > 0 && (
+          <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50/70 p-3.5 text-xs text-purple-900 animate-fade-in">
+            <div className="flex items-center justify-between border-b border-purple-200/60 pb-2">
+              <span className="font-bold flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-purple-600" />
+                Scheduled Event ({selectedDateEvents[0].date})
+              </span>
+              <button
+                onClick={() => setSelectedDateEvents(null)}
+                className="text-purple-600 hover:text-purple-900"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-2 space-y-2">
+              {selectedDateEvents.map((evt) => (
+                <div key={evt.id} className="flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-slate-900">{evt.name}</p>
+                    <p className="text-[10px] text-purple-700">{evt.category.replace('_', ' ')} • {evt.dayOfWeek}</p>
                   </div>
                   <button
-                    onClick={() => handleDeleteHoliday(event.id, event.name)}
-                    className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                    onClick={() => handleDeleteHoliday(evt.id, evt.name)}
+                    className="rounded-lg p-1 text-rose-600 hover:bg-rose-100"
                     title="Delete Holiday"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
-              </div>
-            ))
-          ) : (
-            <div className="p-6 text-center text-xs text-slate-400">
-              No holiday records found for this filter.
+              ))}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       {/* ADMIN ADD HOLIDAY MODAL */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-5 text-xs text-slate-800">
             <div className="flex items-center justify-between border-b pb-3 font-bold text-sm text-slate-900">
-              <span>Add Holiday to Master API Schedule</span>
+              <span>Add Holiday to Master Calendar</span>
               <button onClick={() => setIsAddModalOpen(false)}>
                 <X className="h-4 w-4 text-slate-400" />
               </button>
