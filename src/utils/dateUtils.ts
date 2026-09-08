@@ -10,9 +10,10 @@ import {
   eachDayOfInterval,
   isSameMonth,
   isSameDay,
-  addMonths,
-  subMonths,
+  parseISO,
 } from 'date-fns';
+import { holidayService } from '@/services/holidayService';
+import { ApiHolidayResponseItem } from '@/modules/holidays/holiday.entity';
 
 export interface CalendarDayCell {
   date: Date;
@@ -23,69 +24,37 @@ export interface CalendarDayCell {
   hasEvent: boolean;
 }
 
-export interface DynamicHolidayEvent {
-  id: string;
-  name: string;
-  category: 'National Holiday' | 'Public Holiday' | 'Company Festival' | 'Mandatory Holiday';
-  date: Date;
-  dateFormatted: string; // e.g. "27 Aug 2026"
-  dayOfWeek: string;    // e.g. "Thursday"
-  relativeLabel: string; // e.g. "Today", "Tomorrow", "In 3 days"
+/**
+ * Fetches holidays dynamically from the API/Database for the year of referenceDate.
+ */
+export async function getDynamicHolidays(
+  referenceDate: Date = new Date(),
+  country: string = 'IN'
+): Promise<ApiHolidayResponseItem[]> {
+  const year = referenceDate.getFullYear();
+  return await holidayService.getHolidays(year, { country });
 }
 
-// Dynamically generate current year holidays
-export function getDynamicHolidays(referenceDate: Date = new Date()): DynamicHolidayEvent[] {
-  const currentYear = referenceDate.getFullYear();
-
-  const baseHolidays = [
-    { id: 'hol-1', name: 'Ganesh Chaturthi', category: 'Public Holiday' as const, month: 7, day: 27 }, // August is month 7 (0-indexed)
-    { id: 'hol-2', name: 'Onam', category: 'Company Festival' as const, month: 7, day: 26 },
-    { id: 'hol-3', name: 'Gandhi Jayanti', category: 'National Holiday' as const, month: 9, day: 2 },  // October is month 9
-    { id: 'hol-4', name: 'Diwali', category: 'Company Festival' as const, month: 10, day: 8 },      // November is month 10
-    { id: 'hol-5', name: 'Christmas', category: 'Public Holiday' as const, month: 11, day: 25 },     // December is month 11
-    { id: 'hol-6', name: 'Independence Day', category: 'National Holiday' as const, month: 7, day: 15 },
-    { id: 'hol-7', name: 'New Year Day', category: 'Public Holiday' as const, month: 0, day: 1 },
-    { id: 'hol-8', name: 'Republic Day', category: 'National Holiday' as const, month: 0, day: 26 },
-  ];
-
+/**
+ * Dynamically calculates relative label comparing targetDate vs current date
+ */
+export function calculateRelativeLabel(targetDate: Date | string): string {
+  const parsed = typeof targetDate === 'string' ? parseISO(targetDate) : targetDate;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  return baseHolidays
-    .map((item) => {
-      const eventDate = new Date(currentYear, item.month, item.day);
-      const relativeLabel = calculateRelativeLabel(eventDate, today);
+  const target = new Date(parsed);
+  target.setHours(0, 0, 0, 0);
 
-      return {
-        id: item.id,
-        name: item.name,
-        category: item.category,
-        date: eventDate,
-        dateFormatted: format(eventDate, 'dd MMM yyyy'),
-        dayOfWeek: format(eventDate, 'EEEE'),
-        relativeLabel,
-      };
-    })
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
-}
-
-// Calculate dynamic relative label comparing targetDate vs reference today
-export function calculateRelativeLabel(targetDate: Date, today: Date = new Date()): string {
-  const targetStart = new Date(targetDate);
-  targetStart.setHours(0, 0, 0, 0);
-
-  const todayStart = new Date(today);
-  todayStart.setHours(0, 0, 0, 0);
-
-  if (isSameDay(targetStart, todayStart)) {
+  if (isToday(target)) {
     return 'Today';
   }
 
-  if (isTomorrow(targetStart)) {
+  if (isTomorrow(target)) {
     return 'Tomorrow';
   }
 
-  const daysDiff = differenceInCalendarDays(targetStart, todayStart);
+  const daysDiff = differenceInCalendarDays(target, today);
 
   if (daysDiff > 1 && daysDiff <= 30) {
     return `In ${daysDiff} days`;
@@ -95,13 +64,15 @@ export function calculateRelativeLabel(targetDate: Date, today: Date = new Date(
     return `${Math.abs(daysDiff)} days ago`;
   }
 
-  return format(targetStart, 'MMM dd');
+  return format(target, 'dd MMM');
 }
 
-// Generate calendar grid for a given month
+/**
+ * Generates calendar grid for active month
+ */
 export function getCalendarGrid(
   activeMonthDate: Date,
-  events: DynamicHolidayEvent[] = []
+  events: ApiHolidayResponseItem[] = []
 ): CalendarDayCell[] {
   const monthStart = startOfMonth(activeMonthDate);
   const monthEnd = endOfMonth(monthStart);
@@ -109,13 +80,15 @@ export function getCalendarGrid(
   const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
 
   const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
-  const today = new Date();
 
   return days.map((date) => {
     const dateString = format(date, 'yyyy-MM-dd');
     const isCurrentMonth = isSameMonth(date, monthStart);
     const todayCheck = isToday(date);
-    const hasEvent = events.some((evt) => isSameDay(evt.date, date));
+    const hasEvent = events.some((evt) => {
+      const evtDateStr = evt.date.split('T')[0];
+      return evtDateStr === dateString;
+    });
 
     return {
       date,

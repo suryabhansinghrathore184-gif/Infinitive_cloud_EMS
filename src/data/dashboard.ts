@@ -12,7 +12,7 @@ export const mockUserData = {
   name: 'Admin',
   role: 'HR Administrator',
   email: 'admin@enterprise-hrms.com',
-  // avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+  avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
 };
 
 export const mockKpiMetrics: KpiMetric[] = [

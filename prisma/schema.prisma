@@ -89,6 +89,37 @@ enum TicketStatus {
   CLOSED
 }
 
+enum HolidayCategory {
+  PUBLIC_HOLIDAY
+  NATIONAL_HOLIDAY
+  COMPANY_HOLIDAY
+  COMPANY_FESTIVAL
+  OPTIONAL_HOLIDAY
+  REGIONAL_HOLIDAY
+}
+
+// ==========================================
+// HOLIDAY MANAGEMENT
+// ==========================================
+
+model Holiday {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  date        DateTime        @db.Date
+  category    HolidayCategory @default(PUBLIC_HOLIDAY)
+  country     String          @default("IN")
+  state       String?
+  isOptional  Boolean         @default(false)
+  isMandatory Boolean         @default(true)
+  status      String          @default("ACTIVE")
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([name, date, country, state])
+  @@map("holidays")
+}
+
 // ==========================================
 // ORGANIZATION & USER ACCOUNTS
 // ==========================================
