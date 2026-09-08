@@ -3,11 +3,13 @@
 import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useEmsStore } from '@/store/emsStore';
-import { Clock, CheckCircle2, XCircle, Calendar, Download, Filter, UserX } from 'lucide-react';
+import { Clock, CheckCircle2, XCircle, Calendar, Download, Filter, UserX, Plus } from 'lucide-react';
+import { MarkAttendanceModal } from '@/components/modals/MarkAttendanceModal';
 
 export default function AttendancePage() {
-  const { state } = useEmsStore();
+  const { state, addAttendanceRecord } = useEmsStore();
   const [statusFilter, setStatusFilter] = useState('All');
+  const [isMarkModalOpen, setIsMarkModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -34,7 +36,7 @@ export default function AttendancePage() {
     >
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed right-6 top-20 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs text-white shadow-xl">
+        <div className="fixed right-6 top-20 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs text-white shadow-xl border border-slate-700">
           <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           <span>{toastMessage}</span>
         </div>
@@ -49,13 +51,23 @@ export default function AttendancePage() {
           </p>
         </div>
 
-        <button
-          onClick={() => showToast('Exporting attendance log...')}
-          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-blue-700"
-        >
-          <Download className="h-4 w-4" />
-          <span>Export Monthly Log</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsMarkModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-blue-700 active:scale-95"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Mark Attendance</span>
+          </button>
+
+          <button
+            onClick={() => showToast('Exporting attendance log...')}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <Download className="h-4 w-4 text-slate-500" />
+            <span>Export Log</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats Summary Grid (Dynamically Computed) */}
@@ -112,11 +124,12 @@ export default function AttendancePage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 focus:border-blue-500 focus:outline-none"
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 focus:border-blue-500 focus:outline-none font-medium"
           >
             <option value="All">All Attendance Statuses</option>
             <option value="Present">Present</option>
             <option value="Late">Late</option>
+            <option value="Absent">Absent</option>
             <option value="On Leave">On Leave</option>
             <option value="Work From Home">Work From Home</option>
           </select>
@@ -134,7 +147,7 @@ export default function AttendancePage() {
             </div>
             <h4 className="mt-3 text-sm font-bold text-slate-800">No attendance data yet</h4>
             <p className="mt-1 max-w-xs text-xs text-slate-500">
-              Employee check-in logs, biometric punches, and manual corrections will display here.
+              Click &quot;+ Mark Attendance&quot; above to log employee check-in, biometric punches, or attendance records.
             </p>
           </div>
         ) : (
@@ -142,6 +155,7 @@ export default function AttendancePage() {
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50 text-slate-500 font-semibold">
                 <th className="px-4 py-3.5">Employee</th>
+                <th className="px-4 py-3.5">Date</th>
                 <th className="px-4 py-3.5">Check-In</th>
                 <th className="px-4 py-3.5">Check-Out</th>
                 <th className="px-4 py-3.5">Break</th>
@@ -162,6 +176,7 @@ export default function AttendancePage() {
                       </div>
                     </div>
                   </td>
+                  <td className="px-4 py-3.5 text-slate-700">{rec.date}</td>
                   <td className="px-4 py-3.5 font-semibold text-slate-800">{rec.checkIn}</td>
                   <td className="px-4 py-3.5 font-semibold text-slate-800">{rec.checkOut}</td>
                   <td className="px-4 py-3.5 text-slate-500">{rec.breakDuration}</td>
@@ -182,6 +197,16 @@ export default function AttendancePage() {
           </table>
         )}
       </div>
+
+      <MarkAttendanceModal
+        isOpen={isMarkModalOpen}
+        onClose={() => setIsMarkModalOpen(false)}
+        employees={state.employees}
+        onSave={(rec) => {
+          addAttendanceRecord(rec);
+          showToast(`Attendance marked for ${rec.employeeName} (${rec.status})`);
+        }}
+      />
     </AdminLayout>
   );
 }

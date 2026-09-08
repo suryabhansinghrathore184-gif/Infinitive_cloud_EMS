@@ -268,6 +268,20 @@ export function useEmsStore() {
     logActivity('Admin', `uploaded document "${created.title}" for ${created.employeeName}`, 'policy');
   };
 
+  // 8. ADD ATTENDANCE RECORD
+  const addAttendanceRecord = (rec: Omit<AttendanceRecord, 'id' | 'workingHours'>) => {
+    const created: AttendanceRecord = {
+      ...rec,
+      id: `att-${Date.now()}`,
+      workingHours: '8 hrs 00 mins',
+    };
+    setState((prev) => ({
+      ...prev,
+      attendance: [created, ...prev.attendance],
+    }));
+    logActivity('Admin', `logged attendance for ${rec.employeeName} (${rec.status})`, 'employee');
+  };
+
   const importEmployees = (batch: Omit<Employee, 'id'>[]): { added: number; skippedDuplicates: number; message: string } => {
     let importedCount = 0;
     let skippedDuplicates = 0;
@@ -377,6 +391,7 @@ export function useEmsStore() {
     createAnnouncement,
     addLeaveType,
     addDocument,
+    addAttendanceRecord,
     importEmployees,
     clearAllData,
     clearSeedData: clearAllData,
