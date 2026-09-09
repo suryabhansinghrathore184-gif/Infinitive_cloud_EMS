@@ -7,7 +7,7 @@ import { Lock, Inbox } from 'lucide-react';
 
 export default function AuditLogsPage() {
   const { state } = useEmsStore();
-  const activities = state.activities;
+  const activities = state.activities || [];
 
   return (
     <AdminLayout

@@ -816,7 +816,7 @@ export default function PayrollPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {state.activities.map((act) => (
+                {(state.activities || []).map((act) => (
                   <tr key={act.id} className="hover:bg-slate-50/60">
                     <td className="px-4 py-3.5 font-bold text-slate-900">{act.user || 'Admin'}</td>
                     <td className="px-4 py-3.5 text-slate-700">{act.action}</td>

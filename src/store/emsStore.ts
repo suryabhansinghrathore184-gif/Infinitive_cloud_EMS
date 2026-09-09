@@ -207,7 +207,31 @@ export function getInitialEmsState(): EmsDataState {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        return {
+          ...cleanInitialState,
+          ...parsed,
+          company: parsed.company || cleanInitialState.company,
+          adminUser: parsed.adminUser || cleanInitialState.adminUser,
+          employees: Array.isArray(parsed.employees) ? parsed.employees : cleanInitialState.employees,
+          departments: Array.isArray(parsed.departments) ? parsed.departments : cleanInitialState.departments,
+          designations: Array.isArray(parsed.designations) ? parsed.designations : cleanInitialState.designations,
+          locations: Array.isArray(parsed.locations) ? parsed.locations : cleanInitialState.locations,
+          attendance: Array.isArray(parsed.attendance) ? parsed.attendance : cleanInitialState.attendance,
+          leaves: Array.isArray(parsed.leaves) ? parsed.leaves : cleanInitialState.leaves,
+          leaveTypes: Array.isArray(parsed.leaveTypes) ? parsed.leaveTypes : cleanInitialState.leaveTypes,
+          holidays: Array.isArray(parsed.holidays) ? parsed.holidays : cleanInitialState.holidays,
+          announcements: Array.isArray(parsed.announcements) ? parsed.announcements : cleanInitialState.announcements,
+          activities: Array.isArray(parsed.activities) ? parsed.activities : cleanInitialState.activities,
+          documents: Array.isArray(parsed.documents) ? parsed.documents : cleanInitialState.documents,
+          jobs: Array.isArray(parsed.jobs) ? parsed.jobs : cleanInitialState.jobs,
+          candidates: Array.isArray(parsed.candidates) ? parsed.candidates : cleanInitialState.candidates,
+          salaryStructures: Array.isArray(parsed.salaryStructures) && parsed.salaryStructures.length > 0 ? parsed.salaryStructures : cleanInitialState.salaryStructures,
+          salaryRules: Array.isArray(parsed.salaryRules) && parsed.salaryRules.length > 0 ? parsed.salaryRules : cleanInitialState.salaryRules,
+          employeeSalaryProfiles: parsed.employeeSalaryProfiles || {},
+          payrollRecords: Array.isArray(parsed.payrollRecords) ? parsed.payrollRecords : cleanInitialState.payrollRecords,
+          payrollSettings: parsed.payrollSettings || cleanInitialState.payrollSettings,
+        };
       } catch (e) {
         console.error('Failed to parse saved EMS data state', e);
       }
@@ -217,13 +241,20 @@ export function getInitialEmsState(): EmsDataState {
 }
 
 export function useEmsStore() {
-  const [state, setState] = useState<EmsDataState>(getInitialEmsState);
+  const [state, setState] = useState<EmsDataState>(cleanInitialState);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    const loaded = getInitialEmsState();
+    setState(loaded);
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (isHydrated && typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }
-  }, [state]);
+  }, [state, isHydrated]);
 
   // Activity logger helper
   const logActivity = (user: string, action: string, category: RecentActivityItem['category'] = 'employee') => {
@@ -868,19 +899,45 @@ export function useEmsStore() {
   };
 
   // Derived Dynamic Statistics (NEVER hardcoded)
-  const totalEmployeesCount = state.employees.length;
-  const activeEmployeesCount = state.employees.filter((e) => e.status === 'Active' || e.status === 'Probation').length;
-  const onLeaveCount = state.employees.filter((e) => e.status === 'On Leave').length;
+  const safeEmployees = Array.isArray(state.employees) ? state.employees : [];
+  const totalEmployeesCount = safeEmployees.length;
+  const activeEmployeesCount = safeEmployees.filter((e) => e.status === 'Active' || e.status === 'Probation').length;
+  const onLeaveCount = safeEmployees.filter((e) => e.status === 'On Leave').length;
 
   const now = new Date();
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-  const newEmployeesCount = state.employees.filter((e) => {
+  const newEmployeesCount = safeEmployees.filter((e) => {
     const join = new Date(e.joiningDate);
     return join >= sixtyDaysAgo;
   }).length;
 
+  const safeState: EmsDataState = {
+    ...state,
+    company: state.company || cleanInitialState.company,
+    adminUser: state.adminUser || cleanInitialState.adminUser,
+    employees: safeEmployees,
+    departments: Array.isArray(state.departments) ? state.departments : [],
+    designations: Array.isArray(state.designations) ? state.designations : [],
+    locations: Array.isArray(state.locations) ? state.locations : [],
+    attendance: Array.isArray(state.attendance) ? state.attendance : [],
+    leaves: Array.isArray(state.leaves) ? state.leaves : [],
+    leaveTypes: Array.isArray(state.leaveTypes) ? state.leaveTypes : [],
+    holidays: Array.isArray(state.holidays) ? state.holidays : [],
+    announcements: Array.isArray(state.announcements) ? state.announcements : [],
+    activities: Array.isArray(state.activities) ? state.activities : [],
+    documents: Array.isArray(state.documents) ? state.documents : [],
+    jobs: Array.isArray(state.jobs) ? state.jobs : [],
+    candidates: Array.isArray(state.candidates) ? state.candidates : [],
+    salaryStructures: Array.isArray(state.salaryStructures) ? state.salaryStructures : cleanInitialState.salaryStructures,
+    salaryRules: Array.isArray(state.salaryRules) ? state.salaryRules : cleanInitialState.salaryRules,
+    employeeSalaryProfiles: state.employeeSalaryProfiles || {},
+    payrollRecords: Array.isArray(state.payrollRecords) ? state.payrollRecords : [],
+    payrollSettings: state.payrollSettings || cleanInitialState.payrollSettings,
+  };
+
   return {
-    state,
+    state: safeState,
+    isHydrated,
     totalEmployeesCount,
     activeEmployeesCount,
     onLeaveCount,
