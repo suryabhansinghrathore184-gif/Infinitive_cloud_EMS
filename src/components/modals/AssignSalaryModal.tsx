@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, UserCheck, Calculator } from 'lucide-react';
-import { Employee, SalaryStructure } from '@/types/admin';
+import React, { useState, useEffect } from 'react';
+import { X, UserCheck } from 'lucide-react';
+import { Employee } from '@/types/admin';
 import { useEmsStore } from '@/store/emsStore';
 
 interface AssignSalaryModalProps {
@@ -20,7 +20,7 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
 }) => {
   const { state, assignEmployeeSalaryProfile } = useEmsStore();
 
-  const [employeeId, setEmployeeId] = useState<string>(selectedEmployee?.id || state.employees[0]?.id || '');
+  const [employeeId, setEmployeeId] = useState<string>('');
   const [selectedStructureId, setSelectedStructureId] = useState<string>('struct-std');
   const [basicSalary, setBasicSalary] = useState<number>(60000);
   const [hra, setHra] = useState<number>(24000);
@@ -33,6 +33,14 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
   const [tdsPercent, setTdsPercent] = useState<number>(10);
   const [effectiveDate, setEffectiveDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [changeReason, setChangeReason] = useState<string>('Annual Salary Revision / Assignment');
+
+  useEffect(() => {
+    if (selectedEmployee?.id) {
+      setEmployeeId(selectedEmployee.id);
+    } else if (state.employees && state.employees.length > 0 && !employeeId) {
+      setEmployeeId(state.employees[0].id || state.employees[0].employeeId);
+    }
+  }, [selectedEmployee, state.employees, employeeId]);
 
   if (!isOpen) return null;
 
@@ -50,24 +58,36 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
     }
   };
 
+  const handleBasicSalaryChange = (newBasic: number) => {
+    setBasicSalary(newBasic);
+    const struct = state.salaryStructures.find((s) => s.id === selectedStructureId);
+    if (struct && struct.hraType === 'PercentBasic') {
+      setHra(Math.round((newBasic * struct.hraValue) / 100));
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!employeeId) return;
+    const targetEmpId = employeeId || selectedEmployee?.id || state.employees[0]?.id;
+    if (!targetEmpId) {
+      alert('Please select a valid employee.');
+      return;
+    }
 
     const structObj = state.salaryStructures.find((s) => s.id === selectedStructureId);
 
     assignEmployeeSalaryProfile(
-      employeeId,
+      targetEmpId,
       {
         structureId: selectedStructureId,
         structureTitle: structObj?.title || 'Custom Structure',
-        basicSalary,
-        hra,
-        conveyance,
-        medical,
-        specialAllowance,
+        basicSalary: Number(basicSalary) || 0,
+        hra: Number(hra) || 0,
+        conveyance: Number(conveyance) || 0,
+        medical: Number(medical) || 0,
+        specialAllowance: Number(specialAllowance) || 0,
         otherAllowances: 0,
-        bonus,
+        bonus: Number(bonus) || 0,
         overtimeRatePerHour: state.payrollSettings?.overtimeRatePerHour || 250,
         pfEnabled,
         pfPercent: state.payrollSettings?.pfDefaultPercent || 12,
@@ -81,12 +101,12 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
       changeReason
     );
 
-    const empObj = state.employees.find((e) => e.id === employeeId || e.employeeId === employeeId);
+    const empObj = state.employees.find((e) => e.id === targetEmpId || e.employeeId === targetEmpId);
     onSuccess(`Salary structure assigned successfully to ${empObj ? empObj.firstName + ' ' + empObj.lastName : 'Employee'}`);
     onClose();
   };
 
-  const computedGross = basicSalary + hra + conveyance + medical + specialAllowance + bonus;
+  const computedGross = Number(basicSalary) + Number(hra) + Number(conveyance) + Number(medical) + Number(specialAllowance) + Number(bonus);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
@@ -156,7 +176,7 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
                   min={0}
                   required
                   value={basicSalary}
-                  onChange={(e) => setBasicSalary(Number(e.target.value))}
+                  onChange={(e) => handleBasicSalaryChange(Number(e.target.value))}
                   className="mt-1 w-full rounded-xl border p-2 bg-white"
                 />
               </div>

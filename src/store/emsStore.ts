@@ -606,7 +606,11 @@ export function useEmsStore() {
     profileData: Omit<EmployeeSalaryProfile, 'employeeId' | 'history'>,
     reason: string = 'Salary structure assigned/updated'
   ) => {
-    const existing = state.employeeSalaryProfiles?.[employeeId];
+    const matchedEmp = state.employees.find((e) => e.id === employeeId || e.employeeId === employeeId);
+    const empKey = matchedEmp?.id || employeeId;
+    const empIdKey = matchedEmp?.employeeId || employeeId;
+
+    const existing = state.employeeSalaryProfiles?.[empKey] || state.employeeSalaryProfiles?.[empIdKey];
     const newHistoryItem = {
       id: `hist-${Date.now()}`,
       effectiveDate: profileData.effectiveDate || new Date().toISOString().split('T')[0],
@@ -627,18 +631,70 @@ export function useEmsStore() {
 
     const updatedProfile: EmployeeSalaryProfile = {
       ...profileData,
-      employeeId,
+      employeeId: empKey,
       history: [newHistoryItem, ...(existing?.history || [])],
     };
+
+    // Auto-update existing Draft/Calculated payroll records for this employee
+    const basic = profileData.basicSalary;
+    const hra = profileData.hra;
+    const conveyance = profileData.conveyance;
+    const medical = profileData.medical;
+    const specialAllowance = profileData.specialAllowance;
+    const otherAllowances = profileData.otherAllowances || 0;
+    const bonus = profileData.bonus || 0;
+
+    const workingDays = state.payrollSettings?.workingDaysPerMonth || 26;
+
+    const updatedPayrollRecords = (state.payrollRecords || []).map((p) => {
+      const isThisEmp = p.employeeId === empKey || p.employeeId === empIdKey;
+      if (!isThisEmp || (p.status !== 'Draft' && p.status !== 'Calculated')) {
+        return p;
+      }
+
+      const grossSalary = basic + hra + conveyance + medical + specialAllowance + otherAllowances + (p.overtimePay || 0) + bonus;
+
+      const lopDeduction = p.unpaidLeaveDays > 0 ? Math.round((basic / workingDays) * p.unpaidLeaveDays) : 0;
+      const pfDeduction = profileData.pfEnabled !== false ? Math.round(basic * ((profileData.pfPercent || state.payrollSettings?.pfDefaultPercent || 12) / 100)) : 0;
+      const ptDeduction = profileData.ptEnabled !== false ? (profileData.ptAmount || state.payrollSettings?.ptDefaultAmount || 200) : 0;
+      const taxDeduction = Math.round(grossSalary * ((profileData.tdsPercent || state.payrollSettings?.tdsDefaultPercent || 10) / 100));
+      const esiDeduction = profileData.esiEnabled ? Math.round(grossSalary * ((profileData.esiPercent || 0.75) / 100)) : 0;
+
+      const totalDeductions = lopDeduction + pfDeduction + ptDeduction + taxDeduction + esiDeduction + (p.loanDeduction || 0) + (p.otherDeductions || 0);
+      const netSalary = Math.max(0, grossSalary - totalDeductions);
+
+      return {
+        ...p,
+        basicSalary: basic,
+        hra,
+        conveyance,
+        medical,
+        specialAllowance,
+        otherAllowances,
+        bonus,
+        grossSalary,
+        lopDeduction,
+        pfDeduction,
+        ptDeduction,
+        taxDeduction,
+        esiDeduction,
+        totalDeductions,
+        netSalary,
+        updatedAt: new Date().toISOString(),
+      };
+    });
 
     setState((prev) => ({
       ...prev,
       employeeSalaryProfiles: {
         ...(prev.employeeSalaryProfiles || {}),
-        [employeeId]: updatedProfile,
+        [empKey]: updatedProfile,
+        [empIdKey]: updatedProfile,
       },
+      payrollRecords: updatedPayrollRecords,
     }));
-    logActivity('Admin', `assigned salary profile to employee ID ${employeeId}`, 'employee');
+
+    logActivity('Admin', `assigned salary profile to employee ${matchedEmp ? matchedEmp.firstName + ' ' + matchedEmp.lastName : employeeId}`, 'employee');
     return updatedProfile;
   };
 
