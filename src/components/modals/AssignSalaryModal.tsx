@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, UserCheck } from 'lucide-react';
-import { Employee } from '@/types/admin';
+import { Employee, EmployeeSalaryAssignment } from '@/types/admin';
 import { useEmsStore } from '@/store/emsStore';
 
 interface AssignSalaryModalProps {
@@ -10,6 +10,7 @@ interface AssignSalaryModalProps {
   onClose: () => void;
   onSuccess: (msg: string) => void;
   selectedEmployee?: Employee | null;
+  editingAssignment?: EmployeeSalaryAssignment | null;
 }
 
 export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
@@ -17,8 +18,9 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
   onClose,
   onSuccess,
   selectedEmployee,
+  editingAssignment,
 }) => {
-  const { state, assignEmployeeSalaryProfile } = useEmsStore();
+  const { state, addSalaryAssignment, updateSalaryAssignment } = useEmsStore();
 
   const [employeeId, setEmployeeId] = useState<string>('');
   const [selectedStructureId, setSelectedStructureId] = useState<string>('struct-std');
@@ -35,12 +37,28 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
   const [changeReason, setChangeReason] = useState<string>('Annual Salary Revision / Assignment');
 
   useEffect(() => {
-    if (selectedEmployee?.id) {
+    if (editingAssignment) {
+      setEmployeeId(editingAssignment.employeeId);
+      if (editingAssignment.structureId) {
+        setSelectedStructureId(editingAssignment.structureId);
+      }
+      setBasicSalary(editingAssignment.basicSalary);
+      setHra(editingAssignment.hra);
+      setConveyance(editingAssignment.conveyance);
+      setMedical(editingAssignment.medical);
+      setSpecialAllowance(editingAssignment.specialAllowance);
+      setBonus(editingAssignment.bonus || 0);
+      setPfEnabled(editingAssignment.pfEnabled);
+      setPtEnabled(editingAssignment.ptEnabled);
+      setTdsPercent(editingAssignment.tdsPercent || 10);
+      setEffectiveDate(editingAssignment.effectiveDate || new Date().toISOString().split('T')[0]);
+      setChangeReason(editingAssignment.revisionReason || 'Salary structure updated');
+    } else if (selectedEmployee?.id) {
       setEmployeeId(selectedEmployee.id);
     } else if (state.employees && state.employees.length > 0 && !employeeId) {
       setEmployeeId(state.employees[0].id || state.employees[0].employeeId);
     }
-  }, [selectedEmployee, state.employees, employeeId]);
+  }, [editingAssignment, selectedEmployee, state.employees]);
 
   if (!isOpen) return null;
 
@@ -74,11 +92,33 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
       return;
     }
 
+    const empObj = state.employees.find((e) => e.id === targetEmpId || e.employeeId === targetEmpId);
+    const empName = empObj ? `${empObj.firstName} ${empObj.lastName}` : 'Employee';
     const structObj = state.salaryStructures.find((s) => s.id === selectedStructureId);
 
-    assignEmployeeSalaryProfile(
-      targetEmpId,
-      {
+    if (editingAssignment) {
+      updateSalaryAssignment(editingAssignment.id, {
+        employeeId: targetEmpId,
+        employeeName: empName,
+        structureId: selectedStructureId,
+        structureTitle: structObj?.title || editingAssignment.structureTitle || 'Custom Structure',
+        basicSalary: Number(basicSalary) || 0,
+        hra: Number(hra) || 0,
+        conveyance: Number(conveyance) || 0,
+        medical: Number(medical) || 0,
+        specialAllowance: Number(specialAllowance) || 0,
+        bonus: Number(bonus) || 0,
+        pfEnabled,
+        ptEnabled,
+        tdsPercent,
+        effectiveDate,
+        revisionReason: changeReason,
+      });
+      onSuccess(`Salary structure updated successfully for ${empName}`);
+    } else {
+      addSalaryAssignment({
+        employeeId: targetEmpId,
+        employeeName: empName,
         structureId: selectedStructureId,
         structureTitle: structObj?.title || 'Custom Structure',
         basicSalary: Number(basicSalary) || 0,
@@ -88,7 +128,6 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
         specialAllowance: Number(specialAllowance) || 0,
         otherAllowances: 0,
         bonus: Number(bonus) || 0,
-        overtimeRatePerHour: state.payrollSettings?.overtimeRatePerHour || 250,
         pfEnabled,
         pfPercent: state.payrollSettings?.pfDefaultPercent || 12,
         ptEnabled,
@@ -97,12 +136,13 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
         esiEnabled: false,
         esiPercent: 0,
         effectiveDate,
-      },
-      changeReason
-    );
+        status: 'Active',
+        revisionReason: changeReason,
+        createdBy: 'Admin',
+      });
+      onSuccess(`Salary structure assigned successfully to ${empName}`);
+    }
 
-    const empObj = state.employees.find((e) => e.id === targetEmpId || e.employeeId === targetEmpId);
-    onSuccess(`Salary structure assigned successfully to ${empObj ? empObj.firstName + ' ' + empObj.lastName : 'Employee'}`);
     onClose();
   };
 
@@ -114,7 +154,7 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
         <div className="flex items-center justify-between border-b pb-3 font-bold text-sm text-slate-900">
           <div className="flex items-center gap-2">
             <UserCheck className="h-4 w-4 text-blue-600" />
-            <span>Assign / Change Employee Salary Structure</span>
+            <span>{editingAssignment ? 'Edit Employee Salary Structure' : 'Assign / Change Employee Salary Structure'}</span>
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:text-slate-700">
             <X className="h-4 w-4" />
@@ -126,8 +166,9 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
             <label className="font-bold text-slate-900">Select Employee *</label>
             <select
               value={employeeId}
+              disabled={!!editingAssignment}
               onChange={(e) => setEmployeeId(e.target.value)}
-              className="mt-1 w-full rounded-xl border p-2.5 bg-slate-50 focus:border-blue-500 focus:bg-white"
+              className="mt-1 w-full rounded-xl border p-2.5 bg-slate-50 focus:border-blue-500 focus:bg-white disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {state.employees.map((e) => (
                 <option key={e.id} value={e.id}>
@@ -290,7 +331,7 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
               type="submit"
               className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-blue-700"
             >
-              Assign Salary Structure
+              {editingAssignment ? 'Update Salary Structure' : 'Assign Salary Structure'}
             </button>
           </div>
         </form>
@@ -298,3 +339,4 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
     </div>
   );
 };
+

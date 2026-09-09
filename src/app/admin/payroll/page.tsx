@@ -24,7 +24,7 @@ import {
   ShieldCheck,
   FileText,
 } from 'lucide-react';
-import { PayrollRecord, SalaryStructure, SalaryRule, EmployeeSalaryProfile } from '@/types/admin';
+import { PayrollRecord, SalaryStructure, SalaryRule, EmployeeSalaryProfile, EmployeeSalaryAssignment } from '@/types/admin';
 
 // Modals
 import { ProcessPayrollModal } from '@/components/modals/ProcessPayrollModal';
@@ -47,6 +47,11 @@ export default function PayrollPage() {
     updateSalaryRule,
     deleteSalaryRule,
     updatePayrollSettings,
+    salaryAssignments,
+    addSalaryAssignment,
+    updateSalaryAssignment,
+    deleteSalaryAssignment,
+    deactivateSalaryAssignment,
   } = useEmsStore();
 
   const [activeTab, setActiveTab] = useState<
@@ -71,6 +76,7 @@ export default function PayrollPage() {
 
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [assigningEmployee, setAssigningEmployee] = useState<any | null>(null);
+  const [editingAssignment, setEditingAssignment] = useState<EmployeeSalaryAssignment | null>(null);
 
   const [isEditPayrollOpen, setIsEditPayrollOpen] = useState(false);
   const [selectedPayrollRecord, setSelectedPayrollRecord] = useState<PayrollRecord | null>(null);
@@ -84,6 +90,7 @@ export default function PayrollPage() {
   const [isDeleteStructureOpen, setIsDeleteStructureOpen] = useState(false);
   const [structureToDelete, setStructureToDelete] = useState<SalaryStructure | null>(null);
   const [profileToDelete, setProfileToDelete] = useState<EmployeeSalaryProfile | null>(null);
+  const [assignmentToDelete, setAssignmentToDelete] = useState<EmployeeSalaryAssignment | null>(null);
 
   const [isPayslipModalOpen, setIsPayslipModalOpen] = useState(false);
   const [payslipRecord, setPayslipRecord] = useState<PayrollRecord | null>(null);
@@ -176,7 +183,7 @@ export default function PayrollPage() {
     showToast('Payroll configuration settings saved successfully!');
   };
 
-  const totalStructuresCount = Object.keys(assignedProfiles).length + structures.length;
+  const totalStructuresCount = (salaryAssignments?.length || Object.keys(assignedProfiles).length) + structures.length;
 
   return (
     <AdminLayout
@@ -209,6 +216,7 @@ export default function PayrollPage() {
           <button
             onClick={() => {
               setAssigningEmployee(null);
+              setEditingAssignment(null);
               setIsAssignModalOpen(true);
             }}
             className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
@@ -602,9 +610,9 @@ export default function PayrollPage() {
           {/* Table of Assigned Employee Salary Profiles */}
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm space-y-2">
             <div className="p-4 border-b border-slate-100 font-bold text-sm text-slate-900 flex items-center justify-between">
-              <span>Assigned Employee Salary Profiles ({Object.keys(assignedProfiles).length})</span>
+              <span>Assigned Employee Salary Profiles ({salaryAssignments?.length || 0})</span>
             </div>
-            {Object.keys(assignedProfiles).length === 0 ? (
+            {!salaryAssignments || salaryAssignments.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <UserCheck className="h-8 w-8 text-slate-300" />
                 <h4 className="mt-2 text-xs font-bold text-slate-700">No employee salary structures assigned yet</h4>
@@ -617,41 +625,54 @@ export default function PayrollPage() {
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50 text-slate-500 font-semibold">
-                      <th className="px-4 py-3.5">Employee ID</th>
+                      <th className="px-4 py-3.5">Employee</th>
                       <th className="px-4 py-3.5">Structure Title</th>
                       <th className="px-4 py-3.5">Effective Date</th>
                       <th className="px-4 py-3.5 text-right">Basic Salary</th>
                       <th className="px-4 py-3.5 text-right">Gross Salary</th>
                       <th className="px-4 py-3.5 text-center">PF / PT</th>
+                      <th className="px-4 py-3.5 text-center">Status</th>
                       <th className="px-4 py-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {Object.entries(assignedProfiles).map(([empIdKey, profile]) => {
-                      const matchedEmp = employees.find((e) => e.id === empIdKey || e.employeeId === empIdKey);
-                      const empName = matchedEmp ? `${matchedEmp.firstName} ${matchedEmp.lastName}` : empIdKey;
-                      const gross = profile.basicSalary + profile.hra + profile.conveyance + profile.medical + profile.specialAllowance + profile.bonus;
+                    {salaryAssignments.map((sa) => {
+                      const matchedEmp = employees.find((e) => e.id === sa.employeeId || e.employeeId === sa.employeeId);
+                      const empName = sa.employeeName || (matchedEmp ? `${matchedEmp.firstName} ${matchedEmp.lastName}` : sa.employeeId);
+                      const gross = sa.basicSalary + sa.hra + sa.conveyance + sa.medical + sa.specialAllowance + (sa.bonus || 0);
 
                       return (
-                        <tr key={empIdKey} className="hover:bg-slate-50/60">
+                        <tr key={sa.id} className="hover:bg-slate-50/60">
                           <td className="px-4 py-3.5 font-bold text-slate-900">
                             <div>{empName}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">{matchedEmp?.employeeId || empIdKey}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{matchedEmp?.employeeId || sa.employeeId}</div>
                           </td>
-                          <td className="px-4 py-3.5 text-slate-700 font-semibold">{profile.structureTitle}</td>
-                          <td className="px-4 py-3.5 text-slate-500 font-mono">{profile.effectiveDate}</td>
-                          <td className="px-4 py-3.5 text-right font-bold text-slate-900">₹{profile.basicSalary.toLocaleString('en-IN')}</td>
+                          <td className="px-4 py-3.5 text-slate-700 font-semibold">{sa.structureTitle}</td>
+                          <td className="px-4 py-3.5 text-slate-500 font-mono">{sa.effectiveDate}</td>
+                          <td className="px-4 py-3.5 text-right font-bold text-slate-900">₹{sa.basicSalary.toLocaleString('en-IN')}</td>
                           <td className="px-4 py-3.5 text-right font-bold text-emerald-600">₹{gross.toLocaleString('en-IN')}</td>
                           <td className="px-4 py-3.5 text-center">
                             <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold border">
-                              {profile.pfEnabled ? 'PF ✓' : 'No PF'} | {profile.ptEnabled ? 'PT ✓' : 'No PT'}
+                              {sa.pfEnabled ? 'PF ✓' : 'No PF'} | {sa.ptEnabled ? 'PT ✓' : 'No PT'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            <span
+                              className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${
+                                sa.status === 'Active'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-slate-100 text-slate-500 border-slate-200'
+                              }`}
+                            >
+                              {sa.status || 'Active'}
                             </span>
                           </td>
                           <td className="px-4 py-3.5 text-right space-x-1">
                             <button
                               title="Edit Salary Assignment"
                               onClick={() => {
-                                setAssigningEmployee(matchedEmp || { id: empIdKey });
+                                setEditingAssignment(sa);
+                                setAssigningEmployee(matchedEmp || { id: sa.employeeId });
                                 setIsAssignModalOpen(true);
                               }}
                               className="p-1 text-slate-600 hover:text-blue-600"
@@ -661,7 +682,8 @@ export default function PayrollPage() {
                             <button
                               title="Delete Assignment"
                               onClick={() => {
-                                setProfileToDelete(profile);
+                                setAssignmentToDelete(sa);
+                                setProfileToDelete(null);
                                 setStructureToDelete(null);
                                 setIsDeleteStructureOpen(true);
                               }}
@@ -959,9 +981,13 @@ export default function PayrollPage() {
 
       <AssignSalaryModal
         isOpen={isAssignModalOpen}
-        onClose={() => setIsAssignModalOpen(false)}
+        onClose={() => {
+          setIsAssignModalOpen(false);
+          setEditingAssignment(null);
+        }}
         onSuccess={(msg) => showToast(msg)}
         selectedEmployee={assigningEmployee}
+        editingAssignment={editingAssignment}
       />
 
       <EditPayrollModal
@@ -987,10 +1013,16 @@ export default function PayrollPage() {
 
       <DeleteSalaryStructureModal
         isOpen={isDeleteStructureOpen}
-        onClose={() => setIsDeleteStructureOpen(false)}
+        onClose={() => {
+          setIsDeleteStructureOpen(false);
+          setAssignmentToDelete(null);
+          setStructureToDelete(null);
+          setProfileToDelete(null);
+        }}
         onSuccess={(msg) => showToast(msg)}
         targetStructure={structureToDelete}
         targetProfile={profileToDelete}
+        targetAssignment={assignmentToDelete}
       />
 
       <ViewPayslipModal

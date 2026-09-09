@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { X, AlertTriangle, Trash2, Ban } from 'lucide-react';
-import { SalaryStructure, EmployeeSalaryProfile } from '@/types/admin';
+import { SalaryStructure, EmployeeSalaryProfile, EmployeeSalaryAssignment } from '@/types/admin';
 import { useEmsStore } from '@/store/emsStore';
 
 interface DeleteSalaryStructureModalProps {
@@ -11,6 +11,7 @@ interface DeleteSalaryStructureModalProps {
   onSuccess: (msg: string) => void;
   targetStructure?: SalaryStructure | null;
   targetProfile?: EmployeeSalaryProfile | null;
+  targetAssignment?: EmployeeSalaryAssignment | null;
 }
 
 export const DeleteSalaryStructureModal: React.FC<DeleteSalaryStructureModalProps> = ({
@@ -19,23 +20,39 @@ export const DeleteSalaryStructureModal: React.FC<DeleteSalaryStructureModalProp
   onSuccess,
   targetStructure,
   targetProfile,
+  targetAssignment,
 }) => {
-  const { state, deleteSalaryStructure, updateSalaryStructure } = useEmsStore();
+  const {
+    state,
+    deleteSalaryStructure,
+    updateSalaryStructure,
+    deleteSalaryAssignment,
+    deactivateSalaryAssignment,
+  } = useEmsStore();
 
-  if (!isOpen || (!targetStructure && !targetProfile)) return null;
+  if (!isOpen || (!targetStructure && !targetProfile && !targetAssignment)) return null;
 
-  const targetEmp = targetProfile ? state.employees.find((e) => e.id === targetProfile.employeeId || e.employeeId === targetProfile.employeeId) : null;
-  const empName = targetEmp ? `${targetEmp.firstName} ${targetEmp.lastName}` : targetProfile?.employeeId || '';
+  const targetEmpId = targetAssignment?.employeeId || targetProfile?.employeeId;
+  const targetEmp = targetEmpId ? state.employees.find((e) => e.id === targetEmpId || e.employeeId === targetEmpId) : null;
+  const empName = targetAssignment?.employeeName || (targetEmp ? `${targetEmp.firstName} ${targetEmp.lastName}` : targetEmpId || '');
 
   // Check if linked to finalized payroll (Approved, Processed, Paid)
   const isUsedInFinalizedPayroll = (state.payrollRecords || []).some(
     (p) =>
-      (p.employeeId === targetProfile?.employeeId || p.employeeId === targetEmp?.id || p.employeeId === targetEmp?.employeeId) &&
+      (p.employeeId === targetEmpId || p.employeeId === targetEmp?.id || p.employeeId === targetEmp?.employeeId) &&
       (p.status === 'Approved' || p.status === 'Processed' || p.status === 'Paid')
   );
 
   const handleDelete = () => {
-    if (targetStructure) {
+    if (targetAssignment) {
+      const res = deleteSalaryAssignment(targetAssignment.id);
+      if (res.success) {
+        onSuccess(res.message);
+        onClose();
+      } else {
+        alert(res.message);
+      }
+    } else if (targetStructure) {
       const res = deleteSalaryStructure(targetStructure.id);
       if (res.success) {
         onSuccess(res.message);
@@ -48,7 +65,6 @@ export const DeleteSalaryStructureModal: React.FC<DeleteSalaryStructureModalProp
         alert('This salary structure is linked to historical payroll and cannot be deleted. You can deactivate it instead.');
         return;
       }
-      // Remove profile from store
       delete state.employeeSalaryProfiles[targetEmp.id];
       delete state.employeeSalaryProfiles[targetEmp.employeeId];
       onSuccess(`Salary structure assignment for ${empName} deleted successfully.`);
@@ -57,7 +73,11 @@ export const DeleteSalaryStructureModal: React.FC<DeleteSalaryStructureModalProp
   };
 
   const handleDeactivate = () => {
-    if (targetStructure) {
+    if (targetAssignment) {
+      deactivateSalaryAssignment(targetAssignment.id, 'Historical payroll conflict deactivation');
+      onSuccess(`Salary structure assignment for ${empName} deactivated.`);
+      onClose();
+    } else if (targetStructure) {
       updateSalaryStructure(targetStructure.id, { status: 'Inactive' });
       onSuccess(`Salary structure "${targetStructure.title}" deactivated.`);
       onClose();
@@ -82,13 +102,21 @@ export const DeleteSalaryStructureModal: React.FC<DeleteSalaryStructureModalProp
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 space-y-2 text-xs">
               <p className="font-bold">Notice: Historical Payroll Conflict</p>
               <p className="text-[11px] text-amber-800">
-                This salary structure is linked to historical finalized payroll for <strong className="text-slate-900">{empName}</strong> and cannot be deleted. You can deactivate it instead.
+                This salary structure is linked to historical finalized payroll for <strong className="text-slate-900">{empName}</strong> and cannot be deleted. You can deactivate it instead to preserve historical audit logs.
               </p>
             </div>
           ) : (
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-slate-900 space-y-1.5 text-xs">
-              <p className="font-bold">Are you sure you want to delete this salary structure assignment?</p>
-              {targetProfile && (
+              <p className="font-bold">Are you sure you want to delete this salary structure record?</p>
+              {targetAssignment && (
+                <div className="text-[11px] text-slate-600 space-y-1 pt-1 border-t mt-1">
+                  <div><span className="font-semibold text-slate-500">Employee:</span> {targetAssignment.employeeName} ({targetAssignment.employeeId})</div>
+                  <div><span className="font-semibold text-slate-500">Structure:</span> {targetAssignment.structureTitle}</div>
+                  <div><span className="font-semibold text-slate-500">Effective Date:</span> {targetAssignment.effectiveDate}</div>
+                  <div><span className="font-semibold text-slate-500">Basic Salary:</span> ₹{targetAssignment.basicSalary.toLocaleString('en-IN')}</div>
+                </div>
+              )}
+              {targetProfile && !targetAssignment && (
                 <div className="text-[11px] text-slate-600 space-y-1 pt-1 border-t mt-1">
                   <div><span className="font-semibold text-slate-500">Employee:</span> {empName} ({targetProfile.employeeId})</div>
                   <div><span className="font-semibold text-slate-500">Structure:</span> {targetProfile.structureTitle}</div>
@@ -139,3 +167,4 @@ export const DeleteSalaryStructureModal: React.FC<DeleteSalaryStructureModalProp
     </div>
   );
 };
+

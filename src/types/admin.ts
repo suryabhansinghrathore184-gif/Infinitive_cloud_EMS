@@ -162,6 +162,34 @@ export interface SalaryHistoryRecord {
   updatedAt: string;
 }
 
+export interface EmployeeSalaryAssignment {
+  id: string; // Unique salaryAssignmentId e.g. "sal-assign-123"
+  employeeId: string;
+  employeeName: string;
+  structureId?: string;
+  structureTitle: string;
+  effectiveDate: string;
+  basicSalary: number;
+  hra: number;
+  conveyance: number;
+  medical: number;
+  specialAllowance: number;
+  otherAllowances: number;
+  bonus: number;
+  pfEnabled: boolean;
+  pfPercent: number;
+  ptEnabled: boolean;
+  ptAmount: number;
+  tdsPercent: number;
+  esiEnabled: boolean;
+  esiPercent: number;
+  status: 'Active' | 'Inactive';
+  revisionReason: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface EmployeeSalaryProfile {
   employeeId: string;
   structureId?: string;

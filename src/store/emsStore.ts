@@ -16,6 +16,7 @@ import {
   SalaryStructure,
   SalaryRule,
   EmployeeSalaryProfile,
+  EmployeeSalaryAssignment,
   PayrollRecord,
   PayrollSettings,
   PayrollStatus,
@@ -74,6 +75,7 @@ export interface EmsDataState {
   candidates: Candidate[];
   salaryStructures: SalaryStructure[];
   salaryRules: SalaryRule[];
+  salaryAssignments: EmployeeSalaryAssignment[];
   employeeSalaryProfiles: Record<string, EmployeeSalaryProfile>;
   payrollRecords: PayrollRecord[];
   payrollSettings: PayrollSettings;
@@ -116,6 +118,35 @@ const cleanInitialState: EmsDataState = {
   documents: [],
   jobs: [],
   candidates: [],
+  salaryAssignments: [
+    {
+      id: 'sal-assign-9201',
+      employeeId: 'EMP9201',
+      employeeName: 'Suryabhan Singh Rathore',
+      structureId: 'struct-std',
+      structureTitle: 'Standard Corporate Structure',
+      effectiveDate: '2026-09-09',
+      basicSalary: 60000,
+      hra: 24000,
+      conveyance: 3000,
+      medical: 2000,
+      specialAllowance: 10000,
+      otherAllowances: 0,
+      bonus: 0,
+      pfEnabled: true,
+      pfPercent: 12,
+      ptEnabled: true,
+      ptAmount: 200,
+      tdsPercent: 10,
+      esiEnabled: false,
+      esiPercent: 0,
+      status: 'Active',
+      revisionReason: 'Initial Salary Assignment',
+      createdBy: 'Admin',
+      createdAt: '2026-09-09',
+      updatedAt: '2026-09-09',
+    },
+  ],
   salaryStructures: [
     {
       id: 'struct-std',
@@ -228,6 +259,7 @@ export function getInitialEmsState(): EmsDataState {
           candidates: Array.isArray(parsed.candidates) ? parsed.candidates : cleanInitialState.candidates,
           salaryStructures: Array.isArray(parsed.salaryStructures) && parsed.salaryStructures.length > 0 ? parsed.salaryStructures : cleanInitialState.salaryStructures,
           salaryRules: Array.isArray(parsed.salaryRules) && parsed.salaryRules.length > 0 ? parsed.salaryRules : cleanInitialState.salaryRules,
+          salaryAssignments: Array.isArray(parsed.salaryAssignments) && parsed.salaryAssignments.length > 0 ? parsed.salaryAssignments : cleanInitialState.salaryAssignments,
           employeeSalaryProfiles: parsed.employeeSalaryProfiles || {},
           payrollRecords: Array.isArray(parsed.payrollRecords) ? parsed.payrollRecords : cleanInitialState.payrollRecords,
           payrollSettings: parsed.payrollSettings || cleanInitialState.payrollSettings,
@@ -600,6 +632,135 @@ export function useEmsStore() {
     logActivity('Admin', 'deleted salary rule');
   };
 
+  // Salary Assignments CRUD
+  const addSalaryAssignment = (assignment: Omit<EmployeeSalaryAssignment, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const created: EmployeeSalaryAssignment = {
+      ...assignment,
+      id: `sal-assign-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    assignEmployeeSalaryProfile(
+      assignment.employeeId,
+      {
+        structureId: assignment.structureId,
+        structureTitle: assignment.structureTitle,
+        basicSalary: assignment.basicSalary,
+        hra: assignment.hra,
+        conveyance: assignment.conveyance,
+        medical: assignment.medical,
+        specialAllowance: assignment.specialAllowance,
+        otherAllowances: assignment.otherAllowances || 0,
+        bonus: assignment.bonus || 0,
+        overtimeRatePerHour: state.payrollSettings?.overtimeRatePerHour || 250,
+        pfEnabled: assignment.pfEnabled,
+        pfPercent: assignment.pfPercent,
+        ptEnabled: assignment.ptEnabled,
+        ptAmount: assignment.ptAmount,
+        tdsPercent: assignment.tdsPercent,
+        esiEnabled: assignment.esiEnabled,
+        esiPercent: assignment.esiPercent,
+        effectiveDate: assignment.effectiveDate,
+      },
+      assignment.revisionReason || 'Salary structure assigned'
+    );
+
+    setState((prev) => ({
+      ...prev,
+      salaryAssignments: [created, ...(prev.salaryAssignments || [])],
+    }));
+
+    logActivity('Admin', `assigned salary structure to ${assignment.employeeName} (${assignment.structureTitle})`, 'employee');
+    return created;
+  };
+
+  const updateSalaryAssignment = (id: string, updated: Partial<EmployeeSalaryAssignment>) => {
+    let targetAssign: EmployeeSalaryAssignment | undefined;
+
+    setState((prev) => {
+      const nextList = (prev.salaryAssignments || []).map((sa) => {
+        if (sa.id !== id) return sa;
+        targetAssign = { ...sa, ...updated, updatedAt: new Date().toISOString() };
+        return targetAssign;
+      });
+      return {
+        ...prev,
+        salaryAssignments: nextList,
+      };
+    });
+
+    if (targetAssign) {
+      assignEmployeeSalaryProfile(
+        targetAssign.employeeId,
+        {
+          structureId: targetAssign.structureId,
+          structureTitle: targetAssign.structureTitle,
+          basicSalary: targetAssign.basicSalary,
+          hra: targetAssign.hra,
+          conveyance: targetAssign.conveyance,
+          medical: targetAssign.medical,
+          specialAllowance: targetAssign.specialAllowance,
+          otherAllowances: targetAssign.otherAllowances || 0,
+          bonus: targetAssign.bonus || 0,
+          overtimeRatePerHour: state.payrollSettings?.overtimeRatePerHour || 250,
+          pfEnabled: targetAssign.pfEnabled,
+          pfPercent: targetAssign.pfPercent,
+          ptEnabled: targetAssign.ptEnabled,
+          ptAmount: targetAssign.ptAmount,
+          tdsPercent: targetAssign.tdsPercent,
+          esiEnabled: targetAssign.esiEnabled,
+          esiPercent: targetAssign.esiPercent,
+          effectiveDate: targetAssign.effectiveDate,
+        },
+        targetAssign.revisionReason || 'Salary structure updated'
+      );
+
+      logActivity('Admin', `updated salary assignment for ${targetAssign.employeeName}`, 'employee');
+    }
+  };
+
+  const deactivateSalaryAssignment = (id: string, reason?: string) => {
+    const target = (state.salaryAssignments || []).find((sa) => sa.id === id);
+    if (!target) return;
+
+    setState((prev) => ({
+      ...prev,
+      salaryAssignments: (prev.salaryAssignments || []).map((sa) =>
+        sa.id === id ? { ...sa, status: 'Inactive' as const, updatedAt: new Date().toISOString() } : sa
+      ),
+    }));
+
+    logActivity('Admin', `deactivated salary structure assignment for ${target.employeeName} (${reason || 'Deactivated'})`, 'employee');
+  };
+
+  const deleteSalaryAssignment = (id: string, reason?: string): { success: boolean; message: string; requiresDeactivation?: boolean } => {
+    const target = (state.salaryAssignments || []).find((sa) => sa.id === id);
+    if (!target) return { success: false, message: 'Salary assignment record not found.' };
+
+    const hasFinalizedPayroll = (state.payrollRecords || []).some(
+      (p) =>
+        (p.employeeId === target.employeeId || p.employeeName.toLowerCase().trim() === target.employeeName.toLowerCase().trim()) &&
+        (p.status === 'Approved' || p.status === 'Processed' || p.status === 'Paid')
+    );
+
+    if (hasFinalizedPayroll) {
+      return {
+        success: false,
+        requiresDeactivation: true,
+        message: `Cannot hard-delete salary structure for ${target.employeeName} because it is referenced in past finalized payroll records (Approved/Processed/Paid). You can deactivate this assignment instead.`,
+      };
+    }
+
+    setState((prev) => ({
+      ...prev,
+      salaryAssignments: (prev.salaryAssignments || []).filter((sa) => sa.id !== id),
+    }));
+
+    logActivity('Admin', `deleted salary structure assignment for ${target.employeeName} (${reason || 'Deleted'})`, 'employee');
+    return { success: true, message: `Salary assignment for ${target.employeeName} deleted successfully.` };
+  };
+
   // Employee Salary Profiles
   const assignEmployeeSalaryProfile = (
     employeeId: string,
@@ -947,6 +1108,7 @@ export function useEmsStore() {
       candidates: mockCandidates,
       salaryStructures: cleanInitialState.salaryStructures,
       salaryRules: cleanInitialState.salaryRules,
+      salaryAssignments: cleanInitialState.salaryAssignments,
       employeeSalaryProfiles: {},
       payrollRecords: mockPayrollRecords,
       payrollSettings: cleanInitialState.payrollSettings,
@@ -986,6 +1148,7 @@ export function useEmsStore() {
     candidates: Array.isArray(state.candidates) ? state.candidates : [],
     salaryStructures: Array.isArray(state.salaryStructures) ? state.salaryStructures : cleanInitialState.salaryStructures,
     salaryRules: Array.isArray(state.salaryRules) ? state.salaryRules : cleanInitialState.salaryRules,
+    salaryAssignments: Array.isArray(state.salaryAssignments) && state.salaryAssignments.length > 0 ? state.salaryAssignments : cleanInitialState.salaryAssignments,
     employeeSalaryProfiles: state.employeeSalaryProfiles || {},
     payrollRecords: Array.isArray(state.payrollRecords) ? state.payrollRecords : [],
     payrollSettings: state.payrollSettings || cleanInitialState.payrollSettings,
@@ -998,6 +1161,7 @@ export function useEmsStore() {
     activeEmployeesCount,
     onLeaveCount,
     newEmployeesCount,
+    salaryAssignments: safeState.salaryAssignments,
     addEmployee,
     deactivateEmployee,
     addDepartment,
@@ -1015,6 +1179,10 @@ export function useEmsStore() {
     addSalaryRule,
     updateSalaryRule,
     deleteSalaryRule,
+    addSalaryAssignment,
+    updateSalaryAssignment,
+    deactivateSalaryAssignment,
+    deleteSalaryAssignment,
     assignEmployeeSalaryProfile,
     processMonthlyPayroll,
     updatePayrollRecord,
