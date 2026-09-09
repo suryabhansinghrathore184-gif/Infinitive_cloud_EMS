@@ -385,3 +385,79 @@ export interface IntegrationCard {
 
 export type { RecentActivityItem, AnnouncementItem } from './dashboard';
 
+// Notification System Models
+export type NotificationCategory =
+  | 'employee'
+  | 'attendance'
+  | 'leave'
+  | 'payroll'
+  | 'document'
+  | 'recruitment'
+  | 'system';
+
+export type NotificationPriority = 'low' | 'normal' | 'high' | 'critical';
+
+export type NotificationDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'failed' | 'read';
+
+export interface AppNotification {
+  id: string;
+  recipientId: string;
+  recipientRole: 'Admin' | 'Employee' | 'HR';
+  title: string;
+  message: string;
+  category: NotificationCategory;
+  priority: NotificationPriority;
+  entityType?: 'employee' | 'leave' | 'attendance' | 'payroll' | 'document' | 'candidate' | 'job' | 'system';
+  entityId?: string;
+  actionUrl: string;
+  isRead: boolean;
+  readAt?: string;
+  deliveryStatus: NotificationDeliveryStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationPreference {
+  id: string;
+  eventKey: string;
+  eventName: string;
+  category: NotificationCategory;
+  inApp: boolean;
+  email: boolean;
+  sms: boolean;
+  whatsapp: boolean;
+}
+
+export interface SmtpConfig {
+  configured: boolean;
+  host: string;
+  port: number;
+  username: string;
+  fromName: string;
+  fromEmail: string;
+  useTls: boolean;
+}
+
+export interface SmsConfig {
+  configured: boolean;
+  provider: string;
+  senderId: string;
+  apiKeySet: boolean;
+}
+
+export interface WhatsappConfig {
+  configured: boolean;
+  phoneNumberId: string;
+  businessAccountId: string;
+  tokenSet: boolean;
+}
+
+export interface NotificationSettingsState {
+  retentionDays: '30' | '90' | '180' | '365' | 'never';
+  smtp: SmtpConfig;
+  sms: SmsConfig;
+  whatsapp: WhatsappConfig;
+  preferences: NotificationPreference[];
+}
+
+

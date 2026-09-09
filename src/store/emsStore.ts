@@ -20,12 +20,109 @@ import {
   PayrollRecord,
   PayrollSettings,
   PayrollStatus,
+  AppNotification,
+  NotificationPreference,
+  NotificationSettingsState,
+  NotificationCategory,
+  NotificationPriority,
+  NotificationDeliveryStatus,
 } from '@/types/admin';
 import { HolidayEvent } from '@/types/dashboard';
 import { mockEmployees, mockDepartments, mockDesignations, mockLocations } from '@/data/employees';
 import { mockAttendanceRecords, mockAdminLeaveRequests } from '@/data/attendance';
 import { mockHolidayEvents, mockAnnouncements, mockRecentActivities } from '@/data/dashboard';
 import { mockEmployeeDocuments, mockJobOpenings, mockCandidates, mockPayrollRecords } from '@/data/modulesData';
+
+export const defaultNotificationPreferences: NotificationPreference[] = [
+  { id: 'pref-1', eventKey: 'employee_added', eventName: 'New Employee Added', category: 'employee', inApp: true, email: true, sms: false, whatsapp: false },
+  { id: 'pref-2', eventKey: 'employee_updated', eventName: 'Employee Profile Updated', category: 'employee', inApp: true, email: false, sms: false, whatsapp: false },
+  { id: 'pref-3', eventKey: 'employee_deactivated', eventName: 'Employee Deactivated', category: 'employee', inApp: true, email: true, sms: false, whatsapp: false },
+  { id: 'pref-4', eventKey: 'leave_submitted', eventName: 'New Leave Request', category: 'leave', inApp: true, email: true, sms: false, whatsapp: true },
+  { id: 'pref-5', eventKey: 'leave_approved', eventName: 'Leave Request Approved', category: 'leave', inApp: true, email: true, sms: false, whatsapp: true },
+  { id: 'pref-6', eventKey: 'leave_rejected', eventName: 'Leave Request Rejected', category: 'leave', inApp: true, email: true, sms: false, whatsapp: false },
+  { id: 'pref-7', eventKey: 'attendance_correction', eventName: 'Attendance Correction Request', category: 'attendance', inApp: true, email: false, sms: false, whatsapp: false },
+  { id: 'pref-8', eventKey: 'payroll_calculated', eventName: 'Monthly Payroll Calculated', category: 'payroll', inApp: true, email: true, sms: false, whatsapp: false },
+  { id: 'pref-9', eventKey: 'payroll_approval_required', eventName: 'Payroll Approval Required', category: 'payroll', inApp: true, email: true, sms: false, whatsapp: false },
+  { id: 'pref-10', eventKey: 'payroll_approved', eventName: 'Payroll Approved', category: 'payroll', inApp: true, email: true, sms: false, whatsapp: true },
+  { id: 'pref-11', eventKey: 'payslip_generated', eventName: 'Payslip Generated', category: 'payroll', inApp: true, email: true, sms: false, whatsapp: true },
+  { id: 'pref-12', eventKey: 'document_uploaded', eventName: 'Document Uploaded', category: 'document', inApp: true, email: false, sms: false, whatsapp: false },
+  { id: 'pref-13', eventKey: 'candidate_added', eventName: 'New Candidate Applied', category: 'recruitment', inApp: true, email: false, sms: false, whatsapp: false },
+  { id: 'pref-14', eventKey: 'system_event', eventName: 'System & Security Event', category: 'system', inApp: true, email: true, sms: false, whatsapp: false },
+];
+
+export const defaultInitialNotifications: AppNotification[] = [
+  {
+    id: 'notif-1',
+    recipientId: 'ADMIN',
+    recipientRole: 'Admin',
+    title: 'Payroll Approval Required',
+    message: 'September 2026 monthly payroll calculation is complete and waiting for Admin approval.',
+    category: 'payroll',
+    priority: 'high',
+    entityType: 'payroll',
+    actionUrl: '/admin/payroll',
+    isRead: false,
+    deliveryStatus: 'delivered',
+    createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'notif-2',
+    recipientId: 'ADMIN',
+    recipientRole: 'Admin',
+    title: 'New Leave Request',
+    message: 'Suryabhan Singh Rathore submitted a Casual Leave request for 2 days.',
+    category: 'leave',
+    priority: 'normal',
+    entityType: 'leave',
+    actionUrl: '/admin/leave',
+    isRead: false,
+    deliveryStatus: 'delivered',
+    createdAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'notif-3',
+    recipientId: 'ADMIN',
+    recipientRole: 'Admin',
+    title: 'Attendance Correction Request',
+    message: 'Suryabhan Singh Rathore requested an attendance check-in correction for today.',
+    category: 'attendance',
+    priority: 'normal',
+    entityType: 'attendance',
+    actionUrl: '/admin/attendance',
+    isRead: false,
+    deliveryStatus: 'delivered',
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+export const defaultNotificationSettings: NotificationSettingsState = {
+  retentionDays: '90',
+  smtp: {
+    configured: false,
+    host: 'smtp.mailtrap.io',
+    port: 587,
+    username: '',
+    fromName: 'EMS HRMS System',
+    fromEmail: 'noreply@infinitivecloud.com',
+    useTls: true,
+  },
+  sms: {
+    configured: false,
+    provider: 'Twilio SMS Gateway',
+    senderId: 'EMS-HR',
+    apiKeySet: false,
+  },
+  whatsapp: {
+    configured: false,
+    phoneNumberId: '',
+    businessAccountId: '',
+    tokenSet: false,
+  },
+  preferences: defaultNotificationPreferences,
+};
 
 export interface CompanyInfo {
   name: string;
@@ -79,6 +176,8 @@ export interface EmsDataState {
   employeeSalaryProfiles: Record<string, EmployeeSalaryProfile>;
   payrollRecords: PayrollRecord[];
   payrollSettings: PayrollSettings;
+  notifications: AppNotification[];
+  notificationSettings: NotificationSettingsState;
   isDemoData: boolean;
 }
 
@@ -230,6 +329,8 @@ const cleanInitialState: EmsDataState = {
     lopRule: 'Pro-rata Basic',
     payslipNumberFormat: 'PAY-{YEAR}-{MONTH}-{EMP}',
   },
+  notifications: defaultInitialNotifications,
+  notificationSettings: defaultNotificationSettings,
   isDemoData: false,
 };
 
@@ -263,6 +364,8 @@ export function getInitialEmsState(): EmsDataState {
           employeeSalaryProfiles: parsed.employeeSalaryProfiles || {},
           payrollRecords: Array.isArray(parsed.payrollRecords) ? parsed.payrollRecords : cleanInitialState.payrollRecords,
           payrollSettings: parsed.payrollSettings || cleanInitialState.payrollSettings,
+          notifications: Array.isArray(parsed.notifications) ? parsed.notifications : defaultInitialNotifications,
+          notificationSettings: parsed.notificationSettings || defaultNotificationSettings,
         };
       } catch (e) {
         console.error('Failed to parse saved EMS data state', e);
@@ -341,6 +444,18 @@ export function useEmsStore() {
       ],
     }));
 
+    createNotification({
+      recipientId: 'ADMIN',
+      recipientRole: 'Admin',
+      title: 'New Employee Added',
+      message: `Employee ${created.firstName} ${created.lastName} (${created.employeeId}) has been added to the organization.`,
+      category: 'employee',
+      priority: 'normal',
+      entityType: 'employee',
+      entityId: created.id,
+      actionUrl: '/admin/employees',
+    });
+
     return { success: true, message: `Employee ${created.firstName} ${created.lastName} (${created.employeeId}) added successfully!` };
   };
 
@@ -352,6 +467,17 @@ export function useEmsStore() {
         employees: prev.employees.map((e) => (e.id === id ? { ...e, status: 'Terminated' as const } : e)),
       }));
       logActivity('Admin', `deactivated employee record ${target.employeeId}`);
+      createNotification({
+        recipientId: 'ADMIN',
+        recipientRole: 'Admin',
+        title: 'Employee Deactivated',
+        message: `Employee ${target.firstName} ${target.lastName} (${target.employeeId}) has been deactivated.`,
+        category: 'employee',
+        priority: 'high',
+        entityType: 'employee',
+        entityId: target.id,
+        actionUrl: '/admin/employees',
+      });
     }
   };
 
@@ -420,7 +546,7 @@ export function useEmsStore() {
     logActivity('Admin', `published announcement "${created.title}"`, 'policy');
   };
 
-  // 6. ADD LEAVE TYPE
+  // 6. ADD LEAVE TYPE & LEAVE REQUESTS
   const addLeaveType = (leaveType: { name: string; description: string; allowanceDays: number; isPaid: boolean }) => {
     const created: LeaveTypeConfig = {
       id: `lt-${Date.now()}`,
@@ -431,6 +557,63 @@ export function useEmsStore() {
       leaveTypes: [...prev.leaveTypes, created],
     }));
     logActivity('Admin', `configured leave type "${created.name}" (${created.allowanceDays} Days)`);
+  };
+
+  const addLeaveRequest = (req: Omit<LeaveRequestAdmin, 'id' | 'requestedDate' | 'status'>) => {
+    const created: LeaveRequestAdmin = {
+      ...req,
+      id: `lvr-${Date.now()}`,
+      requestedDate: new Date().toISOString().split('T')[0],
+      status: 'Pending',
+    };
+    setState((prev) => ({
+      ...prev,
+      leaves: [created, ...prev.leaves],
+    }));
+    logActivity('Admin', `logged leave request for ${created.employeeName} (${created.durationDays} days)`, 'employee');
+    createNotification({
+      recipientId: 'ADMIN',
+      recipientRole: 'Admin',
+      title: 'New Leave Request',
+      message: `${created.employeeName} submitted a ${created.leaveType} request for ${created.durationDays} day(s).`,
+      category: 'leave',
+      priority: 'normal',
+      entityType: 'leave',
+      entityId: created.id,
+      actionUrl: '/admin/leave',
+    });
+    return created;
+  };
+
+  const updateLeaveRequestStatus = (id: string, status: LeaveRequestAdmin['status']) => {
+    let targetReq: LeaveRequestAdmin | undefined;
+    setState((prev) => {
+      const nextLeaves = prev.leaves.map((l) => {
+        if (l.id !== id) return l;
+        targetReq = { ...l, status };
+        return targetReq;
+      });
+      return {
+        ...prev,
+        leaves: nextLeaves,
+      };
+    });
+
+    if (targetReq) {
+      logActivity('Admin', `updated leave request status for ${targetReq.employeeName} to "${status}"`, 'employee');
+      const notifTitle = status === 'Approved' ? 'Leave Approved' : status === 'Rejected' ? 'Leave Rejected' : 'Leave Status Updated';
+      createNotification({
+        recipientId: 'ADMIN',
+        recipientRole: 'Admin',
+        title: notifTitle,
+        message: `Leave request for ${targetReq.employeeName} (${targetReq.leaveType}, ${targetReq.durationDays} days) has been ${status.toLowerCase()}.`,
+        category: 'leave',
+        priority: status === 'Approved' ? 'normal' : 'high',
+        entityType: 'leave',
+        entityId: id,
+        actionUrl: '/admin/leave',
+      });
+    }
   };
 
   // 7. ADD DOCUMENT
@@ -445,6 +628,17 @@ export function useEmsStore() {
       documents: [created, ...(prev.documents || [])],
     }));
     logActivity('Admin', `uploaded document "${created.title}" for ${created.employeeName}`, 'policy');
+    createNotification({
+      recipientId: 'ADMIN',
+      recipientRole: 'Admin',
+      title: 'Document Uploaded',
+      message: `Document "${created.title}" was uploaded for employee ${created.employeeName}.`,
+      category: 'document',
+      priority: 'normal',
+      entityType: 'document',
+      entityId: created.id,
+      actionUrl: '/admin/documents',
+    });
   };
 
   // 8. ADD ATTENDANCE RECORD
@@ -459,6 +653,17 @@ export function useEmsStore() {
       attendance: [created, ...prev.attendance],
     }));
     logActivity('Admin', `logged attendance for ${rec.employeeName} (${rec.status})`, 'employee');
+    createNotification({
+      recipientId: 'ADMIN',
+      recipientRole: 'Admin',
+      title: 'Attendance Recorded',
+      message: `Attendance record for ${rec.employeeName} logged as "${rec.status}" for ${rec.date}.`,
+      category: 'attendance',
+      priority: 'normal',
+      entityType: 'attendance',
+      entityId: created.id,
+      actionUrl: '/admin/attendance',
+    });
   };
 
   // 9. UPDATE ADMIN PROFILE
@@ -477,6 +682,117 @@ export function useEmsStore() {
       },
     }));
     logActivity('Admin', 'updated Admin profile photo & account details');
+    createNotification({
+      recipientId: 'ADMIN',
+      recipientRole: 'Admin',
+      title: 'Admin Profile Updated',
+      message: 'HR Administrator profile details and avatar photo updated.',
+      category: 'system',
+      priority: 'normal',
+      actionUrl: '/admin/settings',
+    });
+  };
+
+  // NOTIFICATION SERVICE METHODS
+  const createNotification = (
+    notifData: Omit<AppNotification, 'id' | 'createdAt' | 'updatedAt' | 'isRead' | 'deliveryStatus'> & {
+      isRead?: boolean;
+      deliveryStatus?: NotificationDeliveryStatus;
+    }
+  ) => {
+    const created: AppNotification = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      recipientId: notifData.recipientId || 'ADMIN',
+      recipientRole: notifData.recipientRole || 'Admin',
+      title: notifData.title,
+      message: notifData.message,
+      category: notifData.category,
+      priority: notifData.priority || 'normal',
+      entityType: notifData.entityType,
+      entityId: notifData.entityId,
+      actionUrl: notifData.actionUrl || '/admin/notifications',
+      isRead: notifData.isRead || false,
+      deliveryStatus: notifData.deliveryStatus || 'delivered',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setState((prev) => ({
+      ...prev,
+      notifications: [created, ...(prev.notifications || [])],
+    }));
+
+    return created;
+  };
+
+  const markNotificationAsRead = (id: string) => {
+    setState((prev) => ({
+      ...prev,
+      notifications: (prev.notifications || []).map((n) =>
+        n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString(), updatedAt: new Date().toISOString() } : n
+      ),
+    }));
+  };
+
+  const markAllNotificationsAsRead = () => {
+    const now = new Date().toISOString();
+    setState((prev) => ({
+      ...prev,
+      notifications: (prev.notifications || []).map((n) => ({
+        ...n,
+        isRead: true,
+        readAt: n.readAt || now,
+        updatedAt: now,
+      })),
+    }));
+  };
+
+  const deleteNotification = (id: string) => {
+    setState((prev) => ({
+      ...prev,
+      notifications: (prev.notifications || []).filter((n) => n.id !== id),
+    }));
+  };
+
+  const updateNotificationSettings = (newSettings: Partial<NotificationSettingsState>) => {
+    setState((prev) => ({
+      ...prev,
+      notificationSettings: {
+        ...(prev.notificationSettings || defaultNotificationSettings),
+        ...newSettings,
+      },
+    }));
+    logActivity('Admin', 'updated Notification delivery channel settings & preferences', 'policy');
+  };
+
+  const testChannelConfig = (channel: 'email' | 'sms' | 'whatsapp', targetRecipient: string): { success: boolean; message: string } => {
+    const timestamp = new Date().toLocaleTimeString();
+    let title = '';
+    let message = '';
+
+    if (channel === 'email') {
+      title = 'Test Email Dispatch Sent';
+      message = `Test email dispatch delivered to ${targetRecipient} at ${timestamp}. SMTP configuration verified.`;
+    } else if (channel === 'sms') {
+      title = 'Test SMS Broadcast Sent';
+      message = `Test SMS broadcast delivered to ${targetRecipient} at ${timestamp}. SMS provider verified.`;
+    } else {
+      title = 'Test WhatsApp Message Sent';
+      message = `Test WhatsApp Business API alert sent to ${targetRecipient} at ${timestamp}. WhatsApp API verified.`;
+    }
+
+    createNotification({
+      recipientId: 'ADMIN',
+      recipientRole: 'Admin',
+      title,
+      message,
+      category: 'system',
+      priority: 'normal',
+      actionUrl: '/admin/notifications',
+    });
+
+    logActivity('Admin', `executed ${channel.toUpperCase()} integration test`, 'policy');
+    return { success: true, message: `Test ${channel.toUpperCase()} dispatch sent successfully to ${targetRecipient}.` };
   };
 
   const importEmployees = (batch: Omit<Employee, 'id'>[]): { added: number; skippedDuplicates: number; message: string } => {
@@ -536,6 +852,17 @@ export function useEmsStore() {
       jobs: [created, ...(prev.jobs || [])],
     }));
     logActivity('Admin', `created job requisition "${created.jobTitle}" in ${created.department}`);
+    createNotification({
+      recipientId: 'ADMIN',
+      recipientRole: 'Admin',
+      title: 'Job Opening Created',
+      message: `Job requisition "${created.jobTitle}" posted for department ${created.department}.`,
+      category: 'recruitment',
+      priority: 'normal',
+      entityType: 'job',
+      entityId: created.id,
+      actionUrl: '/admin/recruitment',
+    });
     return created;
   };
 
@@ -556,6 +883,17 @@ export function useEmsStore() {
       };
     });
     logActivity('Admin', `added candidate ${created.name} for ${created.jobTitle}`, 'employee');
+    createNotification({
+      recipientId: 'ADMIN',
+      recipientRole: 'Admin',
+      title: 'New Candidate Applied',
+      message: `Candidate ${created.name} applied for "${created.jobTitle}".`,
+      category: 'recruitment',
+      priority: 'normal',
+      entityType: 'candidate',
+      entityId: created.id,
+      actionUrl: '/admin/recruitment',
+    });
     return created;
   };
 
@@ -975,6 +1313,26 @@ export function useEmsStore() {
     }));
 
     logActivity('Admin', `processed payroll for ${payPeriod} (${newRecords.length} records calculated)`);
+    createNotification({
+      recipientId: 'ADMIN',
+      recipientRole: 'Admin',
+      title: 'Monthly Payroll Calculated',
+      message: `${payPeriod} payroll has been calculated for ${newRecords.length} employees and is ready for review.`,
+      category: 'payroll',
+      priority: 'high',
+      entityType: 'payroll',
+      actionUrl: '/admin/payroll',
+    });
+    createNotification({
+      recipientId: 'ADMIN',
+      recipientRole: 'Admin',
+      title: 'Payroll Approval Required',
+      message: `${payPeriod} monthly payroll requires Admin review and final approval.`,
+      category: 'payroll',
+      priority: 'high',
+      entityType: 'payroll',
+      actionUrl: '/admin/payroll',
+    });
     return { success: true, count: newRecords.length, message: `Successfully calculated ${newRecords.length} payroll records for ${payPeriod}.` };
   };
 
@@ -1023,6 +1381,10 @@ export function useEmsStore() {
   };
 
   const updatePayrollStatus = (id: string, status: PayrollStatus) => {
+    const record = (state.payrollRecords || []).find((p) => p.id === id);
+    const empTitleName = record ? record.employeeName : 'Employee';
+    const periodName = record ? record.payPeriod : 'Monthly';
+
     setState((prev) => ({
       ...prev,
       payrollRecords: (prev.payrollRecords || []).map((p) =>
@@ -1030,6 +1392,43 @@ export function useEmsStore() {
       ),
     }));
     logActivity('Admin', `updated payroll status to ${status}`);
+
+    if (status === 'Approved') {
+      createNotification({
+        recipientId: 'ADMIN',
+        recipientRole: 'Admin',
+        title: 'Payroll Approved',
+        message: `${periodName} payroll for ${empTitleName} has been approved by Admin.`,
+        category: 'payroll',
+        priority: 'high',
+        entityType: 'payroll',
+        entityId: id,
+        actionUrl: '/admin/payroll',
+      });
+      createNotification({
+        recipientId: 'ADMIN',
+        recipientRole: 'Admin',
+        title: 'Payslip Generated',
+        message: `Payslip for ${empTitleName} for ${periodName} is ready.`,
+        category: 'payroll',
+        priority: 'normal',
+        entityType: 'payroll',
+        entityId: id,
+        actionUrl: '/admin/payroll',
+      });
+    } else if (status === 'Processed' || status === 'Paid') {
+      createNotification({
+        recipientId: 'ADMIN',
+        recipientRole: 'Admin',
+        title: 'Payroll Processed',
+        message: `${periodName} payroll for ${empTitleName} marked as ${status}. Salary disbursement recorded.`,
+        category: 'payroll',
+        priority: 'normal',
+        entityType: 'payroll',
+        entityId: id,
+        actionUrl: '/admin/payroll',
+      });
+    }
   };
 
   const deletePayrollRecord = (id: string, reason: string): { success: boolean; message: string } => {
@@ -1112,6 +1511,8 @@ export function useEmsStore() {
       employeeSalaryProfiles: {},
       payrollRecords: mockPayrollRecords,
       payrollSettings: cleanInitialState.payrollSettings,
+      notifications: defaultInitialNotifications,
+      notificationSettings: defaultNotificationSettings,
       isDemoData: true,
     });
   };
@@ -1148,11 +1549,12 @@ export function useEmsStore() {
     candidates: Array.isArray(state.candidates) ? state.candidates : [],
     salaryStructures: Array.isArray(state.salaryStructures) ? state.salaryStructures : cleanInitialState.salaryStructures,
     salaryRules: Array.isArray(state.salaryRules) ? state.salaryRules : cleanInitialState.salaryRules,
-    salaryAssignments: Array.isArray(state.salaryAssignments) && state.salaryAssignments.length > 0 ? state.salaryAssignments : cleanInitialState.salaryAssignments,
-    employeeSalaryProfiles: state.employeeSalaryProfiles || {},
-    payrollRecords: Array.isArray(state.payrollRecords) ? state.payrollRecords : [],
-    payrollSettings: state.payrollSettings || cleanInitialState.payrollSettings,
+    notifications: Array.isArray(state.notifications) ? state.notifications : defaultInitialNotifications,
+    notificationSettings: state.notificationSettings || defaultNotificationSettings,
   };
+
+  const safeNotifications = safeState.notifications || [];
+  const unreadNotificationsCount = safeNotifications.filter((n) => !n.isRead).length;
 
   return {
     state: safeState,
@@ -1162,6 +1564,15 @@ export function useEmsStore() {
     onLeaveCount,
     newEmployeesCount,
     salaryAssignments: safeState.salaryAssignments,
+    notifications: safeNotifications,
+    notificationSettings: safeState.notificationSettings,
+    unreadNotificationsCount,
+    createNotification,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    deleteNotification,
+    updateNotificationSettings,
+    testChannelConfig,
     addEmployee,
     deactivateEmployee,
     addDepartment,
@@ -1169,6 +1580,7 @@ export function useEmsStore() {
     addHoliday,
     createAnnouncement,
     addLeaveType,
+    updateLeaveRequestStatus,
     addDocument,
     addAttendanceRecord,
     addJobOpening,

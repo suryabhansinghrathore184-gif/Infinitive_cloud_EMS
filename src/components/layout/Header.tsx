@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Search,
   Bell,
@@ -12,6 +13,15 @@ import {
   Settings,
   LogOut,
   ShieldCheck,
+  Check,
+  CheckCheck,
+  CreditCard,
+  CalendarDays,
+  Users as UsersIcon,
+  FileText,
+  UserPlus,
+  Clock,
+  Puzzle,
 } from 'lucide-react';
 import { useEmsStore } from '@/store/emsStore';
 
@@ -20,7 +30,15 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
-  const { state } = useEmsStore();
+  const router = useRouter();
+  const {
+    state,
+    notifications,
+    unreadNotificationsCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+  } = useEmsStore();
+
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
@@ -29,6 +47,35 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     email: 'admin@organization.com',
     role: 'HR Administrator',
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
+  };
+
+  const recentNotifications = (notifications || []).slice(0, 5);
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'payroll':
+        return <CreditCard className="h-4 w-4 text-emerald-600" />;
+      case 'leave':
+        return <CalendarDays className="h-4 w-4 text-blue-600" />;
+      case 'employee':
+        return <UsersIcon className="h-4 w-4 text-indigo-600" />;
+      case 'attendance':
+        return <Clock className="h-4 w-4 text-amber-600" />;
+      case 'document':
+        return <FileText className="h-4 w-4 text-purple-600" />;
+      case 'recruitment':
+        return <UserPlus className="h-4 w-4 text-rose-600" />;
+      default:
+        return <Puzzle className="h-4 w-4 text-slate-600" />;
+    }
+  };
+
+  const handleNotificationClick = (id: string, actionUrl: string) => {
+    markNotificationAsRead(id);
+    setIsNotificationsOpen(false);
+    if (actionUrl) {
+      router.push(actionUrl);
+    }
   };
 
   return (
@@ -81,21 +128,76 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             aria-label="Notifications"
           >
             <Bell className="h-5 w-5" />
-            <span className="absolute right-1.5 top-1.5 flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-600"></span>
-            </span>
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+              </span>
+            )}
           </button>
 
           {/* Notifications Dropdown */}
           {isNotificationsOpen && (
-            <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-slate-200 bg-white py-2 shadow-xl">
-              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
-                <span className="text-sm font-semibold text-slate-800">Notifications</span>
-                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600">Live</span>
+            <div className="absolute right-0 mt-2 w-88 rounded-2xl border border-slate-200 bg-white py-2 shadow-2xl z-50 text-xs animate-fade-in">
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
+                <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+                  <span>Notifications</span>
+                  {unreadNotificationsCount > 0 && (
+                    <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">
+                      {unreadNotificationsCount} Unread
+                    </span>
+                  )}
+                </div>
+                {unreadNotificationsCount > 0 && (
+                  <button
+                    onClick={() => markAllNotificationsAsRead()}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline"
+                  >
+                    <CheckCheck className="h-3.5 w-3.5" />
+                    <span>Mark all read</span>
+                  </button>
+                )}
               </div>
-              <div className="p-4 text-center text-xs text-slate-500">
-                System notifications will stream live here as events occur.
+
+              <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                {recentNotifications.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 text-xs">No notifications yet.</div>
+                ) : (
+                  recentNotifications.map((n) => (
+                    <div
+                      key={n.id}
+                      onClick={() => handleNotificationClick(n.id, n.actionUrl)}
+                      className={`flex items-start gap-3 p-3 transition cursor-pointer hover:bg-slate-50 ${
+                        !n.isRead ? 'bg-blue-50/40' : ''
+                      }`}
+                    >
+                      <div className="mt-0.5 rounded-lg border border-slate-100 bg-white p-2 shadow-xs">
+                        {getCategoryIcon(n.category)}
+                      </div>
+                      <div className="flex-1 space-y-0.5 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className={`font-bold truncate ${!n.isRead ? 'text-slate-900' : 'text-slate-700'}`}>
+                            {n.title}
+                          </p>
+                          {!n.isRead && <span className="h-2 w-2 rounded-full bg-blue-600 shrink-0"></span>}
+                        </div>
+                        <p className="text-[11px] text-slate-600 line-clamp-2">{n.message}</p>
+                        <p className="text-[10px] text-slate-400 font-mono pt-0.5">
+                          {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="border-t border-slate-100 p-2 text-center">
+                <Link
+                  href="/admin/notifications"
+                  onClick={() => setIsNotificationsOpen(false)}
+                  className="block rounded-xl py-1.5 font-bold text-blue-600 hover:bg-blue-50 transition"
+                >
+                  View All Notifications →
+                </Link>
               </div>
             </div>
           )}

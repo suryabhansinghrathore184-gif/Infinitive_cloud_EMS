@@ -23,6 +23,8 @@ import {
   X,
 } from 'lucide-react';
 
+import { useEmsStore } from '@/store/emsStore';
+
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
@@ -46,7 +48,7 @@ const navItems: NavItem[] = [
   { name: 'Documents', href: '/admin/documents', icon: FileText },
   { name: 'Recruitment', href: '/admin/recruitment', icon: UserPlus },
   { name: 'Communication', href: '/admin/communication', icon: MessageSquare },
-  { name: 'Notifications', href: '/admin/notifications', icon: Bell, badge: '3' },
+  { name: 'Notifications', href: '/admin/notifications', icon: Bell },
   { name: 'Helpdesk', href: '/admin/helpdesk', icon: HelpCircle, badge: '2' },
   { name: 'Reports', href: '/admin/reports', icon: BarChart3 },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
@@ -56,6 +58,16 @@ const navItems: NavItem[] = [
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const pathname = usePathname();
+  const { unreadNotificationsCount } = useEmsStore();
+
+  const getDynamicBadge = (item: NavItem) => {
+    if (item.name === 'Notifications') {
+      if (unreadNotificationsCount <= 0) return null;
+      if (unreadNotificationsCount > 99) return '99+';
+      return String(unreadNotificationsCount);
+    }
+    return item.badge || null;
+  };
 
   return (
     <>
@@ -105,6 +117,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               const isActive =
                 pathname === item.href || (pathname === '/' && item.href === '/admin/dashboard');
 
+              const badgeText = getDynamicBadge(item);
+
               return (
                 <Link
                   key={item.name}
@@ -124,7 +138,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     />
                     <span>{item.name}</span>
                   </div>
-                  {item.badge && (
+                  {badgeText && (
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                         isActive
@@ -132,7 +146,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                           : 'bg-slate-800 text-blue-400 group-hover:bg-slate-700'
                       }`}
                     >
-                      {item.badge}
+                      {badgeText}
                     </span>
                   )}
                 </Link>

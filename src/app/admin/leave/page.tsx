@@ -8,7 +8,7 @@ import { CalendarDays, CheckCircle2, Plus, CalendarOff } from 'lucide-react';
 import { AddLeaveTypeModal } from '@/components/modals/AddLeaveTypeModal';
 
 export default function LeavePage() {
-  const { state, addLeaveType } = useEmsStore();
+  const { state, addLeaveType, updateLeaveRequestStatus } = useEmsStore();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isAddLeaveTypeOpen, setIsAddLeaveTypeOpen] = useState(false);
 
@@ -117,7 +117,11 @@ export default function LeavePage() {
                   <td className="px-4 py-3.5 text-slate-600 max-w-xs truncate">{req.reason}</td>
                   <td className="px-4 py-3.5 text-slate-700">{req.approver}</td>
                   <td className="px-4 py-3.5">
-                    <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold text-amber-700 border border-amber-200">
+                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold border ${
+                      req.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                      req.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                      'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
                       {req.status}
                     </span>
                   </td>
@@ -125,13 +129,19 @@ export default function LeavePage() {
                     {req.status === 'Pending' && (
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => showToast(`Leave approved for ${req.employeeName}`)}
+                          onClick={() => {
+                            updateLeaveRequestStatus(req.id, 'Approved');
+                            showToast(`Leave approved for ${req.employeeName}`);
+                          }}
                           className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                         >
                           Approve
                         </button>
                         <button
-                          onClick={() => showToast(`Leave rejected for ${req.employeeName}`)}
+                          onClick={() => {
+                            updateLeaveRequestStatus(req.id, 'Rejected');
+                            showToast(`Leave rejected for ${req.employeeName}`);
+                          }}
                           className="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
                         >
                           Reject
