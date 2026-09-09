@@ -117,6 +117,91 @@ export interface LeaveRequestAdmin {
   status: 'Pending' | 'Approved' | 'Rejected' | 'Clarification';
 }
 
+export interface SalaryStructure {
+  id: string;
+  title: string;
+  description: string;
+  basicSalary: number;
+  hraType: 'Fixed' | 'PercentBasic';
+  hraValue: number;
+  conveyance: number;
+  medical: number;
+  specialAllowance: number;
+  otherAllowances: number;
+  pfPercent: number;
+  ptAmount: number;
+  tdsPercent: number;
+  esiPercent: number;
+  effectiveDate: string;
+  status: 'Active' | 'Inactive';
+}
+
+export interface SalaryRule {
+  id: string;
+  name: string;
+  code: string;
+  type: 'Earning' | 'Deduction';
+  calcType: 'Fixed Amount' | 'Percentage of Basic' | 'Percentage of Gross' | 'Formula';
+  value: number | string;
+  appliesTo: 'All Employees' | 'Department' | 'Designation' | 'Specific Employee';
+  targetValue?: string;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  active: boolean;
+  description: string;
+}
+
+export interface SalaryHistoryRecord {
+  id: string;
+  effectiveDate: string;
+  basicSalary: number;
+  grossSalary: number;
+  netSalary: number;
+  changedBy: string;
+  changeReason: string;
+  updatedAt: string;
+}
+
+export interface EmployeeSalaryProfile {
+  employeeId: string;
+  structureId?: string;
+  structureTitle: string;
+  basicSalary: number;
+  hra: number;
+  conveyance: number;
+  medical: number;
+  specialAllowance: number;
+  otherAllowances: number;
+  bonus: number;
+  overtimeRatePerHour: number;
+  pfEnabled: boolean;
+  pfPercent: number;
+  ptEnabled: boolean;
+  ptAmount: number;
+  tdsPercent: number;
+  esiEnabled: boolean;
+  esiPercent: number;
+  effectiveDate: string;
+  history: SalaryHistoryRecord[];
+}
+
+export type PayrollStatus =
+  | 'Draft'
+  | 'Calculated'
+  | 'Pending Approval'
+  | 'Approved'
+  | 'Processed'
+  | 'Paid'
+  | 'Cancelled';
+
+export interface PayrollAdjustment {
+  date: string;
+  user: string;
+  originalNet: number;
+  adjustedNet: number;
+  reason: string;
+}
+
 export interface PayrollRecord {
   id: string;
   employeeId: string;
@@ -124,17 +209,62 @@ export interface PayrollRecord {
   avatar: string;
   department: string;
   designation: string;
+  joiningDate?: string;
+  payPeriod: string; // e.g., "September 2026"
+  payMonth: number; // 9
+  payYear: number; // 2026
+  
+  // Attendance & Work Days
+  workingDays: number;
+  presentDays: number;
+  paidLeaveDays: number;
+  unpaidLeaveDays: number;
+  overtimeHours: number;
+  overtimeRate: number;
+
+  // Earnings Breakdown
   basicSalary: number;
   hra: number;
-  allowances: number;
+  conveyance: number;
+  medical: number;
+  specialAllowance: number;
+  otherAllowances: number;
   overtimePay: number;
+  bonus: number;
+  otherEarnings: number;
   grossSalary: number;
+
+  // Deductions Breakdown
+  lopDeduction: number;
   pfDeduction: number;
   ptDeduction: number;
-  taxDeduction: number;
+  taxDeduction: number; // TDS
+  esiDeduction: number;
+  loanDeduction: number;
+  otherDeductions: number;
+  totalDeductions: number;
+
+  // Final Net
   netSalary: number;
-  status: 'Draft' | 'Processing' | 'Approved' | 'Disbursed';
-  payPeriod: string;
+
+  // Status & Audit
+  status: PayrollStatus;
+  notes?: string;
+  adjustmentHistory?: PayrollAdjustment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PayrollSettings {
+  payCycle: string;
+  workingDaysPerMonth: number;
+  overtimeRatePerHour: number;
+  pfDefaultPercent: number;
+  ptDefaultAmount: number;
+  tdsDefaultPercent: number;
+  esiDefaultPercent: number;
+  lopRule: 'Pro-rata Basic' | 'Pro-rata Gross' | 'Fixed Rate';
+  payslipNumberFormat: string;
 }
 
 export interface PerformanceReview {

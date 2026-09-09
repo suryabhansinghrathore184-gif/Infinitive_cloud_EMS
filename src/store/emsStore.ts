@@ -13,12 +13,18 @@ import {
   EmployeeDocument,
   JobOpening,
   Candidate,
+  SalaryStructure,
+  SalaryRule,
+  EmployeeSalaryProfile,
+  PayrollRecord,
+  PayrollSettings,
+  PayrollStatus,
 } from '@/types/admin';
 import { HolidayEvent } from '@/types/dashboard';
 import { mockEmployees, mockDepartments, mockDesignations, mockLocations } from '@/data/employees';
 import { mockAttendanceRecords, mockAdminLeaveRequests } from '@/data/attendance';
 import { mockHolidayEvents, mockAnnouncements, mockRecentActivities } from '@/data/dashboard';
-import { mockEmployeeDocuments, mockJobOpenings, mockCandidates } from '@/data/modulesData';
+import { mockEmployeeDocuments, mockJobOpenings, mockCandidates, mockPayrollRecords } from '@/data/modulesData';
 
 export interface CompanyInfo {
   name: string;
@@ -66,6 +72,11 @@ export interface EmsDataState {
   documents: EmployeeDocument[];
   jobs: JobOpening[];
   candidates: Candidate[];
+  salaryStructures: SalaryStructure[];
+  salaryRules: SalaryRule[];
+  employeeSalaryProfiles: Record<string, EmployeeSalaryProfile>;
+  payrollRecords: PayrollRecord[];
+  payrollSettings: PayrollSettings;
   isDemoData: boolean;
 }
 
@@ -105,6 +116,89 @@ const cleanInitialState: EmsDataState = {
   documents: [],
   jobs: [],
   candidates: [],
+  salaryStructures: [
+    {
+      id: 'struct-std',
+      title: 'Standard Corporate Structure',
+      description: 'Default structure for full-time corporate employees (HRA 40%, PF 12%, PT ₹200)',
+      basicSalary: 60000,
+      hraType: 'PercentBasic',
+      hraValue: 40,
+      conveyance: 3000,
+      medical: 2000,
+      specialAllowance: 10000,
+      otherAllowances: 0,
+      pfPercent: 12,
+      ptAmount: 200,
+      tdsPercent: 10,
+      esiPercent: 0,
+      effectiveDate: '2026-01-01',
+      status: 'Active',
+    },
+  ],
+  salaryRules: [
+    {
+      id: 'rule-hra',
+      name: 'House Rent Allowance (HRA)',
+      code: 'EARN_HRA',
+      type: 'Earning',
+      calcType: 'Percentage of Basic',
+      value: 40,
+      appliesTo: 'All Employees',
+      effectiveFrom: '2026-01-01',
+      active: true,
+      description: 'Standard 40% of Basic Salary as HRA allowance',
+    },
+    {
+      id: 'rule-pf',
+      name: 'Provident Fund (PF)',
+      code: 'DED_PF',
+      type: 'Deduction',
+      calcType: 'Percentage of Basic',
+      value: 12,
+      appliesTo: 'All Employees',
+      effectiveFrom: '2026-01-01',
+      active: true,
+      description: 'Statutory 12% employee PF contribution from Basic Salary',
+    },
+    {
+      id: 'rule-pt',
+      name: 'Professional Tax (PT)',
+      code: 'DED_PT',
+      type: 'Deduction',
+      calcType: 'Fixed Amount',
+      value: 200,
+      appliesTo: 'All Employees',
+      effectiveFrom: '2026-01-01',
+      active: true,
+      description: 'State Professional Tax deduction fixed ₹200/month',
+    },
+    {
+      id: 'rule-tds',
+      name: 'Tax Deducted at Source (TDS)',
+      code: 'DED_TDS',
+      type: 'Deduction',
+      calcType: 'Percentage of Gross',
+      value: 10,
+      appliesTo: 'All Employees',
+      effectiveFrom: '2026-01-01',
+      active: true,
+      description: 'Income Tax TDS calculated as percentage of Gross Salary',
+    },
+  ],
+  employeeSalaryProfiles: {},
+  payrollRecords: [],
+  payrollSettings: {
+    payCycle: 'Monthly',
+    workingDaysPerMonth: 26,
+    overtimeRatePerHour: 250,
+    pfDefaultPercent: 12,
+    ptDefaultAmount: 200,
+    tdsDefaultPercent: 10,
+    esiDefaultPercent: 0.75,
+    lopRule: 'Pro-rata Basic',
+    payslipNumberFormat: 'PAY-{YEAR}-{MONTH}-{EMP}',
+  },
   isDemoData: false,
 };
 
@@ -403,6 +497,325 @@ export function useEmsStore() {
   };
 
   // Reset & Seed Controls
+  // Salary Structures
+  const addSalaryStructure = (struct: Omit<SalaryStructure, 'id'>) => {
+    const created: SalaryStructure = {
+      ...struct,
+      id: `struct-${Date.now()}`,
+    };
+    setState((prev) => ({
+      ...prev,
+      salaryStructures: [created, ...(prev.salaryStructures || [])],
+    }));
+    logActivity('Admin', `created salary structure "${created.title}"`);
+    return created;
+  };
+
+  const updateSalaryStructure = (id: string, updated: Partial<SalaryStructure>) => {
+    setState((prev) => ({
+      ...prev,
+      salaryStructures: (prev.salaryStructures || []).map((s) =>
+        s.id === id ? { ...s, ...updated } : s
+      ),
+    }));
+    logActivity('Admin', 'updated salary structure');
+  };
+
+  const deleteSalaryStructure = (id: string): { success: boolean; message: string } => {
+    const isAssigned = Object.values(state.employeeSalaryProfiles || {}).some(
+      (p) => p.structureId === id
+    );
+    if (isAssigned) {
+      return {
+        success: false,
+        message: 'Cannot delete salary structure because it is currently assigned to one or more employees.',
+      };
+    }
+    setState((prev) => ({
+      ...prev,
+      salaryStructures: (prev.salaryStructures || []).filter((s) => s.id !== id),
+    }));
+    logActivity('Admin', 'deleted salary structure');
+    return { success: true, message: 'Salary structure deleted successfully.' };
+  };
+
+  // Salary Rules
+  const addSalaryRule = (rule: Omit<SalaryRule, 'id'>) => {
+    const created: SalaryRule = {
+      ...rule,
+      id: `rule-${Date.now()}`,
+    };
+    setState((prev) => ({
+      ...prev,
+      salaryRules: [created, ...(prev.salaryRules || [])],
+    }));
+    logActivity('Admin', `created salary rule "${created.name}" (${created.code})`);
+    return created;
+  };
+
+  const updateSalaryRule = (id: string, updated: Partial<SalaryRule>) => {
+    setState((prev) => ({
+      ...prev,
+      salaryRules: (prev.salaryRules || []).map((r) => (r.id === id ? { ...r, ...updated } : r)),
+    }));
+    logActivity('Admin', 'updated salary rule');
+  };
+
+  const deleteSalaryRule = (id: string) => {
+    setState((prev) => ({
+      ...prev,
+      salaryRules: (prev.salaryRules || []).filter((r) => r.id !== id),
+    }));
+    logActivity('Admin', 'deleted salary rule');
+  };
+
+  // Employee Salary Profiles
+  const assignEmployeeSalaryProfile = (
+    employeeId: string,
+    profileData: Omit<EmployeeSalaryProfile, 'employeeId' | 'history'>,
+    reason: string = 'Salary structure assigned/updated'
+  ) => {
+    const existing = state.employeeSalaryProfiles?.[employeeId];
+    const newHistoryItem = {
+      id: `hist-${Date.now()}`,
+      effectiveDate: profileData.effectiveDate || new Date().toISOString().split('T')[0],
+      basicSalary: profileData.basicSalary,
+      grossSalary:
+        profileData.basicSalary +
+        profileData.hra +
+        profileData.conveyance +
+        profileData.medical +
+        profileData.specialAllowance +
+        profileData.otherAllowances +
+        profileData.bonus,
+      netSalary: 0,
+      changedBy: 'Admin',
+      changeReason: reason,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const updatedProfile: EmployeeSalaryProfile = {
+      ...profileData,
+      employeeId,
+      history: [newHistoryItem, ...(existing?.history || [])],
+    };
+
+    setState((prev) => ({
+      ...prev,
+      employeeSalaryProfiles: {
+        ...(prev.employeeSalaryProfiles || {}),
+        [employeeId]: updatedProfile,
+      },
+    }));
+    logActivity('Admin', `assigned salary profile to employee ID ${employeeId}`, 'employee');
+    return updatedProfile;
+  };
+
+  // Process Monthly Payroll Calculation Engine
+  const processMonthlyPayroll = (month: number, year: number) => {
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    const payPeriod = `${monthNames[month - 1]} ${year}`;
+
+    const activeEmployees = state.employees.filter((e) => e.status !== 'Terminated' && e.status !== 'Former Employee');
+    const existingPeriodRecords = (state.payrollRecords || []).filter((p) => p.payMonth === month && p.payYear === year);
+
+    if (activeEmployees.length === 0) {
+      return { success: false, count: 0, message: 'No active employees found to process payroll.' };
+    }
+
+    const newRecords: PayrollRecord[] = [];
+    const workingDays = state.payrollSettings?.workingDaysPerMonth || 26;
+
+    activeEmployees.forEach((emp) => {
+      const alreadyExists = existingPeriodRecords.some((p) => p.employeeId === emp.employeeId || p.employeeId === emp.id);
+      if (alreadyExists) return;
+
+      const profile = state.employeeSalaryProfiles?.[emp.id] || state.employeeSalaryProfiles?.[emp.employeeId];
+      const stdStruct = state.salaryStructures?.[0];
+
+      const basic = profile?.basicSalary || stdStruct?.basicSalary || 50000;
+      const hra = profile?.hra ?? (stdStruct?.hraType === 'PercentBasic' ? Math.round(basic * ((stdStruct?.hraValue || 40) / 100)) : (stdStruct?.hraValue || 20000));
+      const conveyance = profile?.conveyance ?? (stdStruct?.conveyance || 3000);
+      const medical = profile?.medical ?? (stdStruct?.medical || 2000);
+      const specialAllowance = profile?.specialAllowance ?? (stdStruct?.specialAllowance || 5000);
+      const otherAllowances = profile?.otherAllowances ?? 0;
+      const bonus = profile?.bonus ?? 0;
+
+      // Attendance data calculation
+      const empAttendance = (state.attendance || []).filter((a) => a.employeeId === emp.id || a.employeeId === emp.employeeId);
+      const presentCount = empAttendance.filter((a) => a.status === 'Present' || a.status === 'Work From Home' || a.status === 'Half Day').length || workingDays - 1;
+
+      // Leave data calculation
+      const empLeaves = (state.leaves || []).filter((l) => (l.employeeId === emp.id || l.employeeId === emp.employeeId) && l.status === 'Approved');
+      const unpaidLeaveDays = empLeaves.reduce((acc, l) => acc + (l.leaveType.toLowerCase().includes('unpaid') || l.leaveType.toLowerCase().includes('lop') ? l.durationDays : 0), 0);
+      const paidLeaveDays = empLeaves.reduce((acc, l) => acc + (!l.leaveType.toLowerCase().includes('unpaid') && !l.leaveType.toLowerCase().includes('lop') ? l.durationDays : 0), 0);
+
+      const actualPresent = Math.min(workingDays, presentCount > 0 ? presentCount : workingDays - unpaidLeaveDays);
+
+      // Overtime
+      const overtimeHours = 0;
+      const overtimeRate = profile?.overtimeRatePerHour || state.payrollSettings?.overtimeRatePerHour || 250;
+      const overtimePay = overtimeHours * overtimeRate;
+
+      const grossSalary = basic + hra + conveyance + medical + specialAllowance + otherAllowances + overtimePay + bonus;
+
+      // Deductions
+      const lopDeduction = unpaidLeaveDays > 0 ? Math.round((basic / workingDays) * unpaidLeaveDays) : 0;
+      const pfDeduction = profile?.pfEnabled !== false ? Math.round(basic * ((profile?.pfPercent || state.payrollSettings?.pfDefaultPercent || 12) / 100)) : 0;
+      const ptDeduction = profile?.ptEnabled !== false ? (profile?.ptAmount || state.payrollSettings?.ptDefaultAmount || 200) : 0;
+      const taxDeduction = Math.round(grossSalary * ((profile?.tdsPercent || state.payrollSettings?.tdsDefaultPercent || 10) / 100));
+      const esiDeduction = profile?.esiEnabled ? Math.round(grossSalary * ((profile?.esiPercent || state.payrollSettings?.esiDefaultPercent || 0.75) / 100)) : 0;
+      const loanDeduction = 0;
+      const otherDeductions = 0;
+
+      const totalDeductions = lopDeduction + pfDeduction + ptDeduction + taxDeduction + esiDeduction + loanDeduction + otherDeductions;
+      const netSalary = Math.max(0, grossSalary - totalDeductions);
+
+      const record: PayrollRecord = {
+        id: `pay-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        employeeId: emp.employeeId || emp.id,
+        employeeName: `${emp.firstName} ${emp.lastName}`,
+        avatar: emp.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
+        department: emp.department || 'General',
+        designation: emp.designation || 'Staff',
+        joiningDate: emp.joiningDate,
+        payPeriod,
+        payMonth: month,
+        payYear: year,
+        workingDays,
+        presentDays: actualPresent,
+        paidLeaveDays,
+        unpaidLeaveDays,
+        overtimeHours,
+        overtimeRate,
+        basicSalary: basic,
+        hra,
+        conveyance,
+        medical,
+        specialAllowance,
+        otherAllowances,
+        overtimePay,
+        bonus,
+        otherEarnings: 0,
+        grossSalary,
+        lopDeduction,
+        pfDeduction,
+        ptDeduction,
+        taxDeduction,
+        esiDeduction,
+        loanDeduction,
+        otherDeductions,
+        totalDeductions,
+        netSalary,
+        status: 'Calculated',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      newRecords.push(record);
+    });
+
+    if (newRecords.length === 0) {
+      return { success: false, count: 0, message: `Payroll for ${payPeriod} has already been calculated for all active employees.` };
+    }
+
+    setState((prev) => ({
+      ...prev,
+      payrollRecords: [...newRecords, ...(prev.payrollRecords || [])],
+    }));
+
+    logActivity('Admin', `processed payroll for ${payPeriod} (${newRecords.length} records calculated)`);
+    return { success: true, count: newRecords.length, message: `Successfully calculated ${newRecords.length} payroll records for ${payPeriod}.` };
+  };
+
+  const updatePayrollRecord = (id: string, updates: Partial<PayrollRecord>, reason: string) => {
+    setState((prev) => ({
+      ...prev,
+      payrollRecords: (prev.payrollRecords || []).map((p) => {
+        if (p.id !== id) return p;
+        const next = { ...p, ...updates };
+
+        next.grossSalary =
+          (next.basicSalary || 0) +
+          (next.hra || 0) +
+          (next.conveyance || 0) +
+          (next.medical || 0) +
+          (next.specialAllowance || 0) +
+          (next.otherAllowances || 0) +
+          (next.overtimePay || 0) +
+          (next.bonus || 0) +
+          (next.otherEarnings || 0);
+
+        next.totalDeductions =
+          (next.lopDeduction || 0) +
+          (next.pfDeduction || 0) +
+          (next.ptDeduction || 0) +
+          (next.taxDeduction || 0) +
+          (next.esiDeduction || 0) +
+          (next.loanDeduction || 0) +
+          (next.otherDeductions || 0);
+
+        const newNet = Math.max(0, next.grossSalary - next.totalDeductions);
+        const adjustment = {
+          date: new Date().toISOString(),
+          user: 'Admin',
+          originalNet: p.netSalary,
+          adjustedNet: newNet,
+          reason: reason || 'Manual adjustment by Admin',
+        };
+        next.netSalary = newNet;
+        next.adjustmentHistory = [adjustment, ...(p.adjustmentHistory || [])];
+        next.updatedAt = new Date().toISOString();
+        return next;
+      }),
+    }));
+    logActivity('Admin', `edited payroll record for ID ${id} (${reason})`);
+  };
+
+  const updatePayrollStatus = (id: string, status: PayrollStatus) => {
+    setState((prev) => ({
+      ...prev,
+      payrollRecords: (prev.payrollRecords || []).map((p) =>
+        p.id === id ? { ...p, status, updatedAt: new Date().toISOString() } : p
+      ),
+    }));
+    logActivity('Admin', `updated payroll status to ${status}`);
+  };
+
+  const deletePayrollRecord = (id: string, reason: string): { success: boolean; message: string } => {
+    const target = (state.payrollRecords || []).find((p) => p.id === id);
+    if (!target) return { success: false, message: 'Payroll record not found.' };
+
+    if (target.status === 'Approved' || target.status === 'Processed' || target.status === 'Paid') {
+      return {
+        success: false,
+        message: `Cannot delete payroll in '${target.status}' status. Only Draft or Calculated payroll records can be deleted.`,
+      };
+    }
+
+    setState((prev) => ({
+      ...prev,
+      payrollRecords: (prev.payrollRecords || []).filter((p) => p.id !== id),
+    }));
+
+    logActivity('Admin', `deleted payroll record ${target.employeeName} (${target.payPeriod}) - Reason: ${reason}`);
+    return { success: true, message: `Payroll record for ${target.employeeName} deleted successfully.` };
+  };
+
+  const updatePayrollSettings = (newSettings: Partial<PayrollSettings>) => {
+    setState((prev) => ({
+      ...prev,
+      payrollSettings: {
+        ...(prev.payrollSettings || cleanInitialState.payrollSettings),
+        ...newSettings,
+      },
+    }));
+    logActivity('Admin', 'updated Payroll system settings');
+  };
+
+  // Reset & Seed Controls
   const clearAllData = () => {
     setState(cleanInitialState);
   };
@@ -445,6 +858,11 @@ export function useEmsStore() {
       documents: mockEmployeeDocuments,
       jobs: mockJobOpenings,
       candidates: mockCandidates,
+      salaryStructures: cleanInitialState.salaryStructures,
+      salaryRules: cleanInitialState.salaryRules,
+      employeeSalaryProfiles: {},
+      payrollRecords: mockPayrollRecords,
+      payrollSettings: cleanInitialState.payrollSettings,
       isDemoData: true,
     });
   };
@@ -478,6 +896,18 @@ export function useEmsStore() {
     addAttendanceRecord,
     addJobOpening,
     addCandidate,
+    addSalaryStructure,
+    updateSalaryStructure,
+    deleteSalaryStructure,
+    addSalaryRule,
+    updateSalaryRule,
+    deleteSalaryRule,
+    assignEmployeeSalaryProfile,
+    processMonthlyPayroll,
+    updatePayrollRecord,
+    updatePayrollStatus,
+    deletePayrollRecord,
+    updatePayrollSettings,
     updateAdminProfile,
     importEmployees,
     clearAllData,
