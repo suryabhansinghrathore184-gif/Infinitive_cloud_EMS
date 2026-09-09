@@ -6,26 +6,25 @@ import { useEmsStore } from '@/store/emsStore';
 import {
   Lock,
   CheckCircle2,
-  FileText,
   Play,
   CreditCard,
   Search,
-  Filter,
   Plus,
   Edit3,
   Trash2,
   Check,
-  Building,
   Layers,
   Code2,
   Settings,
   History,
   Eye,
-  Sliders,
   DollarSign,
-  Download,
+  Ban,
+  UserCheck,
+  ShieldCheck,
+  FileText,
 } from 'lucide-react';
-import { PayrollRecord, SalaryStructure, SalaryRule, PayrollStatus } from '@/types/admin';
+import { PayrollRecord, SalaryStructure, SalaryRule, EmployeeSalaryProfile } from '@/types/admin';
 
 // Modals
 import { ProcessPayrollModal } from '@/components/modals/ProcessPayrollModal';
@@ -34,6 +33,8 @@ import { AddEditSalaryRuleModal } from '@/components/modals/AddEditSalaryRuleMod
 import { AssignSalaryModal } from '@/components/modals/AssignSalaryModal';
 import { EditPayrollModal } from '@/components/modals/EditPayrollModal';
 import { DeletePayrollModal } from '@/components/modals/DeletePayrollModal';
+import { ApprovePayrollModal } from '@/components/modals/ApprovePayrollModal';
+import { DeleteSalaryStructureModal } from '@/components/modals/DeleteSalaryStructureModal';
 import { ViewPayslipModal } from '@/components/modals/ViewPayslipModal';
 
 export default function PayrollPage() {
@@ -45,7 +46,6 @@ export default function PayrollPage() {
     addSalaryRule,
     updateSalaryRule,
     deleteSalaryRule,
-    updatePayrollStatus,
     updatePayrollSettings,
   } = useEmsStore();
 
@@ -70,12 +70,20 @@ export default function PayrollPage() {
   const [editingRule, setEditingRule] = useState<SalaryRule | null>(null);
 
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [assigningEmployee, setAssigningEmployee] = useState<any | null>(null);
 
   const [isEditPayrollOpen, setIsEditPayrollOpen] = useState(false);
   const [selectedPayrollRecord, setSelectedPayrollRecord] = useState<PayrollRecord | null>(null);
 
+  const [isApprovePayrollOpen, setIsApprovePayrollOpen] = useState(false);
+  const [payrollToApprove, setPayrollToApprove] = useState<PayrollRecord | null>(null);
+
   const [isDeletePayrollOpen, setIsDeletePayrollOpen] = useState(false);
   const [payrollToDelete, setPayrollToDelete] = useState<PayrollRecord | null>(null);
+
+  const [isDeleteStructureOpen, setIsDeleteStructureOpen] = useState(false);
+  const [structureToDelete, setStructureToDelete] = useState<SalaryStructure | null>(null);
+  const [profileToDelete, setProfileToDelete] = useState<EmployeeSalaryProfile | null>(null);
 
   const [isPayslipModalOpen, setIsPayslipModalOpen] = useState(false);
   const [payslipRecord, setPayslipRecord] = useState<PayrollRecord | null>(null);
@@ -96,6 +104,7 @@ export default function PayrollPage() {
   const structures = state.salaryStructures || [];
   const rules = state.salaryRules || [];
   const employees = state.employees || [];
+  const assignedProfiles = state.employeeSalaryProfiles || {};
 
   // Filtered Payroll Records
   const filteredRecords = records
@@ -117,12 +126,14 @@ export default function PayrollPage() {
   // Summary Metrics calculations
   const totalNetDisbursed = records.reduce((acc, r) => acc + (r.netSalary || 0), 0);
   const totalStatutoryDeductions = records.reduce(
-    (acc, r) => acc + (r.pfDeduction || 0) + (r.ptDeduction || 0) + (r.taxDeduction || 0),
+    (acc, r) => acc + (r.pfDeduction || 0) + (r.ptDeduction || 0) + (r.taxDeduction || 0) + (r.esiDeduction || 0),
     0
   );
-  const payslipsGeneratedCount = records.filter(
+  const approvedOrPaidRecords = records.filter(
     (r) => r.status === 'Approved' || r.status === 'Processed' || r.status === 'Paid'
-  ).length;
+  );
+  const payslipsGeneratedCount = approvedOrPaidRecords.length;
+  const totalPayrollScopeCount = records.length || employees.length;
 
   // Handlers for Structure CRUD
   const handleSaveStructure = (structData: Omit<SalaryStructure, 'id'>) => {
@@ -134,11 +145,6 @@ export default function PayrollPage() {
       showToast(`Created salary structure "${structData.title}"`);
     }
     setEditingStructure(null);
-  };
-
-  const handleDeleteStructure = (id: string) => {
-    const res = deleteSalaryStructure(id);
-    showToast(res.message);
   };
 
   // Handlers for Rule CRUD
@@ -170,6 +176,8 @@ export default function PayrollPage() {
     showToast('Payroll configuration settings saved successfully!');
   };
 
+  const totalStructuresCount = Object.keys(assignedProfiles).length + structures.length;
+
   return (
     <AdminLayout
       pageTitle="Monthly Payroll Processing"
@@ -199,7 +207,10 @@ export default function PayrollPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => setIsAssignModalOpen(true)}
+            onClick={() => {
+              setAssigningEmployee(null);
+              setIsAssignModalOpen(true);
+            }}
             className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
           >
             <DollarSign className="h-4 w-4 text-blue-600" />
@@ -238,7 +249,7 @@ export default function PayrollPage() {
           }`}
         >
           <Layers className="h-4 w-4" />
-          <span>Salary Structures ({structures.length})</span>
+          <span>Salary Structures ({totalStructuresCount})</span>
         </button>
 
         <button
@@ -344,7 +355,7 @@ export default function PayrollPage() {
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <span className="text-xs font-semibold text-slate-500">PAYSLIPS GENERATED</span>
               <p className="mt-2 text-2xl font-extrabold text-emerald-600">
-                {payslipsGeneratedCount} / {records.length || employees.length}
+                {payslipsGeneratedCount} / {totalPayrollScopeCount}
               </p>
               <span className="text-[10px] text-slate-400">Ready for Disbursal</span>
             </div>
@@ -485,19 +496,23 @@ export default function PayrollPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3.5 text-right space-x-1">
-                          {/* View Payslip */}
+                          {/* View / Download Payslip */}
                           <button
                             title="View / Print Payslip"
                             onClick={() => {
-                              setPayslipRecord(r);
-                              setIsPayslipModalOpen(true);
+                              if (r.status === 'Draft' || r.status === 'Calculated') {
+                                showToast('Payslip can be generated after payroll approval.');
+                              } else {
+                                setPayslipRecord(r);
+                                setIsPayslipModalOpen(true);
+                              }
                             }}
                             className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50"
                           >
-                            <Eye className="h-3.5 w-3.5 text-blue-600" /> Payslip
+                            <FileText className="h-3.5 w-3.5 text-blue-600" /> Payslip
                           </button>
 
-                          {/* Edit (if Draft / Calculated / Pending) */}
+                          {/* Edit (if Draft / Calculated) */}
                           {(r.status === 'Draft' || r.status === 'Calculated') && (
                             <button
                               title="Edit Adjustments"
@@ -516,26 +531,12 @@ export default function PayrollPage() {
                             <button
                               title="Approve Payroll"
                               onClick={() => {
-                                updatePayrollStatus(r.id, 'Approved');
-                                showToast(`Payroll for ${r.employeeName} approved.`);
+                                setPayrollToApprove(r);
+                                setIsApprovePayrollOpen(true);
                               }}
                               className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2 py-1 font-semibold text-white hover:bg-blue-700"
                             >
                               <Check className="h-3.5 w-3.5" /> Approve
-                            </button>
-                          )}
-
-                          {/* Process / Pay Action */}
-                          {r.status === 'Approved' && (
-                            <button
-                              title="Mark Disbursed / Paid"
-                              onClick={() => {
-                                updatePayrollStatus(r.id, 'Paid');
-                                showToast(`Payroll for ${r.employeeName} marked as PAID.`);
-                              }}
-                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2 py-1 font-semibold text-white hover:bg-emerald-700"
-                            >
-                              Mark Paid
                             </button>
                           )}
 
@@ -565,78 +566,179 @@ export default function PayrollPage() {
 
       {/* TAB 2: SALARY STRUCTURES */}
       {activeTab === 'structures' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="space-y-6">
+          {/* Header & Actions */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Salary Structures & Templates</h3>
+              <h3 className="text-sm font-bold text-slate-900">Employee Salary Structures & Templates</h3>
               <p className="text-xs text-slate-500">
-                Define pre-configured earning and deduction templates for your organization
+                View assigned employee salary structures, manage revisions, and create preset templates
               </p>
             </div>
-            <button
-              onClick={() => {
-                setEditingStructure(null);
-                setIsStructureModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4" />
-              <span>+ Add Salary Structure</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setAssigningEmployee(null);
+                  setIsAssignModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <UserCheck className="h-4 w-4 text-blue-600" />
+                <span>Assign Structure</span>
+              </button>
+              <button
+                onClick={() => {
+                  setEditingStructure(null);
+                  setIsStructureModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4" />
+                <span>+ Preset Structure</span>
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {structures.map((s) => (
-              <div
-                key={s.id}
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3 hover:border-blue-300 transition"
-              >
-                <div className="flex items-start justify-between border-b pb-2">
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-sm">{s.title}</h4>
-                    <p className="text-xs text-slate-500">{s.description}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        setEditingStructure(s);
-                        setIsStructureModalOpen(true);
-                      }}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                    >
-                      <Edit3 className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteStructure(s.id)}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-slate-500">Basic Salary:</span>
-                    <p className="font-bold text-slate-900">₹{s.basicSalary.toLocaleString('en-IN')}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">HRA Allowance:</span>
-                    <p className="font-bold text-slate-900">
-                      {s.hraType === 'PercentBasic' ? `${s.hraValue}% of Basic` : `₹${s.hraValue}`}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Conveyance / Medical:</span>
-                    <p className="font-semibold text-slate-700">₹{s.conveyance} / ₹{s.medical}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Statutory PF / PT:</span>
-                    <p className="font-semibold text-slate-700">{s.pfPercent}% / ₹{s.ptAmount}</p>
-                  </div>
-                </div>
+          {/* Table of Assigned Employee Salary Profiles */}
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm space-y-2">
+            <div className="p-4 border-b border-slate-100 font-bold text-sm text-slate-900 flex items-center justify-between">
+              <span>Assigned Employee Salary Profiles ({Object.keys(assignedProfiles).length})</span>
+            </div>
+            {Object.keys(assignedProfiles).length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <UserCheck className="h-8 w-8 text-slate-300" />
+                <h4 className="mt-2 text-xs font-bold text-slate-700">No employee salary structures assigned yet</h4>
+                <p className="mt-1 max-w-xs text-[11px] text-slate-500">
+                  Click &quot;Assign Structure&quot; to assign basic salary and allowance breakdowns to an employee.
+                </p>
               </div>
-            ))}
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50 text-slate-500 font-semibold">
+                      <th className="px-4 py-3.5">Employee ID</th>
+                      <th className="px-4 py-3.5">Structure Title</th>
+                      <th className="px-4 py-3.5">Effective Date</th>
+                      <th className="px-4 py-3.5 text-right">Basic Salary</th>
+                      <th className="px-4 py-3.5 text-right">Gross Salary</th>
+                      <th className="px-4 py-3.5 text-center">PF / PT</th>
+                      <th className="px-4 py-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {Object.entries(assignedProfiles).map(([empIdKey, profile]) => {
+                      const matchedEmp = employees.find((e) => e.id === empIdKey || e.employeeId === empIdKey);
+                      const empName = matchedEmp ? `${matchedEmp.firstName} ${matchedEmp.lastName}` : empIdKey;
+                      const gross = profile.basicSalary + profile.hra + profile.conveyance + profile.medical + profile.specialAllowance + profile.bonus;
+
+                      return (
+                        <tr key={empIdKey} className="hover:bg-slate-50/60">
+                          <td className="px-4 py-3.5 font-bold text-slate-900">
+                            <div>{empName}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{matchedEmp?.employeeId || empIdKey}</div>
+                          </td>
+                          <td className="px-4 py-3.5 text-slate-700 font-semibold">{profile.structureTitle}</td>
+                          <td className="px-4 py-3.5 text-slate-500 font-mono">{profile.effectiveDate}</td>
+                          <td className="px-4 py-3.5 text-right font-bold text-slate-900">₹{profile.basicSalary.toLocaleString('en-IN')}</td>
+                          <td className="px-4 py-3.5 text-right font-bold text-emerald-600">₹{gross.toLocaleString('en-IN')}</td>
+                          <td className="px-4 py-3.5 text-center">
+                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold border">
+                              {profile.pfEnabled ? 'PF ✓' : 'No PF'} | {profile.ptEnabled ? 'PT ✓' : 'No PT'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-right space-x-1">
+                            <button
+                              title="Edit Salary Assignment"
+                              onClick={() => {
+                                setAssigningEmployee(matchedEmp || { id: empIdKey });
+                                setIsAssignModalOpen(true);
+                              }}
+                              className="p-1 text-slate-600 hover:text-blue-600"
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                            <button
+                              title="Delete Assignment"
+                              onClick={() => {
+                                setProfileToDelete(profile);
+                                setStructureToDelete(null);
+                                setIsDeleteStructureOpen(true);
+                              }}
+                              className="p-1 text-slate-600 hover:text-rose-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Preset Templates Grid */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold text-slate-900">Preset Salary Templates ({structures.length})</h4>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {structures.map((s) => (
+                <div
+                  key={s.id}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3 hover:border-blue-300 transition"
+                >
+                  <div className="flex items-start justify-between border-b pb-2">
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">{s.title}</h4>
+                      <p className="text-xs text-slate-500">{s.description}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setEditingStructure(s);
+                          setIsStructureModalOpen(true);
+                        }}
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      >
+                        <Edit3 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setStructureToDelete(s);
+                          setProfileToDelete(null);
+                          setIsDeleteStructureOpen(true);
+                        }}
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-slate-500">Basic Salary:</span>
+                      <p className="font-bold text-slate-900">₹{s.basicSalary.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">HRA Allowance:</span>
+                      <p className="font-bold text-slate-900">
+                        {s.hraType === 'PercentBasic' ? `${s.hraValue}% of Basic` : `₹${s.hraValue}`}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Conveyance / Medical:</span>
+                      <p className="font-semibold text-slate-700">₹{s.conveyance} / ₹{s.medical}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Statutory PF / PT:</span>
+                      <p className="font-semibold text-slate-700">{s.pfPercent}% / ₹{s.ptAmount}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -859,6 +961,7 @@ export default function PayrollPage() {
         isOpen={isAssignModalOpen}
         onClose={() => setIsAssignModalOpen(false)}
         onSuccess={(msg) => showToast(msg)}
+        selectedEmployee={assigningEmployee}
       />
 
       <EditPayrollModal
@@ -868,11 +971,26 @@ export default function PayrollPage() {
         record={selectedPayrollRecord}
       />
 
+      <ApprovePayrollModal
+        isOpen={isApprovePayrollOpen}
+        onClose={() => setIsApprovePayrollOpen(false)}
+        onSuccess={(msg) => showToast(msg)}
+        record={payrollToApprove}
+      />
+
       <DeletePayrollModal
         isOpen={isDeletePayrollOpen}
         onClose={() => setIsDeletePayrollOpen(false)}
         onSuccess={(msg) => showToast(msg)}
         record={payrollToDelete}
+      />
+
+      <DeleteSalaryStructureModal
+        isOpen={isDeleteStructureOpen}
+        onClose={() => setIsDeleteStructureOpen(false)}
+        onSuccess={(msg) => showToast(msg)}
+        targetStructure={structureToDelete}
+        targetProfile={profileToDelete}
       />
 
       <ViewPayslipModal
