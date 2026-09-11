@@ -24,6 +24,8 @@ import {
   Puzzle,
 } from 'lucide-react';
 import { useEmsStore } from '@/store/emsStore';
+import { useAuthStore } from '@/store/authStore';
+import { LogoutConfirmModal } from '@/components/modals/LogoutConfirmModal';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -39,14 +41,17 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     markAllNotificationsAsRead,
   } = useEmsStore();
 
+  const { user } = useAuthStore();
+
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
-  const adminUser = state.adminUser || {
-    name: 'Admin',
-    email: 'admin@organization.com',
-    role: 'HR Administrator',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
+  const activeUser = user || {
+    name: state.adminUser?.name || 'Admin',
+    email: state.adminUser?.email || 'admin@organization.com',
+    role: state.adminUser?.role || 'HR Administrator',
+    avatar: state.adminUser?.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
   };
 
   const recentNotifications = (notifications || []).slice(0, 5);
@@ -214,18 +219,18 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             {/* Avatar */}
             <div className="relative h-9 w-9 overflow-hidden rounded-full ring-2 ring-blue-500/30">
               <img
-                src={adminUser.avatar}
-                alt={adminUser.name}
+                src={activeUser.avatar}
+                alt={activeUser.name}
                 className="h-full w-full object-cover"
               />
               <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
             </div>
             <div className="hidden text-left sm:block">
               <div className="flex items-center gap-1">
-                <span className="text-sm font-semibold text-slate-900">{adminUser.name}</span>
+                <span className="text-sm font-semibold text-slate-900">{activeUser.name}</span>
                 <ShieldCheck className="h-4 w-4 text-blue-600" />
               </div>
-              <p className="text-xs text-slate-500">{adminUser.role}</p>
+              <p className="text-xs text-slate-500">{activeUser.role}</p>
             </div>
             <ChevronDown className="hidden h-4 w-4 text-slate-400 sm:block" />
           </button>
@@ -234,8 +239,8 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           {isProfileOpen && (
             <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
               <div className="border-b border-slate-100 px-3 py-2">
-                <p className="text-xs font-semibold text-slate-900">{adminUser.name}</p>
-                <p className="text-[11px] text-slate-500">{adminUser.email}</p>
+                <p className="text-xs font-semibold text-slate-900">{activeUser.name}</p>
+                <p className="text-[11px] text-slate-500">{activeUser.email}</p>
               </div>
               <div className="py-1 text-xs text-slate-700">
                 <Link
@@ -257,8 +262,11 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               </div>
               <div className="border-t border-slate-100 pt-1 text-xs text-rose-600">
                 <button
-                  onClick={() => setIsProfileOpen(false)}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 hover:bg-rose-50"
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    setIsLogoutModalOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 hover:bg-rose-50 font-semibold cursor-pointer"
                 >
                   <LogOut className="h-4 w-4" />
                   <span>Sign Out</span>
@@ -268,6 +276,12 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           )}
         </div>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      <LogoutConfirmModal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+      />
     </header>
   );
 };
