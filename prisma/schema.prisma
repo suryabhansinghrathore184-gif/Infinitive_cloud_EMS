@@ -1,8 +1,8 @@
 // Enterprise Employee Management System (EMS / HRMS)
-// PostgreSQL Database Schema (Prisma ORM)
+// MongoDB Database Schema (Prisma ORM)
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
@@ -103,7 +103,7 @@ enum HolidayCategory {
 // ==========================================
 
 model Holiday {
-  id          String          @id @default(uuid())
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   description String?
   date        DateTime        @db.Date
@@ -125,31 +125,31 @@ model Holiday {
 // ==========================================
 
 model User {
-  id               String      @id @default(uuid())
-  email            String      @unique
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  email            String    @unique
   passwordHash     String
-  isActive         Boolean     @default(true)
-  isEmailVerified  Boolean     @default(false)
-  twoFactorEnabled Boolean     @default(false)
+  isActive         Boolean   @default(true)
+  isEmailVerified  Boolean   @default(false)
+  twoFactorEnabled Boolean   @default(false)
   twoFactorSecret  String?
   lastLoginAt      DateTime?
   lastLoginIp      String?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
   deletedAt        DateTime?
 
-  userRoles        UserRole[]
-  employee         Employee?
-  refreshTokens    RefreshToken[]
-  auditLogs        AuditLog[]
-  assignedTickets  HrTicket[]  @relation("TicketAssignee")
-  createdTickets   HrTicket[]  @relation("TicketCreator")
+  userRoles       UserRole[]
+  employee        Employee?
+  refreshTokens   RefreshToken[]
+  auditLogs       AuditLog[]
+  assignedTickets HrTicket[]     @relation("TicketAssignee")
+  createdTickets  HrTicket[]     @relation("TicketCreator")
 
   @@map("users")
 }
 
 model Role {
-  id          String   @id @default(uuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String   @unique
   description String?
   isSystem    Boolean  @default(false)
@@ -163,7 +163,7 @@ model Role {
 }
 
 model Permission {
-  id          String   @id @default(uuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   module      String
   action      String
   code        String   @unique
@@ -176,30 +176,32 @@ model Permission {
 }
 
 model UserRole {
-  userId String
-  roleId String
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  roleId String @db.ObjectId
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
-  @@id([userId, roleId])
+  @@unique([userId, roleId])
   @@map("user_roles")
 }
 
 model RolePermission {
-  roleId       String
-  permissionId String
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  roleId       String @db.ObjectId
+  permissionId String @db.ObjectId
 
   role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
-  @@id([roleId, permissionId])
+  @@unique([roleId, permissionId])
   @@map("role_permissions")
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
   token     String   @unique
   expiresAt DateTime
   revoked   Boolean  @default(false)
@@ -215,7 +217,7 @@ model RefreshToken {
 // ==========================================
 
 model Location {
-  id        String   @id @default(uuid())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   name      String
   code      String   @unique
   address   String?
@@ -232,7 +234,7 @@ model Location {
 }
 
 model Department {
-  id          String   @id @default(uuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String   @unique
   code        String   @unique
   description String?
@@ -247,10 +249,10 @@ model Department {
 }
 
 model Designation {
-  id           String   @id @default(uuid())
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
   title        String
   code         String   @unique
-  departmentId String
+  departmentId String   @db.ObjectId
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -265,9 +267,9 @@ model Designation {
 // ==========================================
 
 model Employee {
-  id               String           @id @default(uuid())
+  id               String           @id @default(auto()) @map("_id") @db.ObjectId
   employeeId       String           @unique
-  userId           String?          @unique
+  userId           String?          @unique @db.ObjectId
   firstName        String
   lastName         String
   profilePhoto     String?
@@ -286,10 +288,10 @@ model Employee {
   employeeGrade    String?
   shift            String?          @default("Standard")
 
-  departmentId  String
-  designationId String
-  locationId    String?
-  managerId     String?
+  departmentId  String  @db.ObjectId
+  designationId String  @db.ObjectId
+  locationId    String? @db.ObjectId
+  managerId     String? @db.ObjectId
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -299,27 +301,27 @@ model Employee {
   department  Department  @relation(fields: [departmentId], references: [id])
   designation Designation @relation(fields: [designationId], references: [id])
   location    Location?   @relation(fields: [locationId], references: [id])
-  manager     Employee?   @relation("ManagerSubordinates", fields: [managerId], references: [id])
+  manager     Employee?   @relation("ManagerSubordinates", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  subordinates      Employee[]             @relation("ManagerSubordinates")
-  emergencyContacts EmployeeContact[]
-  bankAccount       EmployeeBankAccount?
-  identityDocs      EmployeeIdentityInfo?
-  documents         EmployeeDocument[]
-  attendances       Attendance[]
-  leaveBalances     LeaveBalance[]
-  leaveRequests     LeaveRequest[]
-  salaryStructure   SalaryStructure?
-  payslips          Payslip[]
-  goals             PerformanceGoal[]
-  performanceReviews PerformanceReview[]   @relation("EmployeeReviews")
+  subordinates       Employee[]             @relation("ManagerSubordinates")
+  emergencyContacts  EmployeeContact[]
+  bankAccount        EmployeeBankAccount?
+  identityDocs       EmployeeIdentityInfo?
+  documents          EmployeeDocument[]
+  attendances        Attendance[]
+  leaveBalances      LeaveBalance[]
+  leaveRequests      LeaveRequest[]
+  salaryStructure    SalaryStructure?
+  payslips           Payslip[]
+  goals              PerformanceGoal[]
+  performanceReviews PerformanceReview[]    @relation("EmployeeReviews")
 
   @@map("employees")
 }
 
 model EmployeeContact {
-  id           String   @id @default(uuid())
-  employeeId   String
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId   String   @db.ObjectId
   contactName  String
   relationship String
   phone        String
@@ -332,8 +334,8 @@ model EmployeeContact {
 }
 
 model EmployeeBankAccount {
-  id            String   @id @default(uuid())
-  employeeId    String   @unique
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId    String   @unique @db.ObjectId
   bankName      String
   accountNumber String
   ifscCode      String
@@ -346,8 +348,8 @@ model EmployeeBankAccount {
 }
 
 model EmployeeIdentityInfo {
-  id         String   @id @default(uuid())
-  employeeId String   @unique
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId String   @unique @db.ObjectId
   panNumber  String?
   aadhaarNo  String?
   passportNo String?
@@ -363,16 +365,16 @@ model EmployeeIdentityInfo {
 // ==========================================
 
 model Attendance {
-  id          String           @id @default(uuid())
-  employeeId  String
-  date        DateTime         @db.Date
-  checkIn     DateTime?
-  checkOut    DateTime?
-  breakHours  Float            @default(0.0)
-  workHours   Float            @default(0.0)
-  status      AttendanceStatus @default(PRESENT)
-  method      AttendanceMethod @default(WEB)
-  createdAt   DateTime         @default(now())
+  id         String           @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId String           @db.ObjectId
+  date       DateTime         @db.Date
+  checkIn    DateTime?
+  checkOut   DateTime?
+  breakHours Float            @default(0.0)
+  workHours  Float            @default(0.0)
+  status     AttendanceStatus @default(PRESENT)
+  method     AttendanceMethod @default(WEB)
+  createdAt  DateTime         @default(now())
 
   employee Employee @relation(fields: [employeeId], references: [id])
 
@@ -381,7 +383,7 @@ model Attendance {
 }
 
 model LeaveType {
-  id          String   @id @default(uuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String   @unique
   code        String   @unique
   daysPerYear Float
@@ -395,9 +397,9 @@ model LeaveType {
 }
 
 model LeaveBalance {
-  id          String @id @default(uuid())
-  employeeId  String
-  leaveTypeId String
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId  String @db.ObjectId
+  leaveTypeId String @db.ObjectId
   year        Int
   allocated   Float
   used        Float  @default(0)
@@ -411,15 +413,15 @@ model LeaveBalance {
 }
 
 model LeaveRequest {
-  id           String      @id @default(uuid())
-  employeeId   String
-  leaveTypeId  String
-  startDate    DateTime    @db.Date
-  endDate      DateTime    @db.Date
-  totalDays    Float
-  reason       String
-  status       LeaveStatus @default(PENDING)
-  createdAt    DateTime    @default(now())
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId  String      @db.ObjectId
+  leaveTypeId String      @db.ObjectId
+  startDate   DateTime    @db.Date
+  endDate     DateTime    @db.Date
+  totalDays   Float
+  reason      String
+  status      LeaveStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
 
   employee  Employee  @relation(fields: [employeeId], references: [id])
   leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
@@ -432,17 +434,17 @@ model LeaveRequest {
 // ==========================================
 
 model SalaryStructure {
-  id          String   @id @default(uuid())
-  employeeId  String   @unique
-  ctc         Float
-  basic       Float
-  hra         Float
-  allowances  Float
-  pf          Float
-  pt          Float
-  tds         Float
-  netSalary   Float
-  createdAt   DateTime @default(now())
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId String   @unique @db.ObjectId
+  ctc        Float
+  basic      Float
+  hra        Float
+  allowances Float
+  pf         Float
+  pt         Float
+  tds        Float
+  netSalary  Float
+  createdAt  DateTime @default(now())
 
   employee Employee @relation(fields: [employeeId], references: [id])
 
@@ -450,8 +452,8 @@ model SalaryStructure {
 }
 
 model Payslip {
-  id          String   @id @default(uuid())
-  employeeId  String
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId  String   @db.ObjectId
   month       Int
   year        Int
   grossSalary Float
@@ -465,8 +467,8 @@ model Payslip {
 }
 
 model PerformanceGoal {
-  id         String   @id @default(uuid())
-  employeeId String
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId String   @db.ObjectId
   title      String
   progress   Float    @default(0.0)
   dueDate    DateTime
@@ -477,8 +479,8 @@ model PerformanceGoal {
 }
 
 model PerformanceReview {
-  id          String   @id @default(uuid())
-  employeeId  String
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId  String   @db.ObjectId
   cycleName   String
   finalRating Float
   createdAt   DateTime @default(now())
@@ -489,8 +491,8 @@ model PerformanceReview {
 }
 
 model EmployeeDocument {
-  id         String   @id @default(uuid())
-  employeeId String
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId String   @db.ObjectId
   title      String
   category   String
   fileKey    String
@@ -503,14 +505,14 @@ model EmployeeDocument {
 }
 
 model HrTicket {
-  id          String         @id @default(uuid())
-  ticketNo    String         @unique
-  creatorId   String
-  assigneeId  String?
-  category    TicketCategory
-  subject     String
-  status      TicketStatus   @default(OPEN)
-  createdAt   DateTime       @default(now())
+  id         String       @id @default(auto()) @map("_id") @db.ObjectId
+  ticketNo   String       @unique
+  creatorId  String       @db.ObjectId
+  assigneeId String?      @db.ObjectId
+  category   TicketCategory
+  subject    String
+  status     TicketStatus @default(OPEN)
+  createdAt  DateTime     @default(now())
 
   creator  User  @relation("TicketCreator", fields: [creatorId], references: [id])
   assignee User? @relation("TicketAssignee", fields: [assigneeId], references: [id])
@@ -519,13 +521,13 @@ model HrTicket {
 }
 
 model AuditLog {
-  id        String   @id @default(uuid())
-  userId    String?
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String?  @db.ObjectId
   action    String
   entity    String
   entityId  String?
-  oldValue  Json?
-  newValue  Json?
+  oldValue  String?
+  newValue  String?
   ipAddress String?
   createdAt DateTime @default(now())
 
