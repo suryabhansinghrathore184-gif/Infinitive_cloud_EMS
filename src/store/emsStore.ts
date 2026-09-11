@@ -26,12 +26,13 @@ import {
   NotificationCategory,
   NotificationPriority,
   NotificationDeliveryStatus,
+  PerformanceReview,
 } from '@/types/admin';
 import { HolidayEvent } from '@/types/dashboard';
 import { mockEmployees, mockDepartments, mockDesignations, mockLocations } from '@/data/employees';
 import { mockAttendanceRecords, mockAdminLeaveRequests } from '@/data/attendance';
 import { mockHolidayEvents, mockAnnouncements, mockRecentActivities } from '@/data/dashboard';
-import { mockEmployeeDocuments, mockJobOpenings, mockCandidates, mockPayrollRecords } from '@/data/modulesData';
+import { mockEmployeeDocuments, mockJobOpenings, mockCandidates, mockPayrollRecords, mockPerformanceReviews } from '@/data/modulesData';
 
 export const defaultNotificationPreferences: NotificationPreference[] = [
   { id: 'pref-1', eventKey: 'employee_added', eventName: 'New Employee Added', category: 'employee', inApp: true, email: true, sms: false, whatsapp: false },
@@ -178,6 +179,7 @@ export interface EmsDataState {
   payrollSettings: PayrollSettings;
   notifications: AppNotification[];
   notificationSettings: NotificationSettingsState;
+  performanceReviews: PerformanceReview[];
   isDemoData: boolean;
 }
 
@@ -217,6 +219,7 @@ const cleanInitialState: EmsDataState = {
   documents: [],
   jobs: [],
   candidates: [],
+  performanceReviews: [],
   salaryAssignments: [
     {
       id: 'sal-assign-9201',
@@ -897,6 +900,47 @@ export function useEmsStore() {
     return created;
   };
 
+  // Performance Reviews CRUD
+  const addPerformanceReview = (review: Omit<PerformanceReview, 'id'>) => {
+    const created: PerformanceReview = {
+      ...review,
+      id: `perf-${Date.now()}`,
+    };
+    setState((prev) => ({
+      ...prev,
+      performanceReviews: [created, ...(prev.performanceReviews || [])],
+    }));
+    logActivity('Admin', `launched performance review cycle "${created.cycle}" for ${created.employeeName}`);
+    createNotification({
+      recipientId: 'ADMIN',
+      recipientRole: 'Admin',
+      title: 'Performance Review Cycle Launched',
+      message: `Performance review cycle "${created.cycle}" initiated for ${created.employeeName}.`,
+      category: 'system',
+      priority: 'normal',
+      actionUrl: '/admin/performance',
+    });
+    return created;
+  };
+
+  const updatePerformanceReview = (id: string, updates: Partial<PerformanceReview>) => {
+    setState((prev) => ({
+      ...prev,
+      performanceReviews: (prev.performanceReviews || []).map((r) =>
+        r.id === id ? { ...r, ...updates } : r
+      ),
+    }));
+    logActivity('Admin', 'updated performance review record');
+  };
+
+  const deletePerformanceReview = (id: string) => {
+    setState((prev) => ({
+      ...prev,
+      performanceReviews: (prev.performanceReviews || []).filter((r) => r.id !== id),
+    }));
+    logActivity('Admin', 'deleted performance review record');
+  };
+
   // Reset & Seed Controls
   // Salary Structures
   const addSalaryStructure = (struct: Omit<SalaryStructure, 'id'>) => {
@@ -1505,6 +1549,7 @@ export function useEmsStore() {
       documents: mockEmployeeDocuments,
       jobs: mockJobOpenings,
       candidates: mockCandidates,
+      performanceReviews: mockPerformanceReviews,
       salaryStructures: cleanInitialState.salaryStructures,
       salaryRules: cleanInitialState.salaryRules,
       salaryAssignments: cleanInitialState.salaryAssignments,
@@ -1547,6 +1592,7 @@ export function useEmsStore() {
     documents: Array.isArray(state.documents) ? state.documents : [],
     jobs: Array.isArray(state.jobs) ? state.jobs : [],
     candidates: Array.isArray(state.candidates) ? state.candidates : [],
+    performanceReviews: Array.isArray(state.performanceReviews) ? state.performanceReviews : mockPerformanceReviews,
     salaryStructures: Array.isArray(state.salaryStructures) ? state.salaryStructures : cleanInitialState.salaryStructures,
     salaryRules: Array.isArray(state.salaryRules) ? state.salaryRules : cleanInitialState.salaryRules,
     notifications: Array.isArray(state.notifications) ? state.notifications : defaultInitialNotifications,
@@ -1585,6 +1631,9 @@ export function useEmsStore() {
     addAttendanceRecord,
     addJobOpening,
     addCandidate,
+    addPerformanceReview,
+    updatePerformanceReview,
+    deletePerformanceReview,
     addSalaryStructure,
     updateSalaryStructure,
     deleteSalaryStructure,
