@@ -1,6 +1,6 @@
 import { MongoClient, Db, GridFSBucket, ObjectId } from 'mongodb';
 
-const MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL || '';
+
 
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;
@@ -11,13 +11,14 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
     return { client: cachedClient, db: cachedDb };
   }
 
-  if (!MONGODB_URI) {
-    throw new Error(
-      'MONGODB_URI environment variable is missing. Please configure your MongoDB Atlas production connection string in .env'
-    );
+  const mongodbUri = process.env.MONGODB_URI || process.env.DATABASE_URL;
+
+  if (!mongodbUri) {
+    console.error('Server Configuration Error: MONGODB_URI environment variable is missing.');
+    throw new Error('Database configuration is unavailable. Please contact system administrator.');
   }
 
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(mongodbUri);
   await client.connect();
   const db = client.db();
 
