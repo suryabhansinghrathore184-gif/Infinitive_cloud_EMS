@@ -115,14 +115,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [helpdeskCount, setHelpdeskCount] = useState<number | null>(null);
   const [apiUnreadNotifCount, setApiUnreadNotifCount] = useState<number | null>(null);
+  const [pendingLeaveCount, setPendingLeaveCount] = useState<number | null>(null);
 
   useEffect(() => {
     let isMounted = true;
     const fetchBadges = async () => {
       try {
-        const [helpdeskRes, notifRes] = await Promise.all([
+        const [helpdeskRes, notifRes, leaveStatsRes] = await Promise.all([
           fetch('/api/v1/hr-requests?limit=1'),
           fetch('/api/v1/notifications/unread-count'),
+          fetch('/api/v1/leave/stats'),
         ]);
 
         if (helpdeskRes.ok) {
@@ -140,6 +142,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           const notifData = await notifRes.json();
           if (notifData.success && typeof notifData.unreadCount === 'number') {
             if (isMounted) setApiUnreadNotifCount(notifData.unreadCount);
+          }
+        }
+
+        if (leaveStatsRes.ok) {
+          const leaveData = await leaveStatsRes.json();
+          if (leaveData.success && leaveData.data && typeof leaveData.data.pending === 'number') {
+            if (isMounted) setPendingLeaveCount(leaveData.data.pending);
           }
         }
       } catch {
@@ -164,6 +173,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       if (helpdeskCount === null || helpdeskCount <= 0) return null;
       if (helpdeskCount > 99) return '99+';
       return String(helpdeskCount);
+    }
+    if (item.name === 'Leave') {
+      if (pendingLeaveCount === null || pendingLeaveCount <= 0) return null;
+      if (pendingLeaveCount > 99) return '99+';
+      return String(pendingLeaveCount);
     }
     return item.badge || null;
   };
