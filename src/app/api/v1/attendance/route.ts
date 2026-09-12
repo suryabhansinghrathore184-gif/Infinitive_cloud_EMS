@@ -20,14 +20,15 @@ export async function GET(req: NextRequest) {
     const date = searchParams.get('date');
     const employeeId = searchParams.get('employeeId');
 
-    let query: any = { organizationId: orgId };
+    let query: any = {
+      $or: [{ organizationId: orgId }, { organizationId: 'org-default' }, { organizationId: { $exists: false } }],
+    };
     if (date) query.date = date;
     if (employeeId) query.employeeId = employeeId;
 
     if (auth.role === 'EMPLOYEE' && auth.employeeId) {
       query.employeeId = auth.employeeId;
     } else if (auth.role === 'MANAGER' && auth.employeeId) {
-      // Find direct report employees
       const team = await db.collection('employees').find({
         organizationId: orgId,
         $or: [{ managerId: auth.employeeId }, { reportingTo: auth.employeeId }, { employeeId: auth.employeeId }],
@@ -36,7 +37,13 @@ export async function GET(req: NextRequest) {
       query.employeeId = { $in: teamEmpIds };
     }
 
-    const attendanceRecords = await db.collection('attendance').find(query).sort({ date: -1 }).toArray();
+    const rawRecords = await db.collection('attendance').find(query).sort({ date: -1 }).toArray();
+    const attendanceRecords = rawRecords.map((r) => ({
+      ...r,
+      date: typeof r.date === 'string' && r.date.includes('GMT')
+        ? new Date(r.date).toISOString().split('T')[0]
+        : r.date,
+    }));
 
     return NextResponse.json({
       success: true,
@@ -44,6 +51,7 @@ export async function GET(req: NextRequest) {
       data: attendanceRecords,
     });
   } catch (error: any) {
+    console.error('Attendance API Error:', error);
     return NextResponse.json({ success: false, message: error.message || 'Failed to fetch attendance records' }, { status: 500 });
   }
 }

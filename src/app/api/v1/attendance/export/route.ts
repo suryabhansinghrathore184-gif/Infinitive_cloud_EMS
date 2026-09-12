@@ -26,22 +26,16 @@ export async function GET(req: NextRequest) {
     const statusFilter = searchParams.get('status') || 'All';
     const fromDate = searchParams.get('from');
     const toDate = searchParams.get('to');
-
     const { db } = await connectToDatabase();
     const orgId = auth.organizationId;
 
-    let query: any = { organizationId: orgId };
+    let query: any = {
+      $or: [{ organizationId: orgId }, { organizationId: 'org-default' }, { organizationId: { $exists: false } }],
+    };
 
     // Status filter
     if (statusFilter && statusFilter !== 'All' && statusFilter !== 'ALL') {
       query.status = statusFilter;
-    }
-
-    // Date range filter
-    if (fromDate || toDate) {
-      query.date = {};
-      if (fromDate) query.date.$gte = fromDate;
-      if (toDate) query.date.$lte = toDate;
     }
 
     // RBAC: Manager & Employee Scoping
@@ -56,7 +50,23 @@ export async function GET(req: NextRequest) {
       query.employeeId = { $in: teamEmpIds };
     }
 
-    const attendanceRecords = await db.collection('attendance').find(query).sort({ date: -1, checkIn: 1 }).toArray();
+    const rawRecords = await db.collection('attendance').find(query).sort({ date: -1, checkIn: 1 }).toArray();
+
+    // Normalize date strings and apply date range filtering safely
+    const attendanceRecords = rawRecords
+      .map((r: any) => {
+        let normDate = r.date || '';
+        if (typeof normDate === 'string' && normDate.includes('GMT')) {
+          const p = new Date(normDate);
+          if (!isNaN(p.getTime())) normDate = p.toISOString().split('T')[0];
+        }
+        return { ...r, date: normDate };
+      })
+      .filter((r: any) => {
+        if (fromDate && r.date < fromDate) return false;
+        if (toDate && r.date > toDate) return false;
+        return true;
+      });
 
     if (!attendanceRecords || attendanceRecords.length === 0) {
       return NextResponse.json(
