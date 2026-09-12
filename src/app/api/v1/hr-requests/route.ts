@@ -46,8 +46,14 @@ export async function GET(req: NextRequest) {
       baseQuery.$or = [{ employeeId: { $in: teamEmpIds } }, { assignedToId: auth.employeeId }, { assignedToId: auth.userId }];
     }
 
-    // Compute live status counts matching the scoped base query
-    const rawAllForCounts = await db.collection('hr_requests').find(baseQuery).toArray();
+    // Compute live status counts matching the scoped base query via MongoDB $group aggregation
+    const [statusAgg, totalBaseCount] = await Promise.all([
+      db.collection('hr_requests').aggregate([
+        { $match: baseQuery },
+        { $group: { _id: { $toLower: { $ifNull: ['$status', 'open'] } }, count: { $sum: 1 } } }
+      ]).toArray(),
+      db.collection('hr_requests').countDocuments(baseQuery)
+    ]);
 
     const statusCounts = {
       open: 0,
@@ -55,16 +61,16 @@ export async function GET(req: NextRequest) {
       inProgress: 0,
       resolved: 0,
       closed: 0,
-      total: rawAllForCounts.length,
+      total: totalBaseCount,
     };
 
-    rawAllForCounts.forEach((t) => {
-      const s = (t.status || 'Open').toLowerCase();
-      if (s === 'open') statusCounts.open += 1;
-      else if (s === 'assigned') statusCounts.assigned += 1;
-      else if (s === 'in progress' || s === 'inprogress') statusCounts.inProgress += 1;
-      else if (s === 'resolved') statusCounts.resolved += 1;
-      else if (s === 'closed') statusCounts.closed += 1;
+    statusAgg.forEach((group: any) => {
+      const s = (group._id || '').toString().toLowerCase();
+      if (s === 'open') statusCounts.open += group.count;
+      else if (s === 'assigned') statusCounts.assigned += group.count;
+      else if (s === 'in progress' || s === 'inprogress') statusCounts.inProgress += group.count;
+      else if (s === 'resolved') statusCounts.resolved += group.count;
+      else if (s === 'closed') statusCounts.closed += group.count;
     });
 
     const actionableCount = statusCounts.open + statusCounts.assigned + statusCounts.inProgress;

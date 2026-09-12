@@ -13,6 +13,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, message: perm.message }, { status: perm.statusCode });
     }
 
+    const { searchParams } = new URL(req.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? Math.max(1, Math.min(100, parseInt(limitParam, 10))) : 0; // 0 means return all if requested, or paginated if limit specified
+    const search = searchParams.get('search')?.trim() || '';
+    const department = searchParams.get('department')?.trim();
+    const status = searchParams.get('status')?.trim();
+
     const { db } = await connectToDatabase();
     const orgId = auth.organizationId;
 
@@ -29,11 +37,44 @@ export async function GET(req: NextRequest) {
       filter.employeeId = auth.employeeId;
     }
 
-    const employees = await db.collection('employees').find(filter).toArray();
+    if (department && department !== 'All') {
+      filter.department = department;
+    }
+    if (status && status !== 'All') {
+      filter.status = status;
+    }
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      filter.$or = [
+        { firstName: regex },
+        { lastName: regex },
+        { employeeId: regex },
+        { email: regex },
+        { department: regex },
+        { designation: regex },
+      ];
+    }
+
+    const totalCount = await db.collection('employees').countDocuments(filter);
+
+    let queryCursor = db
+      .collection('employees')
+      .find(filter)
+      .sort({ createdAt: -1, employeeId: 1 });
+
+    if (limit > 0) {
+      queryCursor = queryCursor.skip((page - 1) * limit).limit(limit);
+    }
+
+    const employees = await queryCursor.toArray();
 
     return NextResponse.json({
       success: true,
       count: employees.length,
+      total: totalCount,
+      page: limit > 0 ? page : 1,
+      limit: limit > 0 ? limit : totalCount,
+      totalPages: limit > 0 ? Math.ceil(totalCount / limit) : 1,
       data: employees,
     });
   } catch (error: any) {

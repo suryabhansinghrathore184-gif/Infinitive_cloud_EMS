@@ -48,7 +48,23 @@ export async function GET(req: NextRequest) {
       empQuery.status = statusFilter;
     }
 
-    const employees = await db.collection('employees').find(empQuery).toArray();
+    const employees = await db
+      .collection('employees')
+      .find(empQuery, {
+        projection: {
+          firstName: 1,
+          lastName: 1,
+          department: 1,
+          location: 1,
+          status: 1,
+          joiningDate: 1,
+          employmentType: 1,
+          gender: 1,
+          resignationDate: 1,
+          terminationDate: 1,
+        },
+      })
+      .toArray();
     const departments = await db.collection('departments').find({ organizationId: orgId }).toArray();
     const locations = await db.collection('locations').find({ organizationId: orgId }).toArray();
 

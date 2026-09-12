@@ -121,34 +121,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     let isMounted = true;
     const fetchBadges = async () => {
       try {
-        const [helpdeskRes, notifRes, leaveStatsRes] = await Promise.all([
-          fetch('/api/v1/hr-requests?limit=1'),
-          fetch('/api/v1/notifications/unread-count'),
-          fetch('/api/v1/leave/stats'),
-        ]);
-
-        if (helpdeskRes.ok) {
-          const data = await helpdeskRes.json();
-          if (data.success && data.statusCounts) {
-            const actionable =
-              (data.statusCounts.open || 0) +
-              (data.statusCounts.assigned || 0) +
-              (data.statusCounts.inProgress || 0);
-            if (isMounted) setHelpdeskCount(actionable);
-          }
-        }
-
-        if (notifRes.ok) {
-          const notifData = await notifRes.json();
-          if (notifData.success && typeof notifData.unreadCount === 'number') {
-            if (isMounted) setApiUnreadNotifCount(notifData.unreadCount);
-          }
-        }
-
-        if (leaveStatsRes.ok) {
-          const leaveData = await leaveStatsRes.json();
-          if (leaveData.success && leaveData.data && typeof leaveData.data.pending === 'number') {
-            if (isMounted) setPendingLeaveCount(leaveData.data.pending);
+        const res = await fetch('/api/v1/layout/badges');
+        if (res.ok) {
+          const result = await res.json();
+          if (result.success && result.data && isMounted) {
+            setApiUnreadNotifCount(result.data.unreadNotifications ?? 0);
+            setPendingLeaveCount(result.data.pendingLeaves ?? 0);
+            setHelpdeskCount(result.data.openHelpdesk ?? 0);
           }
         }
       } catch {
@@ -157,10 +136,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     };
 
     fetchBadges();
+    const interval = setInterval(fetchBadges, 60000);
     return () => {
       isMounted = false;
+      clearInterval(interval);
     };
-  }, [pathname]);
+  }, []);
 
   const getDynamicBadge = (item: NavItem) => {
     if (item.name === 'Notifications') {

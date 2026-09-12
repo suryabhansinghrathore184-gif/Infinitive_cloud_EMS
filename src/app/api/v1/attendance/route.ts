@@ -19,12 +19,17 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const date = searchParams.get('date');
     const employeeId = searchParams.get('employeeId');
+    const statusParam = searchParams.get('status');
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? Math.max(1, Math.min(100, parseInt(limitParam, 10))) : 0;
 
     let query: any = {
       $or: [{ organizationId: orgId }, { organizationId: 'org-default' }, { organizationId: { $exists: false } }],
     };
     if (date) query.date = date;
     if (employeeId) query.employeeId = employeeId;
+    if (statusParam && statusParam !== 'All') query.status = statusParam;
 
     if (auth.role === 'EMPLOYEE' && auth.employeeId) {
       query.employeeId = auth.employeeId;
@@ -37,7 +42,14 @@ export async function GET(req: NextRequest) {
       query.employeeId = { $in: teamEmpIds };
     }
 
-    const rawRecords = await db.collection('attendance').find(query).sort({ date: -1 }).toArray();
+    const totalCount = await db.collection('attendance').countDocuments(query);
+
+    let queryCursor = db.collection('attendance').find(query).sort({ date: -1 });
+    if (limit > 0) {
+      queryCursor = queryCursor.skip((page - 1) * limit).limit(limit);
+    }
+
+    const rawRecords = await queryCursor.toArray();
     const attendanceRecords = rawRecords.map((r) => ({
       ...r,
       date: typeof r.date === 'string' && r.date.includes('GMT')
@@ -48,6 +60,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       count: attendanceRecords.length,
+      total: totalCount,
+      page: limit > 0 ? page : 1,
+      limit: limit > 0 ? limit : totalCount,
+      totalPages: limit > 0 ? Math.ceil(totalCount / limit) : 1,
       data: attendanceRecords,
     });
   } catch (error: any) {

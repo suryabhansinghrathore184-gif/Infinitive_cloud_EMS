@@ -1,7 +1,5 @@
 import { MongoClient, Db, GridFSBucket, ObjectId } from 'mongodb';
 
-
-
 declare global {
   var _mongoClientPromise: Promise<{ client: MongoClient; db: Db }> | undefined;
 }
@@ -21,7 +19,8 @@ async function createDatabaseConnection(): Promise<{ client: MongoClient; db: Db
 
   try {
     const client = new MongoClient(mongodbUri, {
-      maxPoolSize: 10,
+      maxPoolSize: 20,
+      minPoolSize: 2,
       serverSelectionTimeoutMS: 5000,
       connectTimeoutMS: 10000,
     });
@@ -48,16 +47,9 @@ async function createDatabaseConnection(): Promise<{ client: MongoClient; db: Db
 }
 
 export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
+  // Fast path: Reuse cached MongoClient & Db directly without blocking network ping roundtrip
   if (cachedClient && cachedDb) {
-    try {
-      await cachedDb.command({ ping: 1 });
-      return { client: cachedClient, db: cachedDb };
-    } catch (e) {
-      console.warn('Cached MongoDB connection ping failed. Resetting cached connection pool...');
-      cachedClient = null;
-      cachedDb = null;
-      global._mongoClientPromise = undefined;
-    }
+    return { client: cachedClient, db: cachedDb };
   }
 
   if (!global._mongoClientPromise) {
@@ -84,38 +76,35 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
 
 export async function ensureProductionIndexes(db: Db): Promise<void> {
   try {
-    // 1. Users: unique email
+    // 1. Users: unique email & organization
     await db.collection('users').createIndex({ email: 1 }, { unique: true, sparse: true });
-    await db.collection('users').createIndex({ organizationId: 1 });
+    await db.collection('users').createIndex({ organizationId: 1, email: 1 });
 
     // 2. Employees: unique organizationId + employeeId, organizationId + userId
     await db.collection('employees').createIndex({ organizationId: 1, employeeId: 1 }, { unique: true, sparse: true });
     await db.collection('employees').createIndex({ organizationId: 1, userId: 1 }, { sparse: true });
+    await db.collection('employees').createIndex({ organizationId: 1, status: 1, department: 1 });
 
     // 3. Documents: organizationId + employeeId, organizationId + uploadedAt
     await db.collection('documents').createIndex({ organizationId: 1, employeeId: 1 });
     await db.collection('documents').createIndex({ organizationId: 1, uploadedAt: -1 });
-    await db.collection('documents').createIndex({ category: 1 });
-    await db.collection('documents').createIndex({ accessRole: 1 });
+    await db.collection('documents').createIndex({ organizationId: 1, category: 1 });
 
-    // 4. Attendance: organizationId + employeeId + date (Non-unique to preserve multi-session check-ins per day)
-    await db.collection('attendance').createIndex({ organizationId: 1, employeeId: 1, date: 1 });
+    // 4. Attendance: organizationId + date, organizationId + employeeId + date
+    await db.collection('attendance').createIndex({ organizationId: 1, date: -1 });
+    await db.collection('attendance').createIndex({ organizationId: 1, employeeId: 1, date: -1 });
 
-    // 5. Leaves: organizationId + employeeId + status, organizationId + managerId + status
+    // 5. Leaves: organizationId + status, organizationId + employeeId + status, organizationId + startDate
+    await db.collection('leaves').createIndex({ organizationId: 1, status: 1, createdAt: -1 });
     await db.collection('leaves').createIndex({ organizationId: 1, employeeId: 1, status: 1 });
     await db.collection('leaves').createIndex({ organizationId: 1, managerId: 1, status: 1 });
+    await db.collection('leaves').createIndex({ organizationId: 1, startDate: 1, endDate: 1 });
     await db.collection('leave_balances').createIndex({ organizationId: 1, employeeId: 1, year: 1 }, { unique: true, sparse: true });
+    await db.collection('leave_types').createIndex({ organizationId: 1, active: 1 });
 
-    // 6. Payroll: payroll_records unique compound index, salary_rules, salary_structures, salary_assignments
+    // 6. Payroll: payroll_records unique compound index, salary_rules, salary_structures
     await db.collection('payroll_records').createIndex({ organizationId: 1, employeeId: 1, payrollPeriod: 1 }, { unique: true, sparse: true });
-    await db.collection('payroll_records').createIndex({ organizationId: 1, payrollPeriod: 1 });
-    await db.collection('payroll_records').createIndex({ organizationId: 1, status: 1 });
-
-    await db.collection('salary_rules').createIndex({ organizationId: 1, enabled: 1 });
-    await db.collection('salary_rules').createIndex({ organizationId: 1, code: 1 }, { unique: true, sparse: true });
-
-    await db.collection('salary_structures').createIndex({ organizationId: 1, employeeId: 1 });
-    await db.collection('salary_assignments').createIndex({ organizationId: 1, employeeId: 1, status: 1 });
+    await db.collection('payroll_records').createIndex({ organizationId: 1, payrollPeriod: -1, status: 1 });
 
     // 7. Audit Logs
     await db.collection('audit_logs').createIndex({ organizationId: 1, timestamp: -1 });
@@ -125,27 +114,15 @@ export async function ensureProductionIndexes(db: Db): Promise<void> {
     await db.collection('designations').createIndex({ organizationId: 1 });
     await db.collection('locations').createIndex({ organizationId: 1 });
 
-    // 9. Announcements, Jobs & Candidates
-    await db.collection('announcements').createIndex({ visibility: 1, status: 1, publishAt: -1 });
-    await db.collection('announcements').createIndex({ slug: 1 });
-    await db.collection('jobs').createIndex({ visibility: 1, status: 1, applicationDeadline: 1 });
-    await db.collection('jobs').createIndex({ slug: 1 });
-    await db.collection('candidates').createIndex({ jobId: 1, email: 1 });
-
-    // 10. Internal Conversations & Messages
-    await db.collection('conversations').createIndex({ organizationId: 1, employeeId: 1 });
-    await db.collection('conversations').createIndex({ organizationId: 1, updatedAt: -1 });
-    await db.collection('messages').createIndex({ conversationId: 1, createdAt: 1 });
-    await db.collection('messages').createIndex({ organizationId: 1, receiverId: 1, readAt: 1 });
-
-    // 11. HR Helpdesk & Support Tickets
+    // 9. HR Helpdesk & Support Tickets
     await db.collection('hr_requests').createIndex({ organizationId: 1, ticketNo: 1 }, { unique: true, sparse: true });
-    await db.collection('hr_requests').createIndex({ organizationId: 1, status: 1 });
+    await db.collection('hr_requests').createIndex({ organizationId: 1, status: 1, updatedAt: -1 });
     await db.collection('hr_requests').createIndex({ organizationId: 1, employeeId: 1 });
     await db.collection('hr_requests').createIndex({ organizationId: 1, assignedToId: 1 });
-    await db.collection('hr_requests').createIndex({ organizationId: 1, requestType: 1 });
-    await db.collection('hr_requests').createIndex({ organizationId: 1, updatedAt: -1 });
-    await db.collection('hr_request_comments').createIndex({ requestId: 1, createdAt: 1 });
+
+    // 10. Notifications
+    await db.collection('notifications').createIndex({ organizationId: 1, recipientId: 1, status: 1, createdAt: -1 });
+    await db.collection('notifications').createIndex({ organizationId: 1, createdAt: -1 });
   } catch (err) {
     console.warn('Index creation warning (indexes may already exist):', err);
   }
@@ -197,7 +174,6 @@ export async function getFileStreamFromGridFS(
       .toArray();
 
     if (!files || files.length === 0) {
-      // Fallback check in photos.files if searching documents and vice versa
       const fallbackCollection = bucketName === 'documents' ? 'photos.files' : 'documents.files';
       const fallbackFiles = await db
         .collection(fallbackCollection)
@@ -211,7 +187,6 @@ export async function getFileStreamFromGridFS(
     const fileDoc = files[0] || (await db.collection(bucketName === 'documents' ? 'photos.files' : 'documents.files').find({ _id: objectId }).toArray())[0];
     const nodeStream = bucket.openDownloadStream(objectId);
 
-    // Convert Node stream to Web ReadableStream for Next.js Response
     const webStream = new ReadableStream({
       start(controller) {
         nodeStream.on('data', (chunk) => controller.enqueue(chunk));
@@ -241,7 +216,6 @@ export async function deleteFileFromGridFS(fileIdStr: string, bucketName: string
     await bucket.delete(objectId);
     return true;
   } catch (error) {
-    // Try fallback bucket if primary fails
     try {
       const fallbackBucket = await getGridFSBucket(bucketName === 'documents' ? 'photos' : 'documents');
       const objectId = new ObjectId(fileIdStr);
@@ -251,24 +225,5 @@ export async function deleteFileFromGridFS(fileIdStr: string, bucketName: string
       console.error('Error deleting file from GridFS:', error);
       return false;
     }
-  }
-}
-
-export async function createNotificationIndexes(db: Db): Promise<void> {
-  try {
-    await db.collection('notifications').createIndex({ organizationId: 1, createdAt: -1 });
-    await db.collection('notifications').createIndex({ organizationId: 1, recipientId: 1, createdAt: -1 });
-    await db.collection('notifications').createIndex({ organizationId: 1, recipientId: 1, status: 1, createdAt: -1 });
-    await db.collection('notifications').createIndex({ organizationId: 1, category: 1, createdAt: -1 });
-    await db.collection('notifications').createIndex({ organizationId: 1, eventType: 1, createdAt: -1 });
-
-    await db.collection('notification_preferences').createIndex(
-      { organizationId: 1, eventType: 1, userId: 1 },
-      { unique: true }
-    );
-
-    await db.collection('notification_delivery_logs').createIndex({ organizationId: 1, notificationId: 1, attemptedAt: -1 });
-  } catch (err) {
-    console.error('Error creating notification indexes:', err);
   }
 }

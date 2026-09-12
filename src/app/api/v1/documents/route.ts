@@ -41,6 +41,10 @@ export async function GET(req: NextRequest) {
     const accessRole = searchParams.get('accessRole') || '';
     const employeeId = searchParams.get('employeeId') || '';
 
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? Math.max(1, Math.min(100, parseInt(limitParam, 10))) : 0;
+
     // Enforce multi-tenant organization isolation
     const filter: any = {
       organizationId: auth.organizationId,
@@ -63,22 +67,33 @@ export async function GET(req: NextRequest) {
     if (employeeId) {
       filter.employeeId = employeeId;
     }
+    if (q) {
+      const regex = new RegExp(q, 'i');
+      filter.$and = [
+        ...(filter.$and || []),
+        {
+          $or: [
+            { title: regex },
+            { employeeName: regex },
+            { fileName: regex },
+            { category: regex },
+          ],
+        },
+      ];
+    }
 
-    let documents = await db
+    const totalCount = await db.collection('documents').countDocuments(filter);
+
+    let queryCursor = db
       .collection('documents')
       .find(filter)
-      .sort({ uploadedAt: -1, _id: -1 })
-      .toArray();
+      .sort({ uploadedAt: -1, _id: -1 });
 
-    if (q) {
-      documents = documents.filter(
-        (doc: any) =>
-          doc.title?.toLowerCase().includes(q) ||
-          doc.employeeName?.toLowerCase().includes(q) ||
-          doc.fileName?.toLowerCase().includes(q) ||
-          doc.category?.toLowerCase().includes(q)
-      );
+    if (limit > 0) {
+      queryCursor = queryCursor.skip((page - 1) * limit).limit(limit);
     }
+
+    const documents = await queryCursor.toArray();
 
     const mappedDocuments = documents.map((doc: any) => ({
       id: doc._id.toString(),
@@ -102,7 +117,15 @@ export async function GET(req: NextRequest) {
       updatedAt: doc.updatedAt || doc.uploadDate,
     }));
 
-    return NextResponse.json({ success: true, documents: mappedDocuments });
+    return NextResponse.json({
+      success: true,
+      count: mappedDocuments.length,
+      total: totalCount,
+      page: limit > 0 ? page : 1,
+      limit: limit > 0 ? limit : totalCount,
+      totalPages: limit > 0 ? Math.ceil(totalCount / limit) : 1,
+      documents: mappedDocuments,
+    });
   } catch (error: any) {
     console.error('Error fetching documents from MongoDB Atlas:', error);
     return NextResponse.json(
