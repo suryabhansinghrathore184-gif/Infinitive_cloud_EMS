@@ -1,10 +1,11 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useAuthStore } from '@/store/authStore';
-import { User, Clock, CalendarDays, FileText, CheckCircle2 } from 'lucide-react';
+import { User, Clock, CalendarDays, FileText, CheckCircle2, MessageSquare } from 'lucide-react';
 
 export default function EmployeeDashboardPage() {
   const { user } = useAuthStore();
@@ -72,7 +73,7 @@ export default function EmployeeDashboardPage() {
         {/* Employee Self-Service Shortcuts */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
           <h3 className="text-sm font-bold text-slate-900">Employee Self-Service (ESS) Hub</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
             <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-1.5">
               <h4 className="font-bold text-slate-900">Apply Time-Off</h4>
               <p className="text-[11px] text-slate-500">Submit casual, sick, or earned leave requests to your manager.</p>
@@ -85,6 +86,16 @@ export default function EmployeeDashboardPage() {
               <h4 className="font-bold text-slate-900">Update Profile Details</h4>
               <p className="text-[11px] text-slate-500">Manage emergency contacts, address, and profile photo.</p>
             </div>
+            <Link
+              href="/employee/messages"
+              className="rounded-xl border border-indigo-100 bg-indigo-50/60 hover:bg-indigo-100/70 p-4 space-y-1.5 transition-colors group"
+            >
+              <h4 className="font-bold text-indigo-900 flex items-center justify-between">
+                <span>HR Direct Messages</span>
+                <MessageSquare className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform" />
+              </h4>
+              <p className="text-[11px] text-indigo-700">Read private HR notices and reply to HR messages.</p>
+            </Link>
           </div>
         </div>
       </AdminLayout>

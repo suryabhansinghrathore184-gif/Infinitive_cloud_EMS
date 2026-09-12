@@ -523,4 +523,46 @@ export interface NotificationSettingsState {
   preferences: NotificationPreference[];
 }
 
+export interface MessageAttachment {
+  fileId: string;
+  fileName: string;
+  fileSize?: string;
+  fileSizeBytes?: number;
+  mimeType?: string;
+  fileUrl: string;
+}
+
+export interface InternalMessage {
+  id: string;
+  conversationId: string;
+  organizationId: string;
+  senderId: string;
+  senderRole: 'HR' | 'Admin' | 'Employee' | 'SUPER_ADMIN' | 'MANAGER' | string;
+  senderName: string;
+  senderAvatar?: string;
+  receiverId: string;
+  message: string;
+  attachments?: MessageAttachment[];
+  readAt?: string | null;
+  createdAt: string;
+}
+
+export interface ConversationThread {
+  id: string;
+  organizationId: string;
+  employeeId: string;
+  employeeName: string;
+  employeeAvatar?: string;
+  employeeEmail?: string;
+  department?: string;
+  subject: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCountHr: number;
+  unreadCountEmployee: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 
