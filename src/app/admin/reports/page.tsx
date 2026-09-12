@@ -225,13 +225,13 @@ export default function ReportsPage() {
             onClick={handleGlobalPdfExport}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all"
           >
-            <FileText className="h-4 w-4" /> Export PDF
+            <FileText className="h-4 w-4" /> Print / Save PDF
           </button>
           <button
             onClick={handleGlobalExcelExport}
             className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Export Excel
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Export Excel (.xls)
           </button>
         </div>
       </div>

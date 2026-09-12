@@ -57,8 +57,9 @@ export async function GET(req: NextRequest) {
     ];
 
     const rows = employees.map((e) => {
+      const isExited = e.status === 'Resigned' || e.status === 'Terminated' || e.status === 'Former Employee';
       const joiningDate = e.joiningDate ? new Date(e.joiningDate) : null;
-      const exitDateStr = e.resignationDate || e.terminationDate || (e.status === 'Resigned' || e.status === 'Terminated' ? e.updatedAt : '');
+      const exitDateStr = isExited ? (e.resignationDate || e.terminationDate || e.updatedAt || '') : '';
       const exitDate = exitDateStr ? new Date(exitDateStr) : new Date();
 
       let tenureMonths = 'N/A';
@@ -69,7 +70,9 @@ export async function GET(req: NextRequest) {
         tenureCount += 1;
       }
 
-      const reason = e.resignationReason || e.exitReason || (e.status === 'Resigned' || e.status === 'Terminated' ? 'Career Progression' : 'Active Service');
+      const reason = isExited
+        ? (e.resignationReason || e.exitReason || 'Not specified')
+        : '-';
 
       return [
         e.employeeId || e.id || '',
@@ -77,7 +80,7 @@ export async function GET(req: NextRequest) {
         e.department || 'N/A',
         e.designation || 'N/A',
         e.joiningDate || 'N/A',
-        exitDateStr ? exitDateStr.slice(0, 10) : 'Active Service',
+        isExited ? (exitDateStr ? exitDateStr.slice(0, 10) : 'N/A') : '-',
         e.status || 'Active',
         tenureMonths,
         reason,

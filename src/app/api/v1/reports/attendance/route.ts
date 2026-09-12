@@ -47,7 +47,18 @@ export async function GET(req: NextRequest) {
     };
 
     if (monthFilter) {
-      attQuery.date = { $regex: `^${monthFilter}` };
+      const year = parseInt(monthFilter.slice(0, 4), 10);
+      const month = parseInt(monthFilter.slice(5, 7), 10);
+      if (!isNaN(year) && !isNaN(month)) {
+        const monthStartDate = new Date(Date.UTC(year, month - 1, 1));
+        const monthEndDate = new Date(Date.UTC(year, month, 1));
+        const nextMonthStr = monthEndDate.toISOString().slice(0, 7);
+        attQuery.$or = [
+          { date: { $gte: monthStartDate, $lt: monthEndDate } },
+          { date: { $regex: `^${monthFilter}` } },
+          { date: { $gte: `${monthFilter}-01`, $lt: `${nextMonthStr}-01` } },
+        ];
+      }
     }
 
     const attendanceRecords = await db.collection('attendance').find(attQuery).toArray();
@@ -59,6 +70,24 @@ export async function GET(req: NextRequest) {
     > = {};
 
     attendanceRecords.forEach((r) => {
+      if (monthFilter) {
+        let recMonth = '';
+        if (r.date instanceof Date) {
+          recMonth = r.date.toISOString().slice(0, 7);
+        } else if (typeof r.date === 'string') {
+          if (r.date.includes('T') || r.date.includes('GMT')) {
+            const p = new Date(r.date);
+            if (!isNaN(p.getTime())) recMonth = p.toISOString().slice(0, 7);
+            else recMonth = r.date.slice(0, 7);
+          } else {
+            recMonth = r.date.slice(0, 7);
+          }
+        }
+        if (recMonth && recMonth !== monthFilter) {
+          return;
+        }
+      }
+
       const empId = r.employeeId;
       if (!attMap[empId]) {
         attMap[empId] = { present: 0, absent: 0, late: 0, lateHours: 0, overtimeHours: 0, totalDays: 0 };

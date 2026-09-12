@@ -191,7 +191,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition-colors"
               >
                 <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                <span>Excel</span>
+                <span>Excel (.xls)</span>
               </button>
 
               <button
@@ -199,7 +199,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all"
               >
                 <FileText className="w-4 h-4" />
-                <span>Print PDF</span>
+                <span>Print / Save PDF</span>
               </button>
             </div>
           </div>
