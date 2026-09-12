@@ -18,21 +18,26 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
     throw new Error('Database configuration is unavailable. Please contact system administrator.');
   }
 
-  const client = new MongoClient(mongodbUri);
-  await client.connect();
-  const db = client.db();
+  try {
+    const client = new MongoClient(mongodbUri);
+    await client.connect();
+    const db = client.db();
 
-  cachedClient = client;
-  cachedDb = db;
+    cachedClient = client;
+    cachedDb = db;
 
-  if (!indexesInitialized) {
-    ensureProductionIndexes(db).catch((err) =>
-      console.error('Error setting up MongoDB production indexes:', err)
-    );
-    indexesInitialized = true;
+    if (!indexesInitialized) {
+      ensureProductionIndexes(db).catch((err) =>
+        console.error('Error setting up MongoDB production indexes:', err)
+      );
+      indexesInitialized = true;
+    }
+
+    return { client, db };
+  } catch (error: any) {
+    console.error('Server Database Connection Failure:', error?.message || error);
+    throw new Error('Database service is temporarily unavailable. Please contact system administrator.');
   }
-
-  return { client, db };
 }
 
 export async function ensureProductionIndexes(db: Db): Promise<void> {
