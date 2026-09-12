@@ -81,6 +81,39 @@ export async function POST(req: NextRequest) {
       if (emp) empName = `${emp.firstName} ${emp.lastName}`;
     }
 
+    // Fetch organization attendance rules to calculate Late / Present status if status not explicitly provided
+    const orgSettings = await db.collection('organization_settings').findOne({ organizationId: orgId });
+    const attRules = orgSettings?.attendance || { workStartTime: '09:00 AM', gracePeriodMinutes: 15, lateMarkingEnabled: true };
+
+    let calculatedStatus = status;
+    if (!calculatedStatus) {
+      const checkInTimeStr = checkIn || '09:00 AM';
+      // Parse checkIn and workStartTime
+      try {
+        const [timePart, modifier] = checkInTimeStr.split(' ');
+        let [hours, minutes] = timePart.split(':').map(Number);
+        if (modifier === 'PM' && hours < 12) hours += 12;
+        if (modifier === 'AM' && hours === 12) hours = 0;
+
+        const [shiftTimePart, shiftModifier] = (attRules.workStartTime || '09:00 AM').split(' ');
+        let [shiftHours, shiftMinutes] = shiftTimePart.split(':').map(Number);
+        if (shiftModifier === 'PM' && shiftHours < 12) shiftHours += 12;
+        if (shiftModifier === 'AM' && shiftHours === 12) shiftHours = 0;
+
+        const checkInMins = hours * 60 + minutes;
+        const shiftMins = shiftHours * 60 + shiftMinutes;
+        const graceMins = Number(attRules.gracePeriodMinutes) || 15;
+
+        if (attRules.lateMarkingEnabled && checkInMins > shiftMins + graceMins) {
+          calculatedStatus = 'Late';
+        } else {
+          calculatedStatus = 'Present';
+        }
+      } catch {
+        calculatedStatus = 'Present';
+      }
+    }
+
     const attendanceDoc = {
       organizationId: orgId,
       employeeId: targetEmpId,
@@ -90,7 +123,7 @@ export async function POST(req: NextRequest) {
       checkOut: checkOut || '06:00 PM',
       breakDuration: body.breakDuration || '1 hr',
       workingHours: body.workingHours || '8 hrs',
-      status: status || 'Present',
+      status: calculatedStatus,
       method: method || 'Web',
       location: location || 'Office HQ',
       updatedAt: now,

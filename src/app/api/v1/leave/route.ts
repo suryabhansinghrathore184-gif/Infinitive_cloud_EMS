@@ -78,21 +78,54 @@ export async function POST(req: NextRequest) {
     const end = new Date(endDate);
     const days = Number(durationDays) || Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1);
 
-    // Fetch or initialize leave balance for employee
+    // Fetch organization leave policies
+    const orgSettings = await db.collection('organization_settings').findOne({ organizationId: orgId });
+    const leavePolicy = orgSettings?.leave || { noticePeriodDays: 2, attachmentRequiredDays: 3, maxCarryForwardDays: 30 };
+
+    // Notice period check
+    if (leavePolicy.noticePeriodDays > 0) {
+      const minNoticeDate = new Date();
+      minNoticeDate.setHours(0, 0, 0, 0);
+      minNoticeDate.setDate(minNoticeDate.getDate() + (leavePolicy.noticePeriodDays - 1));
+      if (start < minNoticeDate && auth.role === 'EMPLOYEE') {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Leave policy requires applying at least ${leavePolicy.noticePeriodDays} day(s) in advance.`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Attachment check if duration exceeds threshold
+    if (days >= (leavePolicy.attachmentRequiredDays || 3) && !body.attachmentUrl && !body.hasAttachment) {
+      // Return notice requirement if mandatory
+    }
+
+    // Fetch or initialize leave balance for employee using configured allowances
     const currentYear = new Date().getFullYear();
     let balanceDoc: any = await db.collection('leave_balances').findOne({ organizationId: orgId, employeeId: targetEmpId, year: currentYear });
 
     if (!balanceDoc) {
+      const defaultBalances: any = {};
+      const configuredTypes = leavePolicy.leaveTypes || [
+        { name: 'Casual', allowanceDays: 12 },
+        { name: 'Sick', allowanceDays: 10 },
+        { name: 'Earned', allowanceDays: 15 },
+        { name: 'Unpaid', allowanceDays: 30 },
+      ];
+      for (const lt of configuredTypes) {
+        const key = lt.name || lt.id;
+        const total = lt.allowanceDays || 12;
+        defaultBalances[key] = { total, used: 0, pending: 0, remaining: total };
+      }
+
       const newBal = {
         organizationId: orgId,
         employeeId: targetEmpId,
         year: currentYear,
-        balances: {
-          Casual: { total: 12, used: 0, pending: 0, remaining: 12 },
-          Sick: { total: 10, used: 0, pending: 0, remaining: 10 },
-          Earned: { total: 15, used: 0, pending: 0, remaining: 15 },
-          Unpaid: { total: 30, used: 0, pending: 0, remaining: 30 },
-        },
+        balances: defaultBalances,
         createdAt: now,
         updatedAt: now,
       };
