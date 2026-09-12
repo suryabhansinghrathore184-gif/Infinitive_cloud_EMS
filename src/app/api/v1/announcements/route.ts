@@ -112,6 +112,26 @@ export async function POST(req: NextRequest) {
       details: { title, visibility: annDoc.visibility, status: annDoc.status },
     });
 
+    // Dispatch announcement notification if published
+    if (annDoc.status === 'Published') {
+      try {
+        const { createNotification } = await import('@/lib/notifications/notificationService');
+        await createNotification({
+          organizationId: orgId,
+          recipientType: 'EMPLOYEE',
+          targetScope: 'ORGANIZATION',
+          eventType: 'announcement_published',
+          category: 'ANNOUNCEMENT',
+          title: `Announcement: ${title}`,
+          message: annDoc.shortDescription || title,
+          priority: annDoc.priority === 'Urgent' || annDoc.priority === 'High' ? 'HIGH' : 'NORMAL',
+          actionUrl: '/announcements',
+        });
+      } catch (notifErr) {
+        console.warn('Could not dispatch announcement notification:', notifErr);
+      }
+    }
+
     const allAnnouncements = await db
       .collection('announcements')
       .find({ organizationId: orgId })

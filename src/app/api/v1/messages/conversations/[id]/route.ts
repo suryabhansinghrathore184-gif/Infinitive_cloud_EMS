@@ -209,7 +209,7 @@ export async function POST(
 
     await db.collection('conversations').updateOne({ id }, updateField);
 
-    // Create Notification
+    // Create & Dispatch Notification via notificationService
     const notifTargetUserId = isEmployee
       ? conversation.createdBy || 'usr-admin-1'
       : (conversation.employeeId || receiverId);
@@ -220,20 +220,22 @@ export async function POST(
 
     const notifLink = isEmployee ? '/admin/communication' : '/employee/messages';
 
-    const notificationDoc = {
-      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      userId: notifTargetUserId,
-      employeeId: isEmployee ? undefined : conversation.employeeId,
-      title: notifTitle,
-      message: replyMessage.message.length > 100 ? `${replyMessage.message.slice(0, 100)}...` : replyMessage.message,
-      category: 'system',
-      priority: 'high',
-      isRead: false,
-      link: notifLink,
-      createdAt: nowISO,
-      updatedAt: nowISO,
-    };
-    await db.collection('notifications').insertOne(notificationDoc);
+    try {
+      const { createNotification } = await import('@/lib/notifications/notificationService');
+      await createNotification({
+        organizationId: auth.organizationId,
+        recipientType: isEmployee ? 'ADMIN' : 'EMPLOYEE',
+        recipientId: notifTargetUserId,
+        eventType: 'internal_hr_message',
+        category: 'HR_EMPLOYEE',
+        title: notifTitle,
+        message: replyMessage.message.length > 100 ? `${replyMessage.message.slice(0, 100)}...` : replyMessage.message,
+        priority: 'HIGH',
+        actionUrl: notifLink,
+      });
+    } catch (notifErr) {
+      console.warn('Could not dispatch message notification:', notifErr);
+    }
 
     return NextResponse.json({
       success: true,

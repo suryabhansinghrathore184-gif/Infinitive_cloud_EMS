@@ -18,7 +18,8 @@ export type NotificationCategory =
   | 'LEAVE'
   | 'RECRUITMENT'
   | 'DOCUMENT'
-  | 'SYSTEM';
+  | 'SYSTEM'
+  | 'ANNOUNCEMENT';
 
 export type NotificationPriority =
   | 'LOW'

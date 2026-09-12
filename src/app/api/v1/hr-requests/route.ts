@@ -300,21 +300,23 @@ export async function POST(req: NextRequest) {
 
     await db.collection('hr_requests').insertOne(newTicketDoc as any);
 
-    // Create Notification for HR/Admin users
-    const notifDoc = {
-      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      userId: 'usr-admin-1', // broadcast/admin target
-      organizationId: orgId,
-      title: `New HR Request ${ticketNo}: ${subject}`,
-      message: `${empName} submitted a ${requestType} ticket (${priority} priority).`,
-      category: 'system',
-      priority: priority === 'Urgent' || priority === 'High' ? 'high' : 'medium',
-      isRead: false,
-      link: '/admin/helpdesk',
-      createdAt: nowISO,
-      updatedAt: nowISO,
-    };
-    await db.collection('notifications').insertOne(notifDoc);
+    // Create & Dispatch Notification via notificationService
+    try {
+      const { createNotification } = await import('@/lib/notifications/notificationService');
+      await createNotification({
+        organizationId: orgId,
+        recipientType: 'ADMIN',
+        recipientId: 'usr-admin-1',
+        eventType: 'hr_request_created',
+        category: 'HR_EMPLOYEE',
+        title: `New HR Request ${ticketNo}: ${subject}`,
+        message: `${empName} submitted a ${requestType} ticket (${priority} priority).`,
+        priority: priority === 'Urgent' || priority === 'High' ? 'HIGH' : 'NORMAL',
+        actionUrl: '/admin/helpdesk',
+      });
+    } catch (notifErr) {
+      console.warn('Could not dispatch HR request notification:', notifErr);
+    }
 
     // Audit Log Event
     await logAuditEvent(req, 'CREATE_HR_TICKET', {

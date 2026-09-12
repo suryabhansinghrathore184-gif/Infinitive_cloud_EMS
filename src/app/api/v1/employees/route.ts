@@ -115,6 +115,26 @@ export async function POST(req: NextRequest) {
 
     await logAuditEvent(req, 'ADD_EMPLOYEE', { employeeId, details: employeeDoc });
 
+    // Trigger Notification for new employee creation
+    try {
+      const { createNotification } = await import('@/lib/notifications/notificationService');
+      await createNotification({
+        organizationId: orgId,
+        recipientType: 'EMPLOYEE',
+        recipientId: employeeId,
+        eventType: 'employee_added',
+        category: 'HR_EMPLOYEE',
+        title: `Welcome ${firstName} ${lastName}!`,
+        message: `Your employee profile has been created with Employee ID: ${employeeId}.`,
+        priority: 'NORMAL',
+        actionUrl: '/employee/dashboard',
+        recipientEmail: email,
+        recipientPhone: phone || undefined,
+      });
+    } catch (notifErr) {
+      console.warn('Could not dispatch employee notification:', notifErr);
+    }
+
     const newEmp = await db.collection('employees').findOne({ organizationId: orgId, employeeId });
 
     return NextResponse.json({
