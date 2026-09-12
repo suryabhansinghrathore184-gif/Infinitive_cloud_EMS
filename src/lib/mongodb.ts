@@ -120,10 +120,17 @@ export async function ensureProductionIndexes(db: Db): Promise<void> {
     // 7. Audit Logs
     await db.collection('audit_logs').createIndex({ organizationId: 1, timestamp: -1 });
 
-    // 8. Organization metadata
+    // 8. Organization metadata & Public Content
     await db.collection('departments').createIndex({ organizationId: 1 });
     await db.collection('designations').createIndex({ organizationId: 1 });
     await db.collection('locations').createIndex({ organizationId: 1 });
+
+    // 9. Announcements, Jobs & Candidates
+    await db.collection('announcements').createIndex({ visibility: 1, status: 1, publishAt: -1 });
+    await db.collection('announcements').createIndex({ slug: 1 });
+    await db.collection('jobs').createIndex({ visibility: 1, status: 1, applicationDeadline: 1 });
+    await db.collection('jobs').createIndex({ slug: 1 });
+    await db.collection('candidates').createIndex({ jobId: 1, email: 1 });
   } catch (err) {
     console.warn('Index creation warning (indexes may already exist):', err);
   }

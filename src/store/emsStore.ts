@@ -791,21 +791,105 @@ export function useEmsStore() {
     logActivity('Admin', `added company holiday "${created.name}" (${created.date})`);
   };
 
-  // 5. CREATE ANNOUNCEMENT
-  const createAnnouncement = (ann: { title: string; content: string; category: string; isImportant?: boolean }) => {
+  // 5. ANNOUNCEMENTS & RECRUITMENT STORE ACTIONS
+  const setAnnouncements = (list: AnnouncementItem[]) => {
+    setState((prev) => ({
+      ...prev,
+      announcements: list,
+    }));
+  };
+
+  const createAnnouncement = (ann: Partial<AnnouncementItem>) => {
     const created: AnnouncementItem = {
-      id: `ann-${Date.now()}`,
-      title: ann.title,
-      content: ann.content,
-      category: ann.category,
+      id: ann.id || `ann-${Date.now()}`,
+      title: ann.title || 'Untitled Announcement',
+      shortDescription: ann.shortDescription || ann.content?.slice(0, 160) || '',
+      content: ann.content || '',
+      category: ann.category || 'General',
+      priority: ann.priority || 'Medium',
+      visibility: ann.visibility || 'Internal Only',
+      status: ann.status || 'Published',
+      imageUrl: ann.imageUrl || '',
+      fileId: ann.fileId || '',
+      publishAt: ann.publishAt || new Date().toISOString(),
+      expiresAt: ann.expiresAt || undefined,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
       isImportant: ann.isImportant || false,
     };
     setState((prev) => ({
       ...prev,
-      announcements: [created, ...prev.announcements],
+      announcements: [created, ...prev.announcements.filter((a) => a.id !== created.id)],
     }));
-    logActivity('Admin', `published announcement "${created.title}"`, 'policy');
+    logActivity('Admin', `created announcement "${created.title}" [${created.visibility}]`, 'policy');
+  };
+
+  const updateAnnouncement = (id: string, updated: Partial<AnnouncementItem>) => {
+    setState((prev) => ({
+      ...prev,
+      announcements: prev.announcements.map((a) => (a.id === id ? { ...a, ...updated } : a)),
+    }));
+    logActivity('Admin', `updated announcement "${id}"`, 'policy');
+  };
+
+  const deleteAnnouncement = (id: string) => {
+    setState((prev) => ({
+      ...prev,
+      announcements: prev.announcements.filter((a) => a.id !== id),
+    }));
+    logActivity('Admin', `deleted announcement "${id}"`, 'policy');
+  };
+
+  const setJobs = (jobList: JobOpening[], candidateList?: Candidate[]) => {
+    setState((prev) => ({
+      ...prev,
+      jobs: jobList,
+      candidates: candidateList || prev.candidates,
+    }));
+  };
+
+  const addJobOpening = (jobData: Partial<JobOpening>) => {
+    const created: JobOpening = {
+      id: jobData.id || `job-${Date.now()}`,
+      jobTitle: jobData.jobTitle || 'New Position',
+      department: jobData.department || 'General',
+      location: jobData.location || 'Headquarters',
+      employmentType: jobData.employmentType || 'Full-time',
+      experience: jobData.experience || '1-3 Years',
+      openings: jobData.openings || 1,
+      skills: jobData.skills || [],
+      salary: jobData.salary || '',
+      showSalaryPublicly: jobData.showSalaryPublicly || false,
+      description: jobData.description || '',
+      responsibilities: jobData.responsibilities || '',
+      requirements: jobData.requirements || '',
+      benefits: jobData.benefits || '',
+      applicationDeadline: jobData.applicationDeadline || '',
+      visibility: jobData.visibility || 'Internal Only',
+      status: jobData.status || 'Published',
+      postedDate: new Date().toISOString().split('T')[0],
+    };
+
+    setState((prev) => ({
+      ...prev,
+      jobs: [created, ...prev.jobs.filter((j) => j.id !== created.id)],
+    }));
+    logActivity('Admin', `posted job requirement "${created.jobTitle}" [${created.visibility}]`, 'employee');
+  };
+
+  const updateJobOpening = (id: string, updated: Partial<JobOpening>) => {
+    setState((prev) => ({
+      ...prev,
+      jobs: prev.jobs.map((j) => (j.id === id ? { ...j, ...updated } : j)),
+    }));
+    logActivity('Admin', `updated job requirement "${id}"`, 'employee');
+  };
+
+  const deleteJobOpening = (id: string) => {
+    setState((prev) => ({
+      ...prev,
+      jobs: prev.jobs.filter((j) => j.id !== id),
+    }));
+    logActivity('Admin', `deleted job requirement "${id}"`, 'employee');
   };
 
   // 6. ADD LEAVE TYPE & LEAVE REQUESTS
@@ -1125,31 +1209,7 @@ export function useEmsStore() {
     };
   };
 
-  const addJobOpening = (newJob: Omit<JobOpening, 'id' | 'postedDate' | 'candidatesCount'>) => {
-    const created: JobOpening = {
-      ...newJob,
-      id: `job-${Date.now()}`,
-      postedDate: new Date().toISOString().split('T')[0],
-      candidatesCount: 0,
-    };
-    setState((prev) => ({
-      ...prev,
-      jobs: [created, ...(prev.jobs || [])],
-    }));
-    logActivity('Admin', `created job requisition "${created.jobTitle}" in ${created.department}`);
-    createNotification({
-      recipientId: 'ADMIN',
-      recipientRole: 'Admin',
-      title: 'Job Opening Created',
-      message: `Job requisition "${created.jobTitle}" posted for department ${created.department}.`,
-      category: 'recruitment',
-      priority: 'normal',
-      entityType: 'job',
-      entityId: created.id,
-      actionUrl: '/admin/recruitment',
-    });
-    return created;
-  };
+  // 8. ADD CANDIDATE APPLICATION
 
   const addCandidate = (newCand: Omit<Candidate, 'id' | 'appliedDate'>) => {
     const created: Candidate = {
@@ -1895,6 +1955,9 @@ export function useEmsStore() {
     deleteLocation,
     addHoliday,
     createAnnouncement,
+    updateAnnouncement,
+    deleteAnnouncement,
+    setAnnouncements,
     addLeaveType,
     updateLeaveRequestStatus,
     setDocuments,
@@ -1902,7 +1965,10 @@ export function useEmsStore() {
     updateDocument,
     deleteDocument,
     addAttendanceRecord,
+    setJobs,
     addJobOpening,
+    updateJobOpening,
+    deleteJobOpening,
     addCandidate,
     addPerformanceReview,
     updatePerformanceReview,

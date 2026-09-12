@@ -56,9 +56,22 @@ export interface RecentActivityItem {
 
 export interface AnnouncementItem {
   id: string;
+  organizationId?: string;
   title: string;
+  slug?: string;
+  shortDescription?: string;
   content: string;
   date: string;
   category: string;
+  priority?: 'Low' | 'Medium' | 'High' | 'Urgent';
+  imageUrl?: string;
+  fileId?: string;
+  visibility?: 'Internal Only' | 'Public Website';
+  status?: 'Draft' | 'Published' | 'Scheduled' | 'Unpublished' | 'Archived';
+  publishAt?: string;
+  expiresAt?: string;
   isImportant?: boolean;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }

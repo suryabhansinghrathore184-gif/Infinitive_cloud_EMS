@@ -362,26 +362,51 @@ export interface EmployeeDocument {
 
 export interface JobOpening {
   id: string;
+  organizationId?: string;
   jobTitle: string;
+  slug?: string;
   department: string;
   location: string;
-  type: string;
+  type?: string;
+  employmentType?: 'Full-time' | 'Part-time' | 'Contract' | 'Intern' | 'Temporary';
+  experience?: string;
+  skills?: string[];
   openings: number;
-  candidatesCount: number;
-  status: 'Active' | 'Closed' | 'Draft';
-  postedDate: string;
+  salary?: string;
+  showSalaryPublicly?: boolean;
+  shortDescription?: string;
+  description?: string;
+  responsibilities?: string;
+  requirements?: string;
+  benefits?: string;
+  applicationDeadline?: string;
+  applicationMethod?: string;
+  candidatesCount?: number;
+  visibility?: 'Internal Only' | 'Public Website';
+  status: 'Active' | 'Closed' | 'Draft' | 'Published' | 'Expired' | 'Archived';
+  postedDate?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Candidate {
   id: string;
+  organizationId?: string;
   jobId: string;
   jobTitle: string;
   name: string;
   email: string;
   phone: string;
+  resumeFileId?: string;
+  resumeFileName?: string;
+  coverLetter?: string;
+  linkedinUrl?: string;
+  portfolioUrl?: string;
   stage: 'Applied' | 'Screening' | 'Interview' | 'Technical Round' | 'Selected' | 'Offer' | 'Joined';
   appliedDate: string;
   rating: number;
+  createdAt?: string;
 }
 
 export interface HrTicket {

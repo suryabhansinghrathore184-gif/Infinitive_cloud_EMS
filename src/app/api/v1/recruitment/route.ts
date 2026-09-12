@@ -17,15 +17,15 @@ export async function GET(req: NextRequest) {
     const orgId = auth.organizationId;
 
     const [jobs, candidates] = await Promise.all([
-      db.collection('jobs').find({ organizationId: orgId }).toArray(),
-      db.collection('candidates').find({ organizationId: orgId }).toArray(),
+      db.collection('jobs').find({ organizationId: orgId }).sort({ createdAt: -1 }).toArray(),
+      db.collection('candidates').find({ organizationId: orgId }).sort({ createdAt: -1 }).toArray(),
     ]);
 
     return NextResponse.json({
       success: true,
       data: {
-        jobs,
-        candidates,
+        jobs: jobs.map((j: any) => ({ ...j, id: j.id || j._id.toString() })),
+        candidates: candidates.map((c: any) => ({ ...c, id: c.id || c._id.toString() })),
       },
     });
   } catch (error: any) {
@@ -53,32 +53,41 @@ export async function POST(req: NextRequest) {
     const now = new Date();
     const collectionName = entityType === 'job' ? 'jobs' : 'candidates';
 
-    const doc = {
+    let doc: any = {
       ...data,
       organizationId: orgId,
       updatedAt: now,
     };
 
+    if (entityType === 'job') {
+      const title = data.jobTitle || 'Requirement';
+      const slug = data.slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      doc.slug = slug;
+      doc.visibility = data.visibility || 'Internal Only';
+      doc.status = data.status || 'Published';
+    }
+
     if (data.id) {
       await db.collection(collectionName).updateOne(
-        { organizationId: orgId, id: data.id },
+        { organizationId: orgId, $or: [{ id: data.id }, { _id: data.id }] },
         { $set: doc, $setOnInsert: { createdAt: now } },
         { upsert: true }
       );
     } else {
       doc.id = `${entityType}-${Date.now()}`;
       doc.createdAt = now;
+      doc.createdBy = auth.email || 'HR Administrator';
       await db.collection(collectionName).insertOne(doc);
     }
 
-    await logAuditEvent(req, `CREATE_${entityType.toUpperCase()}`, { details: doc });
+    await logAuditEvent(req, `SAVE_${entityType.toUpperCase()}`, { details: { title: doc.jobTitle || doc.name, visibility: doc.visibility } });
 
-    const items = await db.collection(collectionName).find({ organizationId: orgId }).toArray();
+    const items = await db.collection(collectionName).find({ organizationId: orgId }).sort({ createdAt: -1 }).toArray();
 
     return NextResponse.json({
       success: true,
-      message: `${entityType === 'job' ? 'Job opening' : 'Candidate record'} saved successfully.`,
-      data: items,
+      message: `${entityType === 'job' ? 'Hiring requirement' : 'Candidate record'} saved successfully.`,
+      data: items.map((i: any) => ({ ...i, id: i.id || i._id.toString() })),
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, message: error.message || 'Failed to save recruitment entity' }, { status: 500 });
