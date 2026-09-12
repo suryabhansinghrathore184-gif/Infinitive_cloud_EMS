@@ -7,8 +7,17 @@ let cachedDb: Db | null = null;
 let indexesInitialized = false;
 
 export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
+  const dbName = process.env.MONGODB_DB || 'ems_hrms';
+
   if (cachedClient && cachedDb) {
-    return { client: cachedClient, db: cachedDb };
+    try {
+      await cachedDb.command({ ping: 1 });
+      return { client: cachedClient, db: cachedDb };
+    } catch (e) {
+      console.warn('Cached MongoDB connection stale or dropped. Resetting connection pool...');
+      cachedClient = null;
+      cachedDb = null;
+    }
   }
 
   const mongodbUri = process.env.MONGODB_URI || process.env.DATABASE_URL;
@@ -19,9 +28,12 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
   }
 
   try {
-    const client = new MongoClient(mongodbUri);
+    const client = new MongoClient(mongodbUri, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
+    });
     await client.connect();
-    const dbName = process.env.MONGODB_DB || 'ems_hrms';
     const db = client.db(dbName);
 
     cachedClient = client;
@@ -36,7 +48,14 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
 
     return { client, db };
   } catch (error: any) {
-    console.error('Server Database Connection Failure:', error?.message || error);
+    cachedClient = null;
+    cachedDb = null;
+    console.error('Server Database Connection Failure Detail:', {
+      message: error?.message || error,
+      name: error?.name,
+      code: error?.code,
+      stack: error?.stack,
+    });
     throw new Error('Database service is temporarily unavailable. Please contact system administrator.');
   }
 }
