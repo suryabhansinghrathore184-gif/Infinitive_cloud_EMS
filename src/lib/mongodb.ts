@@ -2,24 +2,16 @@ import { MongoClient, Db, GridFSBucket, ObjectId } from 'mongodb';
 
 
 
+declare global {
+  var _mongoClientPromise: Promise<{ client: MongoClient; db: Db }> | undefined;
+}
+
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;
 let indexesInitialized = false;
 
-export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
+async function createDatabaseConnection(): Promise<{ client: MongoClient; db: Db }> {
   const dbName = process.env.MONGODB_DB || 'ems_hrms';
-
-  if (cachedClient && cachedDb) {
-    try {
-      await cachedDb.command({ ping: 1 });
-      return { client: cachedClient, db: cachedDb };
-    } catch (e) {
-      console.warn('Cached MongoDB connection stale or dropped. Resetting connection pool...');
-      cachedClient = null;
-      cachedDb = null;
-    }
-  }
-
   const mongodbUri = process.env.MONGODB_URI || process.env.DATABASE_URL;
 
   if (!mongodbUri) {
@@ -36,9 +28,6 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
     await client.connect();
     const db = client.db(dbName);
 
-    cachedClient = client;
-    cachedDb = db;
-
     if (!indexesInitialized) {
       ensureProductionIndexes(db).catch((err) =>
         console.error('Error setting up MongoDB production indexes:', err)
@@ -48,8 +37,6 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
 
     return { client, db };
   } catch (error: any) {
-    cachedClient = null;
-    cachedDb = null;
     console.error('Server Database Connection Failure Detail:', {
       message: error?.message || error,
       name: error?.name,
@@ -57,6 +44,36 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
       stack: error?.stack,
     });
     throw new Error('Database service is temporarily unavailable. Please contact system administrator.');
+  }
+}
+
+export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
+  if (cachedClient && cachedDb) {
+    try {
+      await cachedDb.command({ ping: 1 });
+      return { client: cachedClient, db: cachedDb };
+    } catch (e) {
+      console.warn('Cached MongoDB connection ping failed. Resetting cached connection pool...');
+      cachedClient = null;
+      cachedDb = null;
+      global._mongoClientPromise = undefined;
+    }
+  }
+
+  if (!global._mongoClientPromise) {
+    global._mongoClientPromise = createDatabaseConnection();
+  }
+
+  try {
+    const conn = await global._mongoClientPromise;
+    cachedClient = conn.client;
+    cachedDb = conn.db;
+    return conn;
+  } catch (err) {
+    global._mongoClientPromise = undefined;
+    cachedClient = null;
+    cachedDb = null;
+    throw err;
   }
 }
 
