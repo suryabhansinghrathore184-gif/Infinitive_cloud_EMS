@@ -1,6 +1,6 @@
 // TypeScript interfaces for EMS Authentication & Access Control
 
-export type UserRole = 'Super Admin' | 'HR/Admin' | 'Manager' | 'Employee';
+export type UserRole = 'Super Admin' | 'SUPER_ADMIN' | 'HR/Admin' | 'ADMIN' | 'HR' | 'Manager' | 'MANAGER' | 'Employee' | 'EMPLOYEE';
 
 export interface AuthUser {
   id: string;

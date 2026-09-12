@@ -287,7 +287,8 @@ export function useAuthStore() {
     const userRole = role || state.user?.role;
     switch (userRole) {
       case 'Super Admin':
-        return '/admin/dashboard';
+      case 'SUPER_ADMIN':
+        return '/super-admin/dashboard';
       case 'HR/Admin':
         return '/admin/dashboard';
       case 'Manager':
