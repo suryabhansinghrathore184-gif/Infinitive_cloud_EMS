@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'HR' | 'EMPLOYEE';
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'HR' | 'MANAGER' | 'EMPLOYEE';
 
 export interface AuthContext {
   userId: string;

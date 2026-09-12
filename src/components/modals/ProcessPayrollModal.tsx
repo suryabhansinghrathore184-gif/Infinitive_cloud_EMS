@@ -32,21 +32,30 @@ export const ProcessPayrollModal: React.FC<ProcessPayrollModalProps> = ({
     (p) => p.payMonth === selectedMonth && p.payYear === selectedYear
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    setTimeout(() => {
-      const res = processMonthlyPayroll(selectedMonth, selectedYear);
+    try {
+      const res = await fetch('/api/v1/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month: selectedMonth, year: selectedYear }),
+      });
+      const data = await res.json();
       setIsProcessing(false);
 
-      if (res.success) {
-        onSuccess(res.message);
+      if (data.success) {
+        processMonthlyPayroll(selectedMonth, selectedYear);
+        onSuccess(data.message || 'Payroll calculated and saved successfully.');
         onClose();
       } else {
-        alert(res.message);
+        alert(data.message || 'Failed to process payroll.');
       }
-    }, 600);
+    } catch (err: any) {
+      setIsProcessing(false);
+      alert(err.message || 'Error connecting to payroll service.');
+    }
   };
 
   const months = [

@@ -84,7 +84,7 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const targetEmpId = employeeId || selectedEmployee?.id || state.employees[0]?.id;
     if (!targetEmpId) {
@@ -96,54 +96,57 @@ export const AssignSalaryModal: React.FC<AssignSalaryModalProps> = ({
     const empName = empObj ? `${empObj.firstName} ${empObj.lastName}` : 'Employee';
     const structObj = state.salaryStructures.find((s) => s.id === selectedStructureId);
 
-    if (editingAssignment) {
-      updateSalaryAssignment(editingAssignment.id, {
-        employeeId: targetEmpId,
-        employeeName: empName,
-        structureId: selectedStructureId,
-        structureTitle: structObj?.title || editingAssignment.structureTitle || 'Custom Structure',
-        basicSalary: Number(basicSalary) || 0,
-        hra: Number(hra) || 0,
-        conveyance: Number(conveyance) || 0,
-        medical: Number(medical) || 0,
-        specialAllowance: Number(specialAllowance) || 0,
-        bonus: Number(bonus) || 0,
-        pfEnabled,
-        ptEnabled,
-        tdsPercent,
-        effectiveDate,
-        revisionReason: changeReason,
+    try {
+      const res = await fetch('/api/v1/payroll/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: empObj?.employeeId || targetEmpId,
+          salaryStructureId: selectedStructureId,
+          basicSalary: Number(basicSalary) || 0,
+          hra: Number(hra) || 0,
+          conveyance: Number(conveyance) || 0,
+          medical: Number(medical) || 0,
+          specialAllowance: Number(specialAllowance) || 0,
+          bonus: Number(bonus) || 0,
+          effectiveFrom: effectiveDate,
+        }),
       });
-      onSuccess(`Salary structure updated successfully for ${empName}`);
-    } else {
-      addSalaryAssignment({
-        employeeId: targetEmpId,
-        employeeName: empName,
-        structureId: selectedStructureId,
-        structureTitle: structObj?.title || 'Custom Structure',
-        basicSalary: Number(basicSalary) || 0,
-        hra: Number(hra) || 0,
-        conveyance: Number(conveyance) || 0,
-        medical: Number(medical) || 0,
-        specialAllowance: Number(specialAllowance) || 0,
-        otherAllowances: 0,
-        bonus: Number(bonus) || 0,
-        pfEnabled,
-        pfPercent: state.payrollSettings?.pfDefaultPercent || 12,
-        ptEnabled,
-        ptAmount: state.payrollSettings?.ptDefaultAmount || 200,
-        tdsPercent,
-        esiEnabled: false,
-        esiPercent: 0,
-        effectiveDate,
-        status: 'Active',
-        revisionReason: changeReason,
-        createdBy: 'Admin',
-      });
-      onSuccess(`Salary structure assigned successfully to ${empName}`);
-    }
+      const data = await res.json();
 
-    onClose();
+      if (data.success) {
+        addSalaryAssignment({
+          employeeId: targetEmpId,
+          employeeName: empName,
+          structureId: selectedStructureId,
+          structureTitle: structObj?.title || 'Custom Structure',
+          basicSalary: Number(basicSalary) || 0,
+          hra: Number(hra) || 0,
+          conveyance: Number(conveyance) || 0,
+          medical: Number(medical) || 0,
+          specialAllowance: Number(specialAllowance) || 0,
+          otherAllowances: 0,
+          bonus: Number(bonus) || 0,
+          pfEnabled,
+          pfPercent: state.payrollSettings?.pfDefaultPercent || 12,
+          ptEnabled,
+          ptAmount: state.payrollSettings?.ptDefaultAmount || 200,
+          tdsPercent,
+          esiEnabled: false,
+          esiPercent: 0,
+          effectiveDate,
+          status: 'Active',
+          revisionReason: changeReason,
+          createdBy: 'Admin',
+        });
+        onSuccess(editingAssignment ? `Salary updated successfully for ${empName}` : `Salary assigned successfully to ${empName}`);
+        onClose();
+      } else {
+        alert(data.message || 'Failed to assign salary structure.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error connecting to salary service.');
+    }
   };
 
   const computedGross = Number(basicSalary) + Number(hra) + Number(conveyance) + Number(medical) + Number(specialAllowance) + Number(bonus);

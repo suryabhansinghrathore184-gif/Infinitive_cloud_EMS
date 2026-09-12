@@ -22,10 +22,24 @@ export const ApprovePayrollModal: React.FC<ApprovePayrollModalProps> = ({
 
   if (!isOpen || !record) return null;
 
-  const handleApprove = () => {
-    updatePayrollStatus(record.id, 'Approved');
-    onSuccess(`Payroll for ${record.employeeName} approved successfully.`);
-    onClose();
+  const handleApprove = async () => {
+    try {
+      const res = await fetch(`/api/v1/payroll/${record.employeeId || record.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'APPROVED' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        updatePayrollStatus(record.id, 'Approved');
+        onSuccess(`Payroll for ${record.employeeName} approved successfully.`);
+        onClose();
+      } else {
+        alert(data.message || 'Failed to approve payroll.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error connecting to server.');
+    }
   };
 
   return (

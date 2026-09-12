@@ -50,13 +50,29 @@ export async function ensureProductionIndexes(db: Db): Promise<void> {
     await db.collection('documents').createIndex({ category: 1 });
     await db.collection('documents').createIndex({ accessRole: 1 });
 
-    // 4. Attendance: organizationId + employeeId + date
+    // 4. Attendance: organizationId + employeeId + date (Non-unique to preserve multi-session check-ins per day)
     await db.collection('attendance').createIndex({ organizationId: 1, employeeId: 1, date: 1 });
 
-    // 5. Leaves: organizationId + employeeId + status
+    // 5. Leaves: organizationId + employeeId + status, organizationId + managerId + status
     await db.collection('leaves').createIndex({ organizationId: 1, employeeId: 1, status: 1 });
+    await db.collection('leaves').createIndex({ organizationId: 1, managerId: 1, status: 1 });
+    await db.collection('leave_balances').createIndex({ organizationId: 1, employeeId: 1, year: 1 }, { unique: true, sparse: true });
 
-    // 6. Organization metadata
+    // 6. Payroll: payroll_records unique compound index, salary_rules, salary_structures, salary_assignments
+    await db.collection('payroll_records').createIndex({ organizationId: 1, employeeId: 1, payrollPeriod: 1 }, { unique: true, sparse: true });
+    await db.collection('payroll_records').createIndex({ organizationId: 1, payrollPeriod: 1 });
+    await db.collection('payroll_records').createIndex({ organizationId: 1, status: 1 });
+
+    await db.collection('salary_rules').createIndex({ organizationId: 1, enabled: 1 });
+    await db.collection('salary_rules').createIndex({ organizationId: 1, code: 1 }, { unique: true, sparse: true });
+
+    await db.collection('salary_structures').createIndex({ organizationId: 1, employeeId: 1 });
+    await db.collection('salary_assignments').createIndex({ organizationId: 1, employeeId: 1, status: 1 });
+
+    // 7. Audit Logs
+    await db.collection('audit_logs').createIndex({ organizationId: 1, timestamp: -1 });
+
+    // 8. Organization metadata
     await db.collection('departments').createIndex({ organizationId: 1 });
     await db.collection('designations').createIndex({ organizationId: 1 });
     await db.collection('locations').createIndex({ organizationId: 1 });

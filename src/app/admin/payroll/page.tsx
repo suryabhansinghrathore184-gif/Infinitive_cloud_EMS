@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useEmsStore } from '@/store/emsStore';
 import {
@@ -59,6 +59,23 @@ export default function PayrollPage() {
   >('processing');
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [liveRecords, setLiveRecords] = useState<PayrollRecord[] | null>(null);
+
+  const fetchLivePayroll = async () => {
+    try {
+      const res = await fetch('/api/v1/payroll');
+      const data = await res.json();
+      if (data.success && data.data?.payrollRecords) {
+        setLiveRecords(data.data.payrollRecords);
+      }
+    } catch (e) {
+      console.error('Failed to load payroll data from server', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchLivePayroll();
+  }, []);
 
   // Search & Filters for Payroll Run Table
   const [searchTerm, setSearchTerm] = useState('');
@@ -107,7 +124,7 @@ export default function PayrollPage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const records = state.payrollRecords || [];
+  const records = liveRecords || state.payrollRecords || [];
   const structures = state.salaryStructures || [];
   const rules = state.salaryRules || [];
   const employees = state.employees || [];
@@ -962,7 +979,10 @@ export default function PayrollPage() {
       <ProcessPayrollModal
         isOpen={isProcessModalOpen}
         onClose={() => setIsProcessModalOpen(false)}
-        onSuccess={(msg) => showToast(msg)}
+        onSuccess={(msg) => {
+          showToast(msg);
+          fetchLivePayroll();
+        }}
       />
 
       <AddEditSalaryStructureModal
@@ -985,7 +1005,10 @@ export default function PayrollPage() {
           setIsAssignModalOpen(false);
           setEditingAssignment(null);
         }}
-        onSuccess={(msg) => showToast(msg)}
+        onSuccess={(msg) => {
+          showToast(msg);
+          fetchLivePayroll();
+        }}
         selectedEmployee={assigningEmployee}
         editingAssignment={editingAssignment}
       />
@@ -993,14 +1016,20 @@ export default function PayrollPage() {
       <EditPayrollModal
         isOpen={isEditPayrollOpen}
         onClose={() => setIsEditPayrollOpen(false)}
-        onSuccess={(msg) => showToast(msg)}
+        onSuccess={(msg) => {
+          showToast(msg);
+          fetchLivePayroll();
+        }}
         record={selectedPayrollRecord}
       />
 
       <ApprovePayrollModal
         isOpen={isApprovePayrollOpen}
         onClose={() => setIsApprovePayrollOpen(false)}
-        onSuccess={(msg) => showToast(msg)}
+        onSuccess={(msg) => {
+          showToast(msg);
+          fetchLivePayroll();
+        }}
         record={payrollToApprove}
       />
 
