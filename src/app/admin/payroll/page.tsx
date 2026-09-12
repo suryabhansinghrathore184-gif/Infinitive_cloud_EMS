@@ -225,7 +225,7 @@ export default function PayrollPage() {
             </span>
           </div>
           <p className="text-xs text-slate-500">
-            Calculate salary components, statutory deductions (PF/PT/TDS), and approve payslips
+            Process employee salaries, review deductions, approve payroll, and generate payslips.
           </p>
         </div>
 
@@ -317,45 +317,70 @@ export default function PayrollPage() {
       {/* TAB 1: MONTHLY PAYROLL RUN */}
       {activeTab === 'processing' && (
         <div className="space-y-4">
-          {/* Automated Payroll Calculation Flow */}
+          {/* 6-Step Visual Payroll Stepper Banner */}
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm text-xs">
-            <h4 className="font-bold text-slate-900 mb-2">Automated Payroll Calculation Flow</h4>
-            <div className="flex flex-wrap items-center gap-2 font-medium text-slate-600">
-              <span
-                onClick={() => showToast('Employee Master data loaded into engine scope.')}
-                className="rounded-lg bg-slate-100 px-3 py-1.5 border border-slate-200 cursor-pointer hover:bg-blue-50"
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h4 className="font-bold text-slate-900">Guided Payroll Process</h4>
+                <p className="text-[11px] text-slate-500">6-step workflow for monthly salary calculation, review, approval, and payslip generation</p>
+              </div>
+              <button
+                onClick={() => setIsProcessModalOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition"
               >
-                Employee Master
-              </span>
-              <span>→</span>
-              <span
-                onClick={() => showToast('Attendance records synced for calculation.')}
-                className="rounded-lg bg-slate-100 px-3 py-1.5 border border-slate-200 cursor-pointer hover:bg-blue-50"
+                <Play className="h-3.5 w-3.5 fill-white" />
+                <span>Launch Payroll Wizard</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-6 text-center font-medium">
+              <div
+                onClick={() => setIsProcessModalOpen(true)}
+                className="flex flex-col items-center justify-center rounded-xl bg-slate-50 p-2.5 border border-slate-200 cursor-pointer hover:bg-blue-50/70 hover:border-blue-300 transition"
               >
-                Attendance Data
-              </span>
-              <span>→</span>
-              <span
-                onClick={() => showToast('Approved leave days & LOP computed.')}
-                className="rounded-lg bg-slate-100 px-3 py-1.5 border border-slate-200 cursor-pointer hover:bg-blue-50"
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white mb-1">1</span>
+                <span className="text-[11px] font-bold text-slate-800">Select Month</span>
+              </div>
+
+              <div
+                onClick={() => setIsProcessModalOpen(true)}
+                className="flex flex-col items-center justify-center rounded-xl bg-slate-50 p-2.5 border border-slate-200 cursor-pointer hover:bg-blue-50/70 hover:border-blue-300 transition"
               >
-                Approved Leaves
-              </span>
-              <span>→</span>
-              <span
-                onClick={() => showToast('Overtime hours & bonuses applied.')}
-                className="rounded-lg bg-slate-100 px-3 py-1.5 border border-slate-200 cursor-pointer hover:bg-blue-50"
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white mb-1">2</span>
+                <span className="text-[11px] font-bold text-slate-800">Select Employees</span>
+              </div>
+
+              <div
+                onClick={() => setIsProcessModalOpen(true)}
+                className="flex flex-col items-center justify-center rounded-xl bg-slate-50 p-2.5 border border-slate-200 cursor-pointer hover:bg-blue-50/70 hover:border-blue-300 transition"
               >
-                Overtime & Bonus
-              </span>
-              <span>→</span>
-              <span className="rounded-lg bg-blue-50 text-blue-700 px-3 py-1.5 border border-blue-200 font-bold">
-                Net Salary
-              </span>
-              <span>→</span>
-              <span className="rounded-lg bg-emerald-50 text-emerald-700 px-3 py-1.5 border border-emerald-200 font-bold">
-                Payslip PDF
-              </span>
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white mb-1">3</span>
+                <span className="text-[11px] font-bold text-slate-800">Review Data</span>
+              </div>
+
+              <div
+                onClick={() => setIsProcessModalOpen(true)}
+                className="flex flex-col items-center justify-center rounded-xl bg-slate-50 p-2.5 border border-slate-200 cursor-pointer hover:bg-blue-50/70 hover:border-blue-300 transition"
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white mb-1">4</span>
+                <span className="text-[11px] font-bold text-slate-800">Calculate</span>
+              </div>
+
+              <div
+                onClick={() => setIsProcessModalOpen(true)}
+                className="flex flex-col items-center justify-center rounded-xl bg-slate-50 p-2.5 border border-slate-200 cursor-pointer hover:bg-blue-50/70 hover:border-blue-300 transition"
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white mb-1">5</span>
+                <span className="text-[11px] font-bold text-slate-800">Review & Approve</span>
+              </div>
+
+              <div
+                onClick={() => setIsProcessModalOpen(true)}
+                className="flex flex-col items-center justify-center rounded-xl bg-emerald-50 p-2.5 border border-emerald-200 cursor-pointer hover:bg-emerald-100 transition"
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white mb-1">6</span>
+                <span className="text-[11px] font-bold text-emerald-800">Payslip / Paid</span>
+              </div>
             </div>
           </div>
 
