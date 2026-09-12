@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { X, Clock, CheckCircle2 } from 'lucide-react';
 import { AttendanceRecord } from '@/types/admin';
+import { mockEmployees } from '@/data/employees';
 
 interface MarkAttendanceModalProps {
   isOpen: boolean;
@@ -17,6 +18,8 @@ export const MarkAttendanceModal: React.FC<MarkAttendanceModalProps> = ({
   employees,
   onSave,
 }) => {
+  const availableEmployees = employees && employees.length > 0 ? employees : mockEmployees;
+
   const [employeeId, setEmployeeId] = useState('');
   const [employeeName, setEmployeeName] = useState('');
   const [avatar, setAvatar] = useState('');
@@ -32,7 +35,7 @@ export const MarkAttendanceModal: React.FC<MarkAttendanceModalProps> = ({
 
   const handleEmployeeSelect = (empId: string) => {
     setEmployeeId(empId);
-    const target = employees.find((e) => e.employeeId === empId);
+    const target = availableEmployees.find((e) => e.employeeId === empId);
     if (target) {
       setEmployeeName(`${target.firstName} ${target.lastName}`);
       setAvatar(target.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80');
@@ -89,17 +92,12 @@ export const MarkAttendanceModal: React.FC<MarkAttendanceModalProps> = ({
               className="mt-1 w-full rounded-xl border p-2.5 bg-slate-50 focus:border-blue-500 focus:bg-white font-semibold text-slate-900"
             >
               <option value="">-- Choose Employee --</option>
-              {employees.map((emp) => (
+              {availableEmployees.map((emp) => (
                 <option key={emp.id} value={emp.employeeId}>
                   {emp.firstName} {emp.lastName} ({emp.employeeId})
                 </option>
               ))}
             </select>
-            {employees.length === 0 && (
-              <p className="mt-1 text-[11px] text-amber-600">
-                No employees registered. Add employees to your organization first.
-              </p>
-            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

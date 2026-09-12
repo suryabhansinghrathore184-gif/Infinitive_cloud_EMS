@@ -16,6 +16,16 @@ export type EmploymentType =
   | 'Intern'
   | 'Temporary';
 
+export interface ProfilePhotoMeta {
+  fileId?: string;
+  mimeType?: string;
+  fileName?: string;
+  source: 'document-extraction' | 'manual-upload';
+  uploadedAt: string;
+  documentId?: string;
+  documentType?: string;
+}
+
 export interface Employee {
   id: string;
   employeeId: string;
@@ -24,6 +34,7 @@ export interface Employee {
   email: string;
   phone: string;
   avatar: string;
+  profilePhoto?: ProfilePhotoMeta;
   dateOfBirth: string;
   gender: string;
   bloodGroup: string;
@@ -76,6 +87,8 @@ export interface Designation {
   department: string;
   level: string;
   employeeCount: number;
+  status?: 'Active' | 'Inactive';
+  description?: string;
 }
 
 export interface Location {
@@ -83,8 +96,11 @@ export interface Location {
   name: string;
   code: string;
   city: string;
+  state?: string;
   country: string;
+  address?: string;
   employeeCount: number;
+  status?: 'Active' | 'Inactive';
 }
 
 export interface AttendanceRecord {

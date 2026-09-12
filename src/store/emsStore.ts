@@ -51,53 +51,7 @@ export const defaultNotificationPreferences: NotificationPreference[] = [
   { id: 'pref-14', eventKey: 'system_event', eventName: 'System & Security Event', category: 'system', inApp: true, email: true, sms: false, whatsapp: false },
 ];
 
-export const defaultInitialNotifications: AppNotification[] = [
-  {
-    id: 'notif-1',
-    recipientId: 'ADMIN',
-    recipientRole: 'Admin',
-    title: 'Payroll Approval Required',
-    message: 'September 2026 monthly payroll calculation is complete and waiting for Admin approval.',
-    category: 'payroll',
-    priority: 'high',
-    entityType: 'payroll',
-    actionUrl: '/admin/payroll',
-    isRead: false,
-    deliveryStatus: 'delivered',
-    createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'notif-2',
-    recipientId: 'ADMIN',
-    recipientRole: 'Admin',
-    title: 'New Leave Request',
-    message: 'Suryabhan Singh Rathore submitted a Casual Leave request for 2 days.',
-    category: 'leave',
-    priority: 'normal',
-    entityType: 'leave',
-    actionUrl: '/admin/leave',
-    isRead: false,
-    deliveryStatus: 'delivered',
-    createdAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'notif-3',
-    recipientId: 'ADMIN',
-    recipientRole: 'Admin',
-    title: 'Attendance Correction Request',
-    message: 'Suryabhan Singh Rathore requested an attendance check-in correction for today.',
-    category: 'attendance',
-    priority: 'normal',
-    entityType: 'attendance',
-    actionUrl: '/admin/attendance',
-    isRead: false,
-    deliveryStatus: 'delivered',
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  },
-];
+export const defaultInitialNotifications: AppNotification[] = [];
 
 export const defaultNotificationSettings: NotificationSettingsState = {
   retentionDays: '90',
@@ -107,7 +61,7 @@ export const defaultNotificationSettings: NotificationSettingsState = {
     port: 587,
     username: '',
     fromName: 'EMS HRMS System',
-    fromEmail: 'noreply@infinitivecloud.com',
+    fromEmail: 'noreply@organization.com',
     useTls: true,
   },
   sms: {
@@ -187,7 +141,7 @@ const STORAGE_KEY = 'ems_hrms_master_data_v2';
 
 const cleanInitialState: EmsDataState = {
   company: {
-    name: 'My New Enterprise Organization',
+    name: 'Enterprise Organization',
     logo: '',
     address: 'Enterprise HQ',
     city: 'Mumbai',
@@ -203,7 +157,7 @@ const cleanInitialState: EmsDataState = {
     name: 'Admin',
     email: 'admin@organization.com',
     role: 'HR Administrator',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
+    avatar: '',
     phone: '+91 98765 43210',
   },
   employees: [],
@@ -220,35 +174,7 @@ const cleanInitialState: EmsDataState = {
   jobs: [],
   candidates: [],
   performanceReviews: [],
-  salaryAssignments: [
-    {
-      id: 'sal-assign-9201',
-      employeeId: 'EMP9201',
-      employeeName: 'Suryabhan Singh Rathore',
-      structureId: 'struct-std',
-      structureTitle: 'Standard Corporate Structure',
-      effectiveDate: '2026-09-09',
-      basicSalary: 60000,
-      hra: 24000,
-      conveyance: 3000,
-      medical: 2000,
-      specialAllowance: 10000,
-      otherAllowances: 0,
-      bonus: 0,
-      pfEnabled: true,
-      pfPercent: 12,
-      ptEnabled: true,
-      ptAmount: 200,
-      tdsPercent: 10,
-      esiEnabled: false,
-      esiPercent: 0,
-      status: 'Active',
-      revisionReason: 'Initial Salary Assignment',
-      createdBy: 'Admin',
-      createdAt: '2026-09-09',
-      updatedAt: '2026-09-09',
-    },
-  ],
+  salaryAssignments: [],
   salaryStructures: [
     {
       id: 'struct-std',
@@ -348,27 +274,28 @@ export function getInitialEmsState(): EmsDataState {
           ...parsed,
           company: parsed.company || cleanInitialState.company,
           adminUser: parsed.adminUser || cleanInitialState.adminUser,
-          employees: Array.isArray(parsed.employees) ? parsed.employees : cleanInitialState.employees,
-          departments: Array.isArray(parsed.departments) ? parsed.departments : cleanInitialState.departments,
-          designations: Array.isArray(parsed.designations) ? parsed.designations : cleanInitialState.designations,
-          locations: Array.isArray(parsed.locations) ? parsed.locations : cleanInitialState.locations,
-          attendance: Array.isArray(parsed.attendance) ? parsed.attendance : cleanInitialState.attendance,
-          leaves: Array.isArray(parsed.leaves) ? parsed.leaves : cleanInitialState.leaves,
-          leaveTypes: Array.isArray(parsed.leaveTypes) ? parsed.leaveTypes : cleanInitialState.leaveTypes,
-          holidays: Array.isArray(parsed.holidays) ? parsed.holidays : cleanInitialState.holidays,
-          announcements: Array.isArray(parsed.announcements) ? parsed.announcements : cleanInitialState.announcements,
-          activities: Array.isArray(parsed.activities) ? parsed.activities : cleanInitialState.activities,
-          documents: Array.isArray(parsed.documents) ? parsed.documents : cleanInitialState.documents,
-          jobs: Array.isArray(parsed.jobs) ? parsed.jobs : cleanInitialState.jobs,
-          candidates: Array.isArray(parsed.candidates) ? parsed.candidates : cleanInitialState.candidates,
-          salaryStructures: Array.isArray(parsed.salaryStructures) && parsed.salaryStructures.length > 0 ? parsed.salaryStructures : cleanInitialState.salaryStructures,
-          salaryRules: Array.isArray(parsed.salaryRules) && parsed.salaryRules.length > 0 ? parsed.salaryRules : cleanInitialState.salaryRules,
-          salaryAssignments: Array.isArray(parsed.salaryAssignments) && parsed.salaryAssignments.length > 0 ? parsed.salaryAssignments : cleanInitialState.salaryAssignments,
+          employees: Array.isArray(parsed.employees) ? parsed.employees : [],
+          departments: Array.isArray(parsed.departments) ? parsed.departments : [],
+          designations: Array.isArray(parsed.designations) ? parsed.designations : [],
+          locations: Array.isArray(parsed.locations) ? parsed.locations : [],
+          attendance: Array.isArray(parsed.attendance) ? parsed.attendance : [],
+          leaves: Array.isArray(parsed.leaves) ? parsed.leaves : [],
+          leaveTypes: Array.isArray(parsed.leaveTypes) ? parsed.leaveTypes : [],
+          holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
+          announcements: Array.isArray(parsed.announcements) ? parsed.announcements : [],
+          activities: Array.isArray(parsed.activities) ? parsed.activities : [],
+          documents: Array.isArray(parsed.documents) ? parsed.documents : [],
+          jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
+          candidates: Array.isArray(parsed.candidates) ? parsed.candidates : [],
+          salaryStructures: Array.isArray(parsed.salaryStructures) ? parsed.salaryStructures : cleanInitialState.salaryStructures,
+          salaryRules: Array.isArray(parsed.salaryRules) ? parsed.salaryRules : cleanInitialState.salaryRules,
+          salaryAssignments: Array.isArray(parsed.salaryAssignments) ? parsed.salaryAssignments : [],
           employeeSalaryProfiles: parsed.employeeSalaryProfiles || {},
-          payrollRecords: Array.isArray(parsed.payrollRecords) ? parsed.payrollRecords : cleanInitialState.payrollRecords,
+          payrollRecords: Array.isArray(parsed.payrollRecords) ? parsed.payrollRecords : [],
           payrollSettings: parsed.payrollSettings || cleanInitialState.payrollSettings,
-          notifications: Array.isArray(parsed.notifications) ? parsed.notifications : defaultInitialNotifications,
+          notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
           notificationSettings: parsed.notificationSettings || defaultNotificationSettings,
+          isDemoData: false,
         };
       } catch (e) {
         console.error('Failed to parse saved EMS data state', e);
@@ -378,21 +305,52 @@ export function getInitialEmsState(): EmsDataState {
   return cleanInitialState;
 }
 
+let globalEmsState: EmsDataState | null = null;
+const emsListeners = new Set<() => void>();
+
+function getGlobalEmsState(): EmsDataState {
+  if (!globalEmsState) {
+    globalEmsState = getInitialEmsState();
+  }
+  return globalEmsState;
+}
+
+function setGlobalEmsState(updater: EmsDataState | ((prev: EmsDataState) => EmsDataState)) {
+  const current = getGlobalEmsState();
+  const next = typeof updater === 'function' ? updater(current) : updater;
+  globalEmsState = next;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch (e) {
+      console.error('Failed to save to localStorage', e);
+    }
+  }
+  emsListeners.forEach((listener) => listener());
+}
+
 export function useEmsStore() {
-  const [state, setState] = useState<EmsDataState>(cleanInitialState);
+  const [stateInternal, setStateInternal] = useState<EmsDataState>(getGlobalEmsState);
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    const loaded = getInitialEmsState();
-    setState(loaded);
     setIsHydrated(true);
+    setStateInternal({ ...getGlobalEmsState() });
+
+    const handleChange = () => {
+      setStateInternal({ ...getGlobalEmsState() });
+    };
+    emsListeners.add(handleChange);
+    return () => {
+      emsListeners.delete(handleChange);
+    };
   }, []);
 
-  useEffect(() => {
-    if (isHydrated && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }
-  }, [state, isHydrated]);
+  const state = stateInternal;
+
+  const setState = (updater: EmsDataState | ((prev: EmsDataState) => EmsDataState)) => {
+    setGlobalEmsState(updater);
+  };
 
   // Activity logger helper
   const logActivity = (user: string, action: string, category: RecentActivityItem['category'] = 'employee') => {
@@ -484,32 +442,132 @@ export function useEmsStore() {
     }
   };
 
-  // 2. ADD DEPARTMENT
-  const addDepartment = (dept: { name: string; head?: string; description?: string }) => {
+  // 2. DEPARTMENT CRUD
+  const addDepartment = (dept: { name: string; code?: string; head?: string; description?: string; status?: 'Active' | 'Inactive' }) => {
+    const code = dept.code && dept.code.trim() ? dept.code.trim().toUpperCase() : dept.name.substring(0, 3).toUpperCase();
     const created: Department = {
       id: `dept-${Date.now()}`,
-      name: dept.name,
-      code: dept.name.substring(0, 3).toUpperCase(),
-      head: dept.head || 'Unassigned',
+      name: dept.name.trim(),
+      code,
+      head: dept.head?.trim() || 'Unassigned',
       employeeCount: 0,
-      description: dept.description || 'Department Unit',
-      status: 'Active',
+      description: dept.description?.trim() || 'Department Unit',
+      status: dept.status || 'Active',
     };
     setState((prev) => ({
       ...prev,
       departments: [...prev.departments, created],
     }));
     logActivity('Admin', `created new department "${created.name}"`);
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/v1/organization', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-role': 'ADMIN' },
+        body: JSON.stringify({ entityType: 'department', data: created }),
+      }).catch((err) => console.error('MongoDB sync error on create department:', err));
+    }
+
+    return created;
   };
 
-  // 3. ADD DESIGNATION
-  const addDesignation = (desg: { title: string; department: string }) => {
+  const updateDepartment = (id: string, updated: Partial<Department>) => {
+    let updatedDeptName = '';
+    setState((prev) => {
+      const oldDept = prev.departments.find((d) => d.id === id);
+      const oldDeptName = oldDept?.name || '';
+      const nextDept = { ...(oldDept || {}), ...updated, id } as Department;
+      updatedDeptName = nextDept.name;
+
+      const nextDepts = prev.departments.map((d) => (d.id === id ? nextDept : d));
+
+      let nextEmployees = prev.employees;
+      let nextDesignations = prev.designations;
+
+      if (oldDeptName && nextDept.name && oldDeptName !== nextDept.name) {
+        nextEmployees = prev.employees.map((e) =>
+          e.department === oldDeptName || e.department === id ? { ...e, department: nextDept.name } : e
+        );
+        nextDesignations = prev.designations.map((des) =>
+          des.department === oldDeptName ? { ...des, department: nextDept.name } : des
+        );
+      }
+
+      return {
+        ...prev,
+        departments: nextDepts,
+        employees: nextEmployees,
+        designations: nextDesignations,
+      };
+    });
+
+    if (updatedDeptName) {
+      logActivity('Admin', `updated department details for "${updatedDeptName}"`);
+      if (typeof window !== 'undefined') {
+        fetch('/api/v1/organization', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'x-user-role': 'ADMIN' },
+          body: JSON.stringify({ entityType: 'department', id, updated }),
+        }).catch((err) => console.error('MongoDB sync error on update department:', err));
+      }
+    }
+  };
+
+  const deleteDepartment = (id: string) => {
+    const target = state.departments.find((d) => d.id === id);
+    if (!target) return { success: false, message: 'Department not found.' };
+
+    const assignedCount = (state.employees || []).filter(
+      (e) => e.department === target.name || e.department === target.id
+    ).length;
+
+    if (assignedCount > 0) {
+      setState((prev) => ({
+        ...prev,
+        departments: prev.departments.map((d) => (d.id === id ? { ...d, status: 'Inactive' as const } : d)),
+      }));
+      logActivity('Admin', `deactivated department "${target.name}" (${assignedCount} employees assigned)`);
+
+      if (typeof window !== 'undefined') {
+        fetch(`/api/v1/organization?entityType=department&id=${id}`, {
+          method: 'DELETE',
+          headers: { 'x-user-role': 'ADMIN' },
+        }).catch((err) => console.error('MongoDB sync error on delete department:', err));
+      }
+
+      return {
+        success: true,
+        message: `Department "${target.name}" has ${assignedCount} assigned employee(s) and was set to Inactive instead of deleted.`,
+      };
+    }
+
+    setState((prev) => ({
+      ...prev,
+      departments: prev.departments.filter((d) => d.id !== id),
+    }));
+    logActivity('Admin', `deleted department "${target.name}"`);
+
+    if (typeof window !== 'undefined') {
+      fetch(`/api/v1/organization?entityType=department&id=${id}`, {
+        method: 'DELETE',
+        headers: { 'x-user-role': 'ADMIN' },
+      }).catch((err) => console.error('MongoDB sync error on delete department:', err));
+    }
+
+    return { success: true, message: `Department "${target.name}" deleted successfully.` };
+  };
+
+  // 3. DESIGNATION CRUD
+  const addDesignation = (desg: { title: string; code?: string; department: string; level?: string; description?: string; status?: 'Active' | 'Inactive' }) => {
+    const code = desg.code && desg.code.trim() ? desg.code.trim().toUpperCase() : desg.title.substring(0, 3).toUpperCase();
     const created: Designation = {
       id: `des-${Date.now()}`,
-      title: desg.title,
-      code: desg.title.substring(0, 3).toUpperCase(),
+      title: desg.title.trim(),
+      code,
       department: desg.department,
-      level: 'L3',
+      level: desg.level || 'L3',
+      description: desg.description || '',
+      status: desg.status || 'Active',
       employeeCount: 0,
     };
     setState((prev) => ({
@@ -517,6 +575,207 @@ export function useEmsStore() {
       designations: [...prev.designations, created],
     }));
     logActivity('Admin', `created new designation "${created.title}"`);
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/v1/organization', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-role': 'ADMIN' },
+        body: JSON.stringify({ entityType: 'designation', data: created }),
+      }).catch((err) => console.error('MongoDB sync error on create designation:', err));
+    }
+
+    return created;
+  };
+
+  const updateDesignation = (id: string, updated: Partial<Designation>) => {
+    let updatedTitle = '';
+    setState((prev) => {
+      const oldDesg = prev.designations.find((d) => d.id === id);
+      const oldTitle = oldDesg?.title || '';
+      const nextDesg = { ...(oldDesg || {}), ...updated, id } as Designation;
+      updatedTitle = nextDesg.title;
+
+      const nextDesgs = prev.designations.map((d) => (d.id === id ? nextDesg : d));
+
+      let nextEmps = prev.employees;
+      if (oldTitle && nextDesg.title && oldTitle !== nextDesg.title) {
+        nextEmps = prev.employees.map((e) =>
+          e.designation === oldTitle || e.designation === id ? { ...e, designation: nextDesg.title } : e
+        );
+      }
+
+      return {
+        ...prev,
+        designations: nextDesgs,
+        employees: nextEmps,
+      };
+    });
+
+    if (updatedTitle) {
+      logActivity('Admin', `updated designation "${updatedTitle}"`);
+      if (typeof window !== 'undefined') {
+        fetch('/api/v1/organization', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'x-user-role': 'ADMIN' },
+          body: JSON.stringify({ entityType: 'designation', id, updated }),
+        }).catch((err) => console.error('MongoDB sync error on update designation:', err));
+      }
+    }
+  };
+
+  const deleteDesignation = (id: string) => {
+    const target = state.designations.find((d) => d.id === id);
+    if (!target) return { success: false, message: 'Designation not found.' };
+
+    const assignedCount = (state.employees || []).filter(
+      (e) => e.designation === target.title || e.designation === target.id
+    ).length;
+
+    if (assignedCount > 0) {
+      setState((prev) => ({
+        ...prev,
+        designations: prev.designations.map((d) => (d.id === id ? { ...d, status: 'Inactive' as const } : d)),
+      }));
+      logActivity('Admin', `deactivated designation "${target.title}" (${assignedCount} employees assigned)`);
+
+      if (typeof window !== 'undefined') {
+        fetch(`/api/v1/organization?entityType=designation&id=${id}`, {
+          method: 'DELETE',
+          headers: { 'x-user-role': 'ADMIN' },
+        }).catch((err) => console.error('MongoDB sync error on delete designation:', err));
+      }
+
+      return {
+        success: true,
+        message: `Designation "${target.title}" has ${assignedCount} assigned employee(s) and was set to Inactive instead of deleted.`,
+      };
+    }
+
+    setState((prev) => ({
+      ...prev,
+      designations: prev.designations.filter((d) => d.id !== id),
+    }));
+    logActivity('Admin', `deleted designation "${target.title}"`);
+
+    if (typeof window !== 'undefined') {
+      fetch(`/api/v1/organization?entityType=designation&id=${id}`, {
+        method: 'DELETE',
+        headers: { 'x-user-role': 'ADMIN' },
+      }).catch((err) => console.error('MongoDB sync error on delete designation:', err));
+    }
+
+    return { success: true, message: `Designation "${target.title}" deleted successfully.` };
+  };
+
+  // 3b. LOCATION CRUD
+  const addLocation = (loc: { name: string; code?: string; city: string; state?: string; country: string; address?: string; status?: 'Active' | 'Inactive' }) => {
+    const code = loc.code && loc.code.trim() ? loc.code.trim().toUpperCase() : loc.city.substring(0, 3).toUpperCase();
+    const created: Location = {
+      id: `loc-${Date.now()}`,
+      name: loc.name.trim(),
+      code,
+      city: loc.city.trim(),
+      state: loc.state?.trim() || '',
+      country: loc.country.trim() || 'India',
+      address: loc.address?.trim() || '',
+      status: loc.status || 'Active',
+      employeeCount: 0,
+    };
+    setState((prev) => ({
+      ...prev,
+      locations: [...prev.locations, created],
+    }));
+    logActivity('Admin', `created new location "${created.name}" (${created.city})`);
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/v1/organization', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-role': 'ADMIN' },
+        body: JSON.stringify({ entityType: 'location', data: created }),
+      }).catch((err) => console.error('MongoDB sync error on create location:', err));
+    }
+
+    return created;
+  };
+
+  const updateLocation = (id: string, updated: Partial<Location>) => {
+    let updatedLocName = '';
+    setState((prev) => {
+      const oldLoc = prev.locations.find((l) => l.id === id);
+      const oldLocName = oldLoc?.name || '';
+      const nextLoc = { ...(oldLoc || {}), ...updated, id } as Location;
+      updatedLocName = nextLoc.name;
+
+      const nextLocs = prev.locations.map((l) => (l.id === id ? nextLoc : l));
+
+      let nextEmps = prev.employees;
+      if (oldLocName && nextLoc.name && oldLocName !== nextLoc.name) {
+        nextEmps = prev.employees.map((e) =>
+          e.location === oldLocName || e.location === id ? { ...e, location: nextLoc.name } : e
+        );
+      }
+
+      return {
+        ...prev,
+        locations: nextLocs,
+        employees: nextEmps,
+      };
+    });
+
+    if (updatedLocName) {
+      logActivity('Admin', `updated location details for "${updatedLocName}"`);
+      if (typeof window !== 'undefined') {
+        fetch('/api/v1/organization', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'x-user-role': 'ADMIN' },
+          body: JSON.stringify({ entityType: 'location', id, updated }),
+        }).catch((err) => console.error('MongoDB sync error on update location:', err));
+      }
+    }
+  };
+
+  const deleteLocation = (id: string) => {
+    const target = state.locations.find((l) => l.id === id);
+    if (!target) return { success: false, message: 'Location not found.' };
+
+    const assignedCount = (state.employees || []).filter(
+      (e) => e.location === target.name || e.location === target.id || e.city === target.city
+    ).length;
+
+    if (assignedCount > 0) {
+      setState((prev) => ({
+        ...prev,
+        locations: prev.locations.map((l) => (l.id === id ? { ...l, status: 'Inactive' as const } : l)),
+      }));
+      logActivity('Admin', `deactivated location "${target.name}" (${assignedCount} staff assigned)`);
+
+      if (typeof window !== 'undefined') {
+        fetch(`/api/v1/organization?entityType=location&id=${id}`, {
+          method: 'DELETE',
+          headers: { 'x-user-role': 'ADMIN' },
+        }).catch((err) => console.error('MongoDB sync error on delete location:', err));
+      }
+
+      return {
+        success: true,
+        message: `Location "${target.name}" has ${assignedCount} assigned employee(s) and was set to Inactive instead of deleted.`,
+      };
+    }
+
+    setState((prev) => ({
+      ...prev,
+      locations: prev.locations.filter((l) => l.id !== id),
+    }));
+    logActivity('Admin', `deleted location "${target.name}"`);
+
+    if (typeof window !== 'undefined') {
+      fetch(`/api/v1/organization?entityType=location&id=${id}`, {
+        method: 'DELETE',
+        headers: { 'x-user-role': 'ADMIN' },
+      }).catch((err) => console.error('MongoDB sync error on delete location:', err));
+    }
+
+    return { success: true, message: `Location "${target.name}" deleted successfully.` };
   };
 
   // 4. ADD HOLIDAY
@@ -1512,54 +1771,7 @@ export function useEmsStore() {
   };
 
   const loadSampleDemoData = () => {
-    setState({
-      company: {
-        name: 'Infinitive Cloud Enterprise Solutions',
-        logo: '',
-        address: 'Tech Park B, Powai',
-        city: 'Mumbai',
-        state: 'Maharashtra',
-        country: 'India',
-        timezone: 'Asia/Kolkata',
-        currency: 'INR (₹)',
-        workingDays: '5 Days (Mon - Fri)',
-        contactEmail: 'hr@infinitivecloud.com',
-        contactPhone: '+91 22 6789 0000',
-      },
-      adminUser: {
-        name: 'Admin',
-        email: 'admin@infinitivecloud.com',
-        role: 'HR Administrator',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
-        phone: '+91 22 6789 0000',
-      },
-      employees: mockEmployees,
-      departments: mockDepartments,
-      designations: mockDesignations,
-      locations: mockLocations,
-      attendance: mockAttendanceRecords,
-      leaves: mockAdminLeaveRequests,
-      leaveTypes: [
-        { id: 'lt-1', name: 'Casual Leave (CL)', description: 'Casual time off', allowanceDays: 12, isPaid: true },
-        { id: 'lt-2', name: 'Sick Leave (SL)', description: 'Medical sick leave', allowanceDays: 10, isPaid: true },
-      ],
-      holidays: mockHolidayEvents,
-      announcements: mockAnnouncements,
-      activities: mockRecentActivities,
-      documents: mockEmployeeDocuments,
-      jobs: mockJobOpenings,
-      candidates: mockCandidates,
-      performanceReviews: mockPerformanceReviews,
-      salaryStructures: cleanInitialState.salaryStructures,
-      salaryRules: cleanInitialState.salaryRules,
-      salaryAssignments: cleanInitialState.salaryAssignments,
-      employeeSalaryProfiles: {},
-      payrollRecords: mockPayrollRecords,
-      payrollSettings: cleanInitialState.payrollSettings,
-      notifications: defaultInitialNotifications,
-      notificationSettings: defaultNotificationSettings,
-      isDemoData: true,
-    });
+    setState(cleanInitialState);
   };
 
   // Derived Dynamic Statistics (NEVER hardcoded)
@@ -1575,14 +1787,42 @@ export function useEmsStore() {
     return join >= sixtyDaysAgo;
   }).length;
 
+  const rawDepartments = Array.isArray(state.departments) ? state.departments : [];
+  const rawDesignations = Array.isArray(state.designations) ? state.designations : [];
+  const rawLocations = Array.isArray(state.locations) ? state.locations : [];
+
+  const computedDepartments = rawDepartments.map((dept) => {
+    const actualCount = safeEmployees.filter(
+      (e) => e.department?.toLowerCase() === dept.name.toLowerCase() || e.department === dept.id
+    ).length;
+    return { ...dept, employeeCount: actualCount > 0 ? actualCount : dept.employeeCount || 0 };
+  });
+
+  const computedDesignations = rawDesignations.map((desg) => {
+    const actualCount = safeEmployees.filter(
+      (e) => e.designation?.toLowerCase() === desg.title.toLowerCase() || e.designation === desg.id
+    ).length;
+    return { ...desg, employeeCount: actualCount > 0 ? actualCount : desg.employeeCount || 0 };
+  });
+
+  const computedLocations = rawLocations.map((loc) => {
+    const actualCount = safeEmployees.filter(
+      (e) =>
+        e.location?.toLowerCase() === loc.name.toLowerCase() ||
+        e.location === loc.id ||
+        e.city?.toLowerCase() === loc.city.toLowerCase()
+    ).length;
+    return { ...loc, employeeCount: actualCount > 0 ? actualCount : loc.employeeCount || 0 };
+  });
+
   const safeState: EmsDataState = {
     ...state,
     company: state.company || cleanInitialState.company,
     adminUser: state.adminUser || cleanInitialState.adminUser,
     employees: safeEmployees,
-    departments: Array.isArray(state.departments) ? state.departments : [],
-    designations: Array.isArray(state.designations) ? state.designations : [],
-    locations: Array.isArray(state.locations) ? state.locations : [],
+    departments: computedDepartments,
+    designations: computedDesignations,
+    locations: computedLocations,
     attendance: Array.isArray(state.attendance) ? state.attendance : [],
     leaves: Array.isArray(state.leaves) ? state.leaves : [],
     leaveTypes: Array.isArray(state.leaveTypes) ? state.leaveTypes : [],
@@ -1622,7 +1862,14 @@ export function useEmsStore() {
     addEmployee,
     deactivateEmployee,
     addDepartment,
+    updateDepartment,
+    deleteDepartment,
     addDesignation,
+    updateDesignation,
+    deleteDesignation,
+    addLocation,
+    updateLocation,
+    deleteLocation,
     addHoliday,
     createAnnouncement,
     addLeaveType,

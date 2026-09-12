@@ -299,6 +299,19 @@ export function useAuthStore() {
     }
   };
 
+  const updateUserAvatar = (avatarUrl: string) => {
+    setState((prev) => {
+      if (!prev.user) return prev;
+      return {
+        ...prev,
+        user: {
+          ...prev.user,
+          avatar: avatarUrl,
+        },
+      };
+    });
+  };
+
   return {
     state,
     isHydrated,
@@ -315,5 +328,6 @@ export function useAuthStore() {
     forgotPassword,
     resetPassword,
     getRoleDashboardRoute,
+    updateUserAvatar,
   };
 }

@@ -106,56 +106,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Demo vs Real Data Source Control Banner */}
-      <div className="flex flex-wrap items-center justify-between rounded-2xl border border-blue-200 bg-blue-50/60 p-4 text-xs text-blue-900 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white font-bold">
-            <Database className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-sm text-slate-900">{state.company.name}</span>
-              {state.isDemoData ? (
-                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 font-bold text-amber-800 text-[10px] border border-amber-300">
-                  DEMO SEED DATA ACTIVE
-                </span>
-              ) : (
-                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 font-bold text-emerald-800 text-[10px] border border-emerald-300">
-                  REAL COMPANY DATA SOURCE
-                </span>
-              )}
-            </div>
-            <p className="text-slate-600 mt-0.5">
-              Dashboard metrics are dynamically calculated from the underlying EMS Master Database ({totalEmployeesCount} Employees Registered).
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2 mt-2 sm:mt-0">
-          {state.isDemoData ? (
-            <button
-              onClick={() => {
-                clearSeedData();
-                showToast('Purged seed data. EMS store is now ready for real company data entry.');
-              }}
-              className="flex items-center gap-1.5 rounded-xl border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-              title="Purge demo records to enter real company employee data"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Purge Seed Data
-            </button>
-          ) : (
-            <button
-              onClick={() => {
-                resetToDemoData();
-                showToast('Loaded sample demo records.');
-              }}
-              className="flex items-center gap-1.5 rounded-xl border border-blue-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-            >
-              <RefreshCw className="h-3.5 w-3.5" /> Load Sample Demo Data
-            </button>
-          )}
-        </div>
-      </div>
 
       {/* Welcome Greeting with Quick Action Entry Buttons */}
       <WelcomeSection

@@ -1,37 +1,63 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Building2 } from 'lucide-react';
+import { Department, Employee } from '@/types/admin';
 
-import { Employee } from '@/types/admin';
-
-interface AddDepartmentModalProps {
+interface EditDepartmentModalProps {
   isOpen: boolean;
   onClose: () => void;
+  department: Department | null;
   employees?: Employee[];
-  onSave: (dept: { name: string; head?: string; description?: string }) => void;
+  onSave: (id: string, updated: Partial<Department>) => void;
 }
 
-export const AddDepartmentModal: React.FC<AddDepartmentModalProps> = ({
+export const EditDepartmentModal: React.FC<EditDepartmentModalProps> = ({
   isOpen,
   onClose,
+  department,
   employees = [],
   onSave,
 }) => {
   const [name, setName] = useState('');
-  const [head, setHead] = useState('Unassigned');
+  const [code, setCode] = useState('');
+  const [head, setHead] = useState('');
   const [isCustomHead, setIsCustomHead] = useState(false);
   const [description, setDescription] = useState('');
+  const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (department) {
+      setName(department.name || '');
+      setCode(department.code || '');
+      setHead(department.head || '');
+      setDescription(department.description || '');
+      setStatus(department.status || 'Active');
+
+      // Check if existing head is in employee list
+      const matchesEmp = employees.some(
+        (e) => `${e.firstName} ${e.lastName}`.toLowerCase() === (department.head || '').toLowerCase()
+      );
+      if (department.head && department.head !== 'Unassigned' && !matchesEmp) {
+        setIsCustomHead(true);
+      } else {
+        setIsCustomHead(false);
+      }
+    }
+  }, [department, employees]);
+
+  if (!isOpen || !department) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onSave({ name: name.trim(), head: head.trim() || 'Unassigned', description: description.trim() });
-    setName('');
-    setHead('Unassigned');
-    setDescription('');
+    onSave(department.id, {
+      name: name.trim(),
+      code: code.trim().toUpperCase() || name.substring(0, 3).toUpperCase(),
+      head: head.trim() || 'Unassigned',
+      description: description.trim(),
+      status,
+    });
     onClose();
   };
 
@@ -41,7 +67,7 @@ export const AddDepartmentModal: React.FC<AddDepartmentModalProps> = ({
         <div className="flex items-center justify-between border-b pb-3 font-bold text-sm text-slate-900">
           <div className="flex items-center gap-2">
             <Building2 className="h-4 w-4 text-blue-600" />
-            <span>Add Department</span>
+            <span>Edit Department</span>
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:text-slate-700">
             <X className="h-4 w-4" />
@@ -61,9 +87,33 @@ export const AddDepartmentModal: React.FC<AddDepartmentModalProps> = ({
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-bold text-slate-900">Department Code</label>
+              <input
+                type="text"
+                placeholder="e.g. ENG"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="mt-1 w-full rounded-xl border p-2.5 bg-slate-50 focus:border-blue-500 focus:bg-white uppercase font-mono"
+              />
+            </div>
+            <div>
+              <label className="font-bold text-slate-900">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as 'Active' | 'Inactive')}
+                className="mt-1 w-full rounded-xl border p-2.5 bg-slate-50 focus:border-blue-500 focus:bg-white font-medium"
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
           <div>
             <div className="flex items-center justify-between">
-              <label className="font-bold text-slate-900">Department Head (Optional)</label>
+              <label className="font-bold text-slate-900">Department Head</label>
               <button
                 type="button"
                 onClick={() => setIsCustomHead(!isCustomHead)}
@@ -122,7 +172,7 @@ export const AddDepartmentModal: React.FC<AddDepartmentModalProps> = ({
               type="submit"
               className="rounded-xl bg-blue-600 px-4 py-1.5 font-bold text-white shadow-xs hover:bg-blue-700"
             >
-              Save Department
+              Update Department
             </button>
           </div>
         </form>
