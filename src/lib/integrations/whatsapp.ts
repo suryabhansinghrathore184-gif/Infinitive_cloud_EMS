@@ -1,4 +1,5 @@
 import { connectToDatabase } from '@/lib/mongodb';
+import { decryptSecret, isEncryptionConfigured } from './encryption';
 
 export interface WhatsAppConfig {
   provider: string;
@@ -23,6 +24,45 @@ const DEFAULT_GRAPH_VERSION = 'v19.0';
 const DEFAULT_API_BASE_URL = 'https://graph.facebook.com';
 
 /**
+ * Loads WhatsApp configuration from MongoDB `integrations` collection (Single Source of Truth).
+ */
+export async function getWhatsAppIntegrationConfig(organizationId: string): Promise<WhatsAppConfig | null> {
+  try {
+    const { db } = await connectToDatabase();
+    const integrationDoc = await db.collection('integrations').findOne({
+      provider: 'whatsapp',
+      $or: [{ organizationId }, { organizationId: 'org-default' }, { organizationId: { $exists: false } }],
+    });
+
+    if (!integrationDoc || integrationDoc.status !== 'CONNECTED' || !integrationDoc.config) {
+      return null;
+    }
+
+    const cfg = integrationDoc.config;
+    let rawToken = cfg.accessToken || '';
+    if (rawToken && isEncryptionConfigured()) {
+      try {
+        rawToken = decryptSecret(rawToken);
+      } catch (e) {
+        // Fallback to raw token if unencrypted
+      }
+    }
+
+    return {
+      provider: 'whatsapp',
+      phoneNumberId: cfg.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+      businessAccountId: cfg.businessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '',
+      graphVersion: cfg.graphVersion || process.env.WHATSAPP_GRAPH_VERSION || DEFAULT_GRAPH_VERSION,
+      apiBaseUrl: cfg.apiBaseUrl || process.env.WHATSAPP_API_BASE_URL || DEFAULT_API_BASE_URL,
+      accessToken: rawToken || process.env.WHATSAPP_API_TOKEN || '',
+    };
+  } catch (err) {
+    console.error('Failed to load WhatsApp config from integrations collection:', err);
+    return null;
+  }
+}
+
+/**
  * Tests WhatsApp Business API credentials by pinging Meta Graph API endpoint.
  * NEVER sends real employee notifications during testing.
  */
@@ -45,7 +85,7 @@ export async function testWhatsAppConnection(
       provider: 'whatsapp',
       status: 'NOT_CONFIGURED',
       testedAt: nowISO,
-      message: 'WhatsApp credentials missing. Please configure Phone Number ID and Access Token.',
+      message: 'WhatsApp credentials missing. Please configure Phone Number ID and Access Token under /admin/integrations.',
     };
   }
 
@@ -99,6 +139,7 @@ export async function testWhatsAppConnection(
 
 /**
  * Dispatches WhatsApp message & logs delivery into `whatsapp_delivery_logs`.
+ * Single source of truth: loads configured credentials from `/admin/integrations`.
  */
 export async function sendWhatsAppMessage(options: {
   organizationId: string;
@@ -111,15 +152,20 @@ export async function sendWhatsAppMessage(options: {
   config?: WhatsAppConfig;
 }): Promise<{ success: boolean; providerMessageId?: string; error?: string }> {
   const nowISO = new Date().toISOString();
-  const { organizationId, employeeId, eventType, phone, templateName, components, config } = options;
+  const { organizationId, employeeId, eventType, phone, templateName, components } = options;
 
-  const phoneNumberId = config?.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '';
-  const accessToken = config?.accessToken || process.env.WHATSAPP_API_TOKEN || '';
-  const graphVersion = config?.graphVersion || process.env.WHATSAPP_GRAPH_VERSION || DEFAULT_GRAPH_VERSION;
-  const baseUrl = config?.apiBaseUrl || process.env.WHATSAPP_API_BASE_URL || DEFAULT_API_BASE_URL;
+  let activeConfig = options.config;
+  if (!activeConfig) {
+    activeConfig = (await getWhatsAppIntegrationConfig(organizationId)) || undefined;
+  }
+
+  const phoneNumberId = activeConfig?.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+  const accessToken = activeConfig?.accessToken || process.env.WHATSAPP_API_TOKEN || '';
+  const graphVersion = activeConfig?.graphVersion || process.env.WHATSAPP_GRAPH_VERSION || DEFAULT_GRAPH_VERSION;
+  const baseUrl = activeConfig?.apiBaseUrl || process.env.WHATSAPP_API_BASE_URL || DEFAULT_API_BASE_URL;
 
   if (!phoneNumberId || !accessToken) {
-    return { success: false, error: 'WhatsApp integration is not configured' };
+    return { success: false, error: 'WhatsApp integration is not configured or connected' };
   }
 
   const cleanPhone = phone.replace(/[^0-9]/g, '');

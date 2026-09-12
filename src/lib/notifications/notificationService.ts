@@ -17,6 +17,7 @@ export interface CreateNotificationOptions {
   targetScope?: TargetScope;
   targetId?: string;
   eventType: string;
+  eventId?: string; // Business-event idempotency key (e.g. "leave:req-101:approved")
   category: NotificationCategory;
   title: string;
   message: string;
@@ -29,6 +30,7 @@ export interface CreateNotificationOptions {
 
 /**
  * Central Server-Side Function to Create & Dispatch Notifications across EMS Modules.
+ * Supports business-event idempotency via eventId.
  */
 export async function createNotification(
   options: CreateNotificationOptions
@@ -40,6 +42,7 @@ export async function createNotification(
     targetScope = 'USER',
     targetId,
     eventType,
+    eventId,
     category,
     title,
     message,
@@ -54,18 +57,33 @@ export async function createNotification(
     throw new Error('organizationId is required to create a notification');
   }
 
-  const nowISO = new Date().toISOString();
   const { db } = await connectToDatabase();
+  const effectiveRecipientId = recipientId || 'usr-admin-1';
 
+  // Business event idempotency check: if eventId is provided, prevent duplicate creation
+  if (eventId) {
+    const existingNotif = await db.collection('notifications').findOne({
+      organizationId,
+      eventId,
+      recipientId: effectiveRecipientId,
+    });
+
+    if (existingNotif) {
+      return existingNotif as unknown as NotificationDoc;
+    }
+  }
+
+  const nowISO = new Date().toISOString();
   const notifId = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
   const notifDoc: NotificationDoc = {
     id: notifId,
+    eventId: eventId || undefined,
     organizationId,
     recipientType,
-    recipientId: recipientId || 'usr-admin-1',
+    recipientId: effectiveRecipientId,
     targetScope,
-    targetId: targetId || recipientId || undefined,
+    targetId: targetId || effectiveRecipientId || undefined,
     eventType,
     category,
     title,
@@ -88,7 +106,7 @@ export async function createNotification(
 
   // Evaluate recipient preferences & multi-channel dispatch
   try {
-    const preferences = await getNotificationPreferences(organizationId, recipientId);
+    const preferences = await getNotificationPreferences(organizationId, effectiveRecipientId);
     const pref = preferences.find((p) => p.eventType === eventType);
 
     const activeChannels: NotificationChannel[] = ['IN_APP'];

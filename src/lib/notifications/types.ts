@@ -43,6 +43,7 @@ export type NotificationStatus =
 export interface NotificationDoc {
   _id?: any;
   id: string;
+  eventId?: string;
   organizationId: string;
   recipientType?: RecipientType;
   recipientId?: string;
