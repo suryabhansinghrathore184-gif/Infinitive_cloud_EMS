@@ -878,29 +878,52 @@ export function useEmsStore() {
     }
   };
 
-  // 7. ADD DOCUMENT
-  const addDocument = (doc: Omit<EmployeeDocument, 'id' | 'uploadDate'>) => {
-    const created: EmployeeDocument = {
-      ...doc,
-      id: `doc-${Date.now()}`,
-      uploadDate: new Date().toISOString().split('T')[0],
-    };
+  // 7. DOCUMENT MANAGEMENT ACTIONS
+  const setDocuments = (docs: EmployeeDocument[]) => {
     setState((prev) => ({
       ...prev,
-      documents: [created, ...(prev.documents || [])],
+      documents: docs,
     }));
-    logActivity('Admin', `uploaded document "${created.title}" for ${created.employeeName}`, 'policy');
+  };
+
+  const addDocument = (doc: EmployeeDocument) => {
+    setState((prev) => ({
+      ...prev,
+      documents: [doc, ...(prev.documents || []).filter((d) => d.id !== doc.id)],
+    }));
+    logActivity('Admin', `uploaded document "${doc.title}" for ${doc.employeeName}`, 'policy');
     createNotification({
       recipientId: 'ADMIN',
       recipientRole: 'Admin',
       title: 'Document Uploaded',
-      message: `Document "${created.title}" was uploaded for employee ${created.employeeName}.`,
+      message: `Document "${doc.title}" was uploaded for employee ${doc.employeeName}.`,
       category: 'document',
       priority: 'normal',
       entityType: 'document',
-      entityId: created.id,
+      entityId: doc.id,
       actionUrl: '/admin/documents',
     });
+  };
+
+  const updateDocument = (id: string, updated: Partial<EmployeeDocument>) => {
+    setState((prev) => ({
+      ...prev,
+      documents: (prev.documents || []).map((d) => (d.id === id ? { ...d, ...updated } : d)),
+    }));
+    logActivity('Admin', `updated document details for ID "${id}"`, 'policy');
+  };
+
+  const deleteDocument = (id: string) => {
+    let docTitle = '';
+    setState((prev) => {
+      const target = (prev.documents || []).find((d) => d.id === id);
+      docTitle = target?.title || id;
+      return {
+        ...prev,
+        documents: (prev.documents || []).filter((d) => d.id !== id),
+      };
+    });
+    logActivity('Admin', `deleted document "${docTitle}"`, 'policy');
   };
 
   // 8. ADD ATTENDANCE RECORD
@@ -1874,7 +1897,10 @@ export function useEmsStore() {
     createAnnouncement,
     addLeaveType,
     updateLeaveRequestStatus,
+    setDocuments,
     addDocument,
+    updateDocument,
+    deleteDocument,
     addAttendanceRecord,
     addJobOpening,
     addCandidate,

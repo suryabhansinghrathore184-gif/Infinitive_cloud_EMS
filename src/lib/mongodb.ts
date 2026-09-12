@@ -1,16 +1,20 @@
 import { MongoClient, Db, GridFSBucket, ObjectId } from 'mongodb';
 
-const MONGODB_URI =
-  process.env.MONGODB_URI ||
-  process.env.DATABASE_URL ||
-  'mongodb://localhost:27017/ems_hrms_db';
+const MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL || '';
 
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;
+let indexesInitialized = false;
 
 export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
   if (cachedClient && cachedDb) {
     return { client: cachedClient, db: cachedDb };
+  }
+
+  if (!MONGODB_URI) {
+    throw new Error(
+      'MONGODB_URI environment variable is missing. Please configure your MongoDB Atlas production connection string in .env'
+    );
   }
 
   const client = new MongoClient(MONGODB_URI);
@@ -20,20 +24,59 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
   cachedClient = client;
   cachedDb = db;
 
+  if (!indexesInitialized) {
+    ensureProductionIndexes(db).catch((err) =>
+      console.error('Error setting up MongoDB production indexes:', err)
+    );
+    indexesInitialized = true;
+  }
+
   return { client, db };
 }
 
-export async function getGridFSBucket(): Promise<GridFSBucket> {
+export async function ensureProductionIndexes(db: Db): Promise<void> {
+  try {
+    // 1. Users: unique email
+    await db.collection('users').createIndex({ email: 1 }, { unique: true, sparse: true });
+    await db.collection('users').createIndex({ organizationId: 1 });
+
+    // 2. Employees: unique organizationId + employeeId, organizationId + userId
+    await db.collection('employees').createIndex({ organizationId: 1, employeeId: 1 }, { unique: true, sparse: true });
+    await db.collection('employees').createIndex({ organizationId: 1, userId: 1 }, { sparse: true });
+
+    // 3. Documents: organizationId + employeeId, organizationId + uploadedAt
+    await db.collection('documents').createIndex({ organizationId: 1, employeeId: 1 });
+    await db.collection('documents').createIndex({ organizationId: 1, uploadedAt: -1 });
+    await db.collection('documents').createIndex({ category: 1 });
+    await db.collection('documents').createIndex({ accessRole: 1 });
+
+    // 4. Attendance: organizationId + employeeId + date
+    await db.collection('attendance').createIndex({ organizationId: 1, employeeId: 1, date: 1 });
+
+    // 5. Leaves: organizationId + employeeId + status
+    await db.collection('leaves').createIndex({ organizationId: 1, employeeId: 1, status: 1 });
+
+    // 6. Organization metadata
+    await db.collection('departments').createIndex({ organizationId: 1 });
+    await db.collection('designations').createIndex({ organizationId: 1 });
+    await db.collection('locations').createIndex({ organizationId: 1 });
+  } catch (err) {
+    console.warn('Index creation warning (indexes may already exist):', err);
+  }
+}
+
+export async function getGridFSBucket(bucketName: string = 'documents'): Promise<GridFSBucket> {
   const { db } = await connectToDatabase();
-  return new GridFSBucket(db, { bucketName: 'photos' });
+  return new GridFSBucket(db, { bucketName });
 }
 
 export async function uploadFileToGridFS(
   filename: string,
   mimeType: string,
-  buffer: Buffer
+  buffer: Buffer,
+  bucketName: string = 'documents'
 ): Promise<string> {
-  const bucket = await getGridFSBucket();
+  const bucket = await getGridFSBucket(bucketName);
   const uploadStream = bucket.openUploadStream(filename, {
     metadata: {
       contentType: mimeType,
@@ -53,23 +96,33 @@ export async function uploadFileToGridFS(
 }
 
 export async function getFileStreamFromGridFS(
-  fileIdStr: string
+  fileIdStr: string,
+  bucketName: string = 'documents'
 ): Promise<{ stream: ReadableStream; filename: string; contentType: string } | null> {
   try {
-    const bucket = await getGridFSBucket();
+    const bucket = await getGridFSBucket(bucketName);
     const { db } = await connectToDatabase();
     const objectId = new ObjectId(fileIdStr);
 
+    const filesCollection = `${bucketName}.files`;
     const files = await db
-      .collection('photos.files')
+      .collection(filesCollection)
       .find({ _id: objectId })
       .toArray();
 
     if (!files || files.length === 0) {
-      return null;
+      // Fallback check in photos.files if searching documents and vice versa
+      const fallbackCollection = bucketName === 'documents' ? 'photos.files' : 'documents.files';
+      const fallbackFiles = await db
+        .collection(fallbackCollection)
+        .find({ _id: objectId })
+        .toArray();
+      if (!fallbackFiles || fallbackFiles.length === 0) {
+        return null;
+      }
     }
 
-    const fileDoc = files[0];
+    const fileDoc = files[0] || (await db.collection(bucketName === 'documents' ? 'photos.files' : 'documents.files').find({ _id: objectId }).toArray())[0];
     const nodeStream = bucket.openDownloadStream(objectId);
 
     // Convert Node stream to Web ReadableStream for Next.js Response
@@ -86,8 +139,8 @@ export async function getFileStreamFromGridFS(
 
     return {
       stream: webStream,
-      filename: fileDoc.filename || 'photo',
-      contentType: fileDoc.metadata?.contentType || 'image/jpeg',
+      filename: fileDoc.filename || 'document',
+      contentType: fileDoc.metadata?.contentType || 'application/octet-stream',
     };
   } catch (error) {
     console.error('Error fetching file from GridFS:', error);
@@ -95,14 +148,22 @@ export async function getFileStreamFromGridFS(
   }
 }
 
-export async function deleteFileFromGridFS(fileIdStr: string): Promise<boolean> {
+export async function deleteFileFromGridFS(fileIdStr: string, bucketName: string = 'documents'): Promise<boolean> {
   try {
-    const bucket = await getGridFSBucket();
+    const bucket = await getGridFSBucket(bucketName);
     const objectId = new ObjectId(fileIdStr);
     await bucket.delete(objectId);
     return true;
   } catch (error) {
-    console.error('Error deleting file from GridFS:', error);
-    return false;
+    // Try fallback bucket if primary fails
+    try {
+      const fallbackBucket = await getGridFSBucket(bucketName === 'documents' ? 'photos' : 'documents');
+      const objectId = new ObjectId(fileIdStr);
+      await fallbackBucket.delete(objectId);
+      return true;
+    } catch (e) {
+      console.error('Error deleting file from GridFS:', error);
+      return false;
+    }
   }
 }

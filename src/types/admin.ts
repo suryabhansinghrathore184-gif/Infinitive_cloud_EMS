@@ -325,17 +325,39 @@ export interface PerformanceReview {
   pipStatus?: 'Active' | 'None';
 }
 
+export type DocumentCategory =
+  | 'Offer Letter'
+  | 'Appointment Letter'
+  | 'Identity Proof'
+  | 'Payslip'
+  | 'Resume'
+  | 'Experience Letter'
+  | 'Contract'
+  | 'Other';
+
+export type DocumentAccessRole =
+  | 'HR Only'
+  | 'Admin Only'
+  | 'HR & Admin'
+  | 'Employee'
+  | 'Public';
+
 export interface EmployeeDocument {
   id: string;
+  title: string;
   employeeId: string;
   employeeName: string;
-  title: string;
-  category: 'Offer Letter' | 'Appointment Letter' | 'ID Proof' | 'Certificate' | 'Salary Slip' | 'Experience Letter';
+  category: DocumentCategory;
   fileName: string;
   fileSize: string;
+  fileSizeBytes?: number;
+  mimeType?: string;
+  fileId?: string;
+  fileUrl?: string;
+  accessRole: DocumentAccessRole;
+  uploadedBy?: string;
   uploadDate: string;
-  expiryDate?: string;
-  accessRole: 'HR Only' | 'Employee & HR' | 'Public';
+  updatedAt?: string;
 }
 
 export interface JobOpening {
