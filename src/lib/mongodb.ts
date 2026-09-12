@@ -20,8 +20,8 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
 
   try {
     const client = new MongoClient(mongodbUri);
-    await client.connect();
-    const db = client.db();
+    const dbName = process.env.MONGODB_DB || 'ems_hrms';
+    const db = client.db(dbName);
 
     cachedClient = client;
     cachedDb = db;
