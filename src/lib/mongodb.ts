@@ -61,7 +61,12 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
   }
 
   if (!global._mongoClientPromise) {
-    global._mongoClientPromise = createDatabaseConnection();
+    global._mongoClientPromise = createDatabaseConnection().catch((err) => {
+      global._mongoClientPromise = undefined;
+      cachedClient = null;
+      cachedDb = null;
+      throw err;
+    });
   }
 
   try {
