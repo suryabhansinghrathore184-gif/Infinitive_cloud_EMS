@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -101,7 +101,7 @@ const navSections: NavSection[] = [
   {
     category: 'SYSTEM',
     items: [
-      { name: 'Helpdesk', href: '/admin/helpdesk', icon: HelpCircle, badge: '2' },
+      { name: 'Helpdesk', href: '/admin/helpdesk', icon: HelpCircle },
       { name: 'Settings', href: '/admin/settings', icon: Settings },
       { name: 'Audit Logs', href: '/admin/audit-logs', icon: ShieldAlert },
       { name: 'Integrations', href: '/admin/integrations', icon: Puzzle },
@@ -113,12 +113,44 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const pathname = usePathname();
   const { unreadNotificationsCount } = useEmsStore();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [helpdeskCount, setHelpdeskCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchHelpdeskBadge = async () => {
+      try {
+        const res = await fetch('/api/v1/hr-requests?limit=1');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.statusCounts) {
+            const actionable =
+              (data.statusCounts.open || 0) +
+              (data.statusCounts.assigned || 0) +
+              (data.statusCounts.inProgress || 0);
+            if (isMounted) setHelpdeskCount(actionable);
+          }
+        }
+      } catch {
+        // Ignore background fetch errors
+      }
+    };
+
+    fetchHelpdeskBadge();
+    return () => {
+      isMounted = false;
+    };
+  }, [pathname]);
 
   const getDynamicBadge = (item: NavItem) => {
     if (item.name === 'Notifications') {
       if (unreadNotificationsCount <= 0) return null;
       if (unreadNotificationsCount > 99) return '99+';
       return String(unreadNotificationsCount);
+    }
+    if (item.name === 'Helpdesk') {
+      if (helpdeskCount === null || helpdeskCount <= 0) return null;
+      if (helpdeskCount > 99) return '99+';
+      return String(helpdeskCount);
     }
     return item.badge || null;
   };

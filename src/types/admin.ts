@@ -34,6 +34,7 @@ export interface Employee {
   email: string;
   phone: string;
   avatar: string;
+  photo?: string;
   profilePhoto?: ProfilePhotoMeta;
   dateOfBirth: string;
   gender: string;
@@ -409,17 +410,62 @@ export interface Candidate {
   createdAt?: string;
 }
 
+export type HrTicketRequestType =
+  | 'Salary Issue'
+  | 'Attendance Correction'
+  | 'Leave Issue'
+  | 'Document Request'
+  | 'Payroll Issue'
+  | 'Profile Correction'
+  | 'IT/Asset Request'
+  | 'General HR Query';
+
+export interface HrTicketComment {
+  id: string;
+  requestId: string;
+  organizationId: string;
+  authorId: string;
+  authorName: string;
+  authorRole: string;
+  comment: string;
+  isInternal: boolean;
+  attachments?: MessageAttachment[];
+  createdAt: string;
+}
+
+export interface HrTicketActivity {
+  action: string;
+  performedBy: string;
+  timestamp: string;
+}
+
 export interface HrTicket {
   id: string;
   ticketNo: string;
+  ticketNumber?: string;
+  organizationId: string;
+  employeeId: string;
   creatorName: string;
-  avatar: string;
-  category: 'Salary issue' | 'Attendance correction' | 'Leave issue' | 'Document request' | 'Payroll issue' | 'IT/asset request' | 'General HR query';
+  creatorAvatar?: string;
+  department?: string;
+  email?: string;
+  requestType: HrTicketRequestType;
+  category?: string;
   subject: string;
-  assignee: string;
-  status: 'Open' | 'Assigned' | 'In Progress' | 'Resolved' | 'Closed';
+  description: string;
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
+  status: 'Open' | 'Assigned' | 'In Progress' | 'Resolved' | 'Closed';
+  assignedToId?: string;
+  assignedToName?: string;
+  assignedToAvatar?: string;
+  assignee?: string;
+  resolution?: string;
+  attachments?: MessageAttachment[];
+  history?: HrTicketActivity[];
   createdAt: string;
+  updatedAt: string;
+  resolvedAt?: string;
+  closedAt?: string;
 }
 
 export interface AuditLogItem {
