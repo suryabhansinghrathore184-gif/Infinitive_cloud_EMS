@@ -59,6 +59,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const updated = await db.collection('payroll_records').findOne(query);
 
+    // Trigger Notification
+    try {
+      const { createNotification } = await import('@/lib/notifications/notificationService');
+      await createNotification({
+        organizationId: auth.organizationId,
+        recipientId: existing.employeeId,
+        eventType: newStatus === 'APPROVED' ? 'payroll_approved' : 'payslip_generated',
+        category: 'PAYROLL',
+        title: `Payroll Record ${newStatus}`,
+        message: `Your payroll for ${existing.month || 'period'} (${existing.year || ''}) has been marked as ${newStatus}.`,
+        priority: 'HIGH',
+        actionUrl: '/admin/payroll',
+      });
+    } catch (notifErr) {
+      console.error('Failed to trigger payroll notification:', notifErr);
+    }
+
     return NextResponse.json({
       success: true,
       message: `Payroll status updated to ${newStatus}.`,

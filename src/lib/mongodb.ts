@@ -253,3 +253,22 @@ export async function deleteFileFromGridFS(fileIdStr: string, bucketName: string
     }
   }
 }
+
+export async function createNotificationIndexes(db: Db): Promise<void> {
+  try {
+    await db.collection('notifications').createIndex({ organizationId: 1, createdAt: -1 });
+    await db.collection('notifications').createIndex({ organizationId: 1, recipientId: 1, createdAt: -1 });
+    await db.collection('notifications').createIndex({ organizationId: 1, recipientId: 1, status: 1, createdAt: -1 });
+    await db.collection('notifications').createIndex({ organizationId: 1, category: 1, createdAt: -1 });
+    await db.collection('notifications').createIndex({ organizationId: 1, eventType: 1, createdAt: -1 });
+
+    await db.collection('notification_preferences').createIndex(
+      { organizationId: 1, eventType: 1, userId: 1 },
+      { unique: true }
+    );
+
+    await db.collection('notification_delivery_logs').createIndex({ organizationId: 1, notificationId: 1, attemptedAt: -1 });
+  } catch (err) {
+    console.error('Error creating notification indexes:', err);
+  }
+}

@@ -114,14 +114,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { unreadNotificationsCount } = useEmsStore();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [helpdeskCount, setHelpdeskCount] = useState<number | null>(null);
+  const [apiUnreadNotifCount, setApiUnreadNotifCount] = useState<number | null>(null);
 
   useEffect(() => {
     let isMounted = true;
-    const fetchHelpdeskBadge = async () => {
+    const fetchBadges = async () => {
       try {
-        const res = await fetch('/api/v1/hr-requests?limit=1');
-        if (res.ok) {
-          const data = await res.json();
+        const [helpdeskRes, notifRes] = await Promise.all([
+          fetch('/api/v1/hr-requests?limit=1'),
+          fetch('/api/v1/notifications/unread-count'),
+        ]);
+
+        if (helpdeskRes.ok) {
+          const data = await helpdeskRes.json();
           if (data.success && data.statusCounts) {
             const actionable =
               (data.statusCounts.open || 0) +
@@ -130,12 +135,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             if (isMounted) setHelpdeskCount(actionable);
           }
         }
+
+        if (notifRes.ok) {
+          const notifData = await notifRes.json();
+          if (notifData.success && typeof notifData.unreadCount === 'number') {
+            if (isMounted) setApiUnreadNotifCount(notifData.unreadCount);
+          }
+        }
       } catch {
         // Ignore background fetch errors
       }
     };
 
-    fetchHelpdeskBadge();
+    fetchBadges();
     return () => {
       isMounted = false;
     };
@@ -143,9 +155,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const getDynamicBadge = (item: NavItem) => {
     if (item.name === 'Notifications') {
-      if (unreadNotificationsCount <= 0) return null;
-      if (unreadNotificationsCount > 99) return '99+';
-      return String(unreadNotificationsCount);
+      const count = apiUnreadNotifCount !== null ? apiUnreadNotifCount : unreadNotificationsCount;
+      if (count <= 0) return null;
+      if (count > 99) return '99+';
+      return String(count);
     }
     if (item.name === 'Helpdesk') {
       if (helpdeskCount === null || helpdeskCount <= 0) return null;

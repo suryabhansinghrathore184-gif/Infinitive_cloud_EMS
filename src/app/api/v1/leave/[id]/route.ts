@@ -139,6 +139,23 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
     const updatedLeave = await db.collection('leaves').findOne(query);
 
+    // Trigger Notification
+    try {
+      const { createNotification } = await import('@/lib/notifications/notificationService');
+      await createNotification({
+        organizationId: auth.organizationId,
+        recipientId: existingLeave.employeeId,
+        eventType: status === 'Approved' ? 'leave_approved' : status === 'Rejected' ? 'leave_rejected' : 'leave_updated',
+        category: 'LEAVE',
+        title: `Leave Request ${status}`,
+        message: `Your ${existingLeave.type || 'casual'} leave request from ${existingLeave.startDate} to ${existingLeave.endDate} has been ${status.toLowerCase()}.`,
+        priority: 'NORMAL',
+        actionUrl: '/admin/leave',
+      });
+    } catch (notifErr) {
+      console.error('Failed to trigger leave notification:', notifErr);
+    }
+
     return NextResponse.json({
       success: true,
       message: `Leave request has been ${status.toLowerCase()}.`,

@@ -1,17 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/layout/AdminLayout';
-import { useEmsStore } from '@/store/emsStore';
-import {
-  AppNotification,
-  NotificationCategory,
-  NotificationPriority,
-  SmtpConfig,
-  SmsConfig,
-  WhatsappConfig,
-} from '@/types/admin';
 import {
   Bell,
   Mail,
@@ -36,1154 +27,981 @@ import {
   X,
   RefreshCw,
   Info,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  RotateCcw,
+  ShieldAlert,
+  Activity,
+  Layers,
 } from 'lucide-react';
+
+interface NotificationItem {
+  id: string;
+  _id: string;
+  organizationId: string;
+  recipientType?: string;
+  recipientId?: string;
+  eventType: string;
+  category: string;
+  title: string;
+  message: string;
+  priority: string;
+  channel?: string;
+  status: string;
+  isRead: boolean;
+  actionUrl?: string | null;
+  link?: string | null;
+  createdAt: string;
+  readAt?: string | null;
+}
+
+interface NotificationPreference {
+  eventType: string;
+  category?: string;
+  inApp: boolean;
+  email: boolean;
+  whatsapp: boolean;
+  sms: boolean;
+  push: boolean;
+  enabled: boolean;
+}
+
+interface ChannelStatusItem {
+  id: string;
+  name: string;
+  type: string;
+  configured: boolean;
+  status: string;
+  statusText: string;
+  description: string;
+}
 
 export default function NotificationsPage() {
   const router = useRouter();
-  const {
-    state,
-    notifications,
-    notificationSettings,
-    unreadNotificationsCount,
-    markNotificationAsRead,
-    markAllNotificationsAsRead,
-    deleteNotification,
-    updateNotificationSettings,
-    testChannelConfig,
-  } = useEmsStore();
 
+  // Active Tab
   const [activeTab, setActiveTab] = useState<'feed' | 'channels' | 'matrix'>('feed');
+
+  // Feed State
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedPriority, setSelectedPriority] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(20);
+
+  // Data State from MongoDB
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [readCount, setReadCount] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [errorMsg, setErrorMsg] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  // Modals state
-  const [activeConfigModal, setActiveConfigModal] = useState<'smtp' | 'whatsapp' | 'sms' | null>(null);
-  const [testModalChannel, setTestModalChannel] = useState<'smtp' | 'whatsapp' | 'sms' | null>(null);
-  const [testRecipient, setTestRecipient] = useState<string>('');
-  const [isTesting, setIsTesting] = useState<boolean>(false);
+  // Detail Modal & Action States
+  const [activeDetailNotif, setActiveDetailNotif] = useState<NotificationItem | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  // Form states for modals
-  const [smtpForm, setSmtpForm] = useState<SmtpConfig>(
-    notificationSettings?.smtp || {
-      configured: false,
-      host: 'smtp.mailtrap.io',
-      port: 587,
-      username: 'admin@company.com',
-      fromName: 'EMS HRMS System',
-      fromEmail: 'noreply@company.com',
-      useTls: true,
-    }
-  );
-
-  const [whatsappForm, setWhatsappForm] = useState<WhatsappConfig>(
-    notificationSettings?.whatsapp || {
-      configured: false,
-      phoneNumberId: '109823471092834',
-      businessAccountId: 'act_982347192384',
-      tokenSet: false,
-    }
-  );
-
-  const [smsForm, setSmsForm] = useState<SmsConfig>(
-    notificationSettings?.sms || {
-      configured: false,
-      provider: 'Twilio SMS Gateway',
-      senderId: 'EMS-HR',
-      apiKeySet: false,
-    }
-  );
+  // Channels & Preferences State
+  const [channels, setChannels] = useState<ChannelStatusItem[]>([]);
+  const [preferences, setPreferences] = useState<NotificationPreference[]>([]);
+  const [deliveryLogs, setDeliveryLogs] = useState<any[]>([]);
+  const [retentionDays, setRetentionDays] = useState<number>(90);
+  const [isUpdatingRetention, setIsUpdatingRetention] = useState<boolean>(false);
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToastMessage({ text, type });
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Filter notifications
-  const filteredNotifications = notifications.filter((notif) => {
-    const matchesCategory =
-      selectedCategory === 'all'
-        ? true
-        : selectedCategory === 'unread'
-        ? !notif.isRead
-        : notif.category === selectedCategory;
-
-    const matchesSearch =
-      notif.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      notif.message.toLowerCase().includes(searchQuery.toLowerCase());
-
-    return matchesCategory && matchesSearch;
-  });
-
-  const categoryIcons: Record<string, React.ReactNode> = {
-    employee: <User className="h-4 w-4 text-blue-500" />,
-    attendance: <Clock className="h-4 w-4 text-emerald-500" />,
-    leave: <Calendar className="h-4 w-4 text-amber-500" />,
-    payroll: <DollarSign className="h-4 w-4 text-purple-500" />,
-    document: <FileText className="h-4 w-4 text-indigo-500" />,
-    recruitment: <Briefcase className="h-4 w-4 text-teal-500" />,
-    system: <Shield className="h-4 w-4 text-rose-500" />,
-  };
-
-  const priorityBadges: Record<NotificationPriority, { bg: string; text: string; border: string }> = {
-    low: { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' },
-    normal: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-    high: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
-    critical: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
-  };
-
-  const formatTimestamp = (isoString: string) => {
+  // 1. Fetch Live Notifications Feed
+  const fetchNotificationsFeed = async () => {
+    setIsLoading(true);
+    setErrorMsg('');
     try {
-      const date = new Date(isoString);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffMins = Math.floor(diffMs / (1000 * 60));
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const params = new URLSearchParams();
+      params.append('page', String(currentPage));
+      params.append('limit', String(pageSize));
+      if (selectedCategory !== 'all') params.append('category', selectedCategory);
+      if (selectedPriority !== 'all') params.append('priority', selectedPriority);
+      if (searchQuery.trim()) params.append('search', searchQuery.trim());
 
-      if (diffMins < 1) return 'Just now';
-      if (diffMins < 60) return `${diffMins}m ago`;
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays === 1) return 'Yesterday';
-      if (diffDays < 7) return `${diffDays}d ago`;
+      const res = await fetch(`/api/v1/notifications?${params.toString()}`);
+      const data = await res.json();
 
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to load notifications from database');
+      }
+
+      setNotifications(data.notifications || []);
+      setTotalCount(data.totalCount || 0);
+      setUnreadCount(data.unreadCount || 0);
+      setReadCount(data.readCount || 0);
+      setTotalPages(data.pagination?.totalPages || 1);
+    } catch (err: any) {
+      console.error('Error fetching notifications feed:', err);
+      setErrorMsg(err.message || 'Unable to connect to notifications database.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 2. Fetch Channels, Preferences & Retention
+  const fetchChannelsAndPreferences = async () => {
+    try {
+      const [channelsRes, prefsRes, retentionRes, logsRes] = await Promise.all([
+        fetch('/api/v1/notifications/channels'),
+        fetch('/api/v1/notifications/preferences'),
+        fetch('/api/v1/notifications/retention'),
+        fetch('/api/v1/notifications/delivery-logs'),
+      ]);
+
+      if (channelsRes.ok) {
+        const cData = await channelsRes.json();
+        setChannels(cData.channels || []);
+      }
+
+      if (prefsRes.ok) {
+        const pData = await prefsRes.json();
+        setPreferences(pData.preferences || []);
+      }
+
+      if (retentionRes.ok) {
+        const rData = await retentionRes.json();
+        setRetentionDays(rData.retentionDays || 90);
+      }
+
+      if (logsRes.ok) {
+        const lData = await logsRes.json();
+        setDeliveryLogs(lData.logs || []);
+      }
+    } catch (err) {
+      console.error('Error loading notification channels/preferences:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotificationsFeed();
+  }, [selectedCategory, selectedPriority, searchQuery, currentPage, pageSize]);
+
+  useEffect(() => {
+    fetchChannelsAndPreferences();
+  }, [activeTab]);
+
+  // Actions
+  const handleMarkAsRead = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    // Optimistic Update
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, status: 'READ', isRead: true } : n))
+    );
+    setUnreadCount((c) => Math.max(0, c - 1));
+    setReadCount((c) => c + 1);
+
+    try {
+      const res = await fetch(`/api/v1/notifications/${id}/read`, { method: 'PATCH' });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        fetchNotificationsFeed(); // Rollback
+      }
     } catch {
-      return isoString;
+      fetchNotificationsFeed();
     }
   };
 
-  const handleSaveSmtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    const updatedSmtp: SmtpConfig = {
-      ...smtpForm,
-      configured: true,
-    };
-    updateNotificationSettings({ smtp: updatedSmtp });
-    setActiveConfigModal(null);
-    showToast('SMTP Mail Gateway settings updated successfully!');
-  };
+  const handleMarkAsUnread = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    // Optimistic Update
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, status: 'UNREAD', isRead: false } : n))
+    );
+    setUnreadCount((c) => c + 1);
+    setReadCount((c) => Math.max(0, c - 1));
 
-  const handleSaveWhatsapp = (e: React.FormEvent) => {
-    e.preventDefault();
-    const updatedWhatsapp: WhatsappConfig = {
-      ...whatsappForm,
-      configured: true,
-      tokenSet: true,
-    };
-    updateNotificationSettings({ whatsapp: updatedWhatsapp });
-    setActiveConfigModal(null);
-    showToast('WhatsApp Business API settings configured!');
-  };
-
-  const handleSaveSms = (e: React.FormEvent) => {
-    e.preventDefault();
-    const updatedSms: SmsConfig = {
-      ...smsForm,
-      configured: true,
-      apiKeySet: true,
-    };
-    updateNotificationSettings({ sms: updatedSms });
-    setActiveConfigModal(null);
-    showToast('SMS Service Gateway settings saved!');
-  };
-
-  const handleSendTest = async () => {
-    if (!testModalChannel || !testRecipient.trim()) {
-      showToast('Please provide a valid recipient email/phone.', 'error');
-      return;
-    }
-
-    setIsTesting(true);
     try {
-      const channelParam = testModalChannel === 'smtp' ? 'email' : testModalChannel;
-      const result = testChannelConfig(channelParam, testRecipient.trim());
-      setIsTesting(false);
-      setTestModalChannel(null);
-      setTestRecipient('');
-      if (result.success) {
-        showToast(result.message, 'success');
+      const res = await fetch(`/api/v1/notifications/${id}/unread`, { method: 'PATCH' });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        fetchNotificationsFeed(); // Rollback
+      }
+    } catch {
+      fetchNotificationsFeed();
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      const res = await fetch('/api/v1/notifications/mark-all-read', { method: 'PATCH' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(`Marked ${data.updatedCount || 0} notifications as READ`);
+        fetchNotificationsFeed();
       } else {
-        showToast(result.message, 'error');
+        throw new Error(data.message || 'Failed to mark notifications read');
       }
-    } catch {
-      setIsTesting(false);
-      showToast('Failed to dispatch test notification.', 'error');
+    } catch (err: any) {
+      showToast(err.message || 'Action failed', 'error');
     }
   };
 
-  const handleTogglePreference = (prefId: string, channel: 'inApp' | 'email' | 'sms' | 'whatsapp') => {
-    const updatedPrefs = (notificationSettings?.preferences || []).map((p) => {
-      if (p.id === prefId) {
-        return { ...p, [channel]: !p[channel] };
+  const handleDeleteNotification = async (id: string) => {
+    try {
+      const res = await fetch(`/api/v1/notifications/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Notification deleted');
+        setDeleteConfirmId(null);
+        fetchNotificationsFeed();
+      } else {
+        throw new Error(data.message || 'Failed to delete notification');
       }
-      return p;
-    });
-    updateNotificationSettings({ preferences: updatedPrefs });
-    showToast('Notification preferences updated!');
+    } catch (err: any) {
+      showToast(err.message || 'Delete failed', 'error');
+    }
   };
 
-  const handleRetentionChange = (days: '30' | '90' | '180' | '365' | 'never') => {
-    updateNotificationSettings({ retentionDays: days });
-    showToast(`Retention policy updated to ${days === 'never' ? 'Keep Indefinitely' : days + ' Days'}`);
+  const handleUpdatePreference = async (eventType: string, key: 'inApp' | 'email' | 'whatsapp' | 'sms', value: boolean) => {
+    setPreferences((prev) =>
+      prev.map((p) => (p.eventType === eventType ? { ...p, [key]: value } : p))
+    );
+
+    try {
+      const current = preferences.find((p) => p.eventType === eventType);
+      await fetch('/api/v1/notifications/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...current,
+          eventType,
+          [key]: value,
+        }),
+      });
+      showToast(`Updated preference for ${eventType}`);
+    } catch {
+      showToast('Failed to save preference', 'error');
+    }
+  };
+
+  const handleSaveRetention = async (days: number) => {
+    setIsUpdatingRetention(true);
+    try {
+      const res = await fetch('/api/v1/notifications/retention', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ retentionDays: days }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRetentionDays(days);
+        showToast(`Retention policy set to ${days} Days`);
+      } else {
+        throw new Error(data.message || 'Failed to update retention policy');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update retention', 'error');
+    } finally {
+      setIsUpdatingRetention(false);
+    }
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'HR_EMPLOYEE':
+        return <User className="h-4 w-4 text-purple-600" />;
+      case 'PAYROLL':
+        return <DollarSign className="h-4 w-4 text-emerald-600" />;
+      case 'ATTENDANCE':
+        return <Clock className="h-4 w-4 text-blue-600" />;
+      case 'LEAVE':
+        return <Calendar className="h-4 w-4 text-amber-600" />;
+      case 'RECRUITMENT':
+        return <Briefcase className="h-4 w-4 text-indigo-600" />;
+      case 'DOCUMENT':
+        return <FileText className="h-4 w-4 text-cyan-600" />;
+      case 'SYSTEM':
+        return <Shield className="h-4 w-4 text-rose-600" />;
+      default:
+        return <Bell className="h-4 w-4 text-slate-600" />;
+    }
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    switch (priority) {
+      case 'URGENT':
+        return <span className="rounded-md bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">URGENT</span>;
+      case 'HIGH':
+        return <span className="rounded-md bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-800">HIGH</span>;
+      case 'LOW':
+        return <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">LOW</span>;
+      default:
+        return <span className="rounded-md bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-800">NORMAL</span>;
+    }
+  };
+
+  const getActiveChannelsSummary = () => {
+    const connected = channels.filter((c) => c.status === 'CONNECTED').map((c) => c.name.split(' ')[0]);
+    if (connected.length === 0) return 'In-App Only';
+    return connected.join(' + ');
   };
 
   return (
     <AdminLayout
-      pageTitle="Notification Management Hub"
+      pageTitle="Notification Center"
       breadcrumbs={[{ label: 'Notifications', href: '/admin/notifications' }]}
     >
-      {/* Toast Notification */}
+      {/* Toast Alert */}
       {toastMessage && (
         <div
-          className={`fixed right-6 top-20 z-50 flex items-center gap-2.5 rounded-xl px-4 py-3 text-xs font-semibold text-white shadow-2xl transition-all ${
-            toastMessage.type === 'success' ? 'bg-slate-900 border border-emerald-500/30' : 'bg-rose-900 border border-rose-500/30'
+          className={`fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold text-white shadow-2xl animate-in fade-in ${
+            toastMessage.type === 'error' ? 'bg-rose-900' : 'bg-slate-900'
           }`}
         >
-          {toastMessage.type === 'success' ? (
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-          ) : (
+          {toastMessage.type === 'error' ? (
             <AlertCircle className="h-4 w-4 text-rose-400" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           )}
           <span>{toastMessage.text}</span>
         </div>
       )}
 
-      {/* Page Header */}
+      {/* Header & Subtitle */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Notification Center & Multi-Channel Dispatch</h2>
-          <p className="text-xs text-slate-500">
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <Bell className="h-6 w-6 text-indigo-600" />
+            Notification Center & Multi-Channel Dispatch
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">
             Real-time HR event alerts, multi-channel gateways (SMTP, WhatsApp, SMS), retention policies, and event matrix
           </p>
         </div>
-
         <div className="flex items-center gap-2">
-          {unreadNotificationsCount > 0 && (
-            <button
-              onClick={() => {
-                markAllNotificationsAsRead();
-                showToast('All notifications marked as read');
-              }}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-            >
-              <Check className="h-4 w-4 text-emerald-600" />
-              <span>Mark All Read</span>
-            </button>
-          )}
+          <button
+            onClick={fetchNotificationsFeed}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          <button
+            onClick={handleMarkAllRead}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-indigo-700 transition"
+          >
+            <Check className="h-4 w-4" />
+            Mark All Read
+          </button>
         </div>
       </div>
 
-      {/* KPI Overview Cards */}
+      {/* Dynamic Top Metrics Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-semibold">Total Alerts</span>
-            <Bell className="h-4 w-4 text-blue-500" />
+            <span className="text-[11px] font-semibold text-slate-500">Total Alerts</span>
+            <Bell className="h-4 w-4 text-indigo-500" />
           </div>
-          <p className="mt-2 text-2xl font-black text-slate-900">{notifications.length}</p>
-          <p className="mt-0.5 text-[10px] text-slate-400">Logged HR events</p>
-        </div>
-
-        <div className="rounded-2xl border border-amber-200/60 bg-amber-50/30 p-4 shadow-sm">
-          <div className="flex items-center justify-between text-amber-600">
-            <span className="text-[11px] font-semibold">Unread</span>
-            <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-          </div>
-          <p className="mt-2 text-2xl font-black text-amber-700">{unreadNotificationsCount}</p>
-          <p className="mt-0.5 text-[10px] text-amber-600/80">Pending review</p>
+          <p className="mt-2 text-2xl font-black text-slate-900">{totalCount}</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">All matching notifications</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-semibold">Read</span>
+            <span className="text-[11px] font-semibold text-blue-600">Unread</span>
+            <Clock className="h-4 w-4 text-blue-500" />
+          </div>
+          <p className="mt-2 text-2xl font-black text-blue-600">{unreadCount}</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">Pending user action</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[11px] font-semibold text-emerald-600">Read</span>
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </div>
-          <p className="mt-2 text-2xl font-black text-slate-900">
-            {notifications.length - unreadNotificationsCount}
-          </p>
-          <p className="mt-0.5 text-[10px] text-slate-400">Acknowledged</p>
+          <p className="mt-2 text-2xl font-black text-slate-900">{readCount}</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">Acknowledged alerts</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-semibold">Channels</span>
-            <Send className="h-4 w-4 text-indigo-500" />
+            <span className="text-[11px] font-semibold text-purple-600">Channels</span>
+            <Send className="h-4 w-4 text-purple-500" />
           </div>
-          <p className="mt-2 text-xs font-bold text-slate-800">
-            {notificationSettings?.smtp?.configured ? 'SMTP ✓ ' : ''}
-            {notificationSettings?.whatsapp?.configured ? 'WA ✓ ' : ''}
-            {notificationSettings?.sms?.configured ? 'SMS ✓' : ''}
-            {!notificationSettings?.smtp?.configured &&
-              !notificationSettings?.whatsapp?.configured &&
-              !notificationSettings?.sms?.configured &&
-              'In-App Only'}
-          </p>
-          <p className="mt-1 text-[10px] text-slate-400">Active Gateways</p>
+          <p className="mt-2 text-sm font-bold text-slate-900 truncate">{getActiveChannelsSummary()}</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">Active dispatch gateways</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-semibold">Retention</span>
-            <Sliders className="h-4 w-4 text-purple-500" />
+            <span className="text-[11px] font-semibold text-amber-600">Retention</span>
+            <Shield className="h-4 w-4 text-amber-500" />
           </div>
-          <p className="mt-2 text-lg font-black text-slate-900">
-            {notificationSettings?.retentionDays === 'never'
-              ? 'Indefinite'
-              : `${notificationSettings?.retentionDays || '90'} Days`}
-          </p>
-          <p className="mt-0.5 text-[10px] text-slate-400">Auto-clean history</p>
+          <p className="mt-2 text-xl font-black text-slate-900">{retentionDays} Days</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">Server auto-cleanup policy</p>
         </div>
       </div>
 
-      {/* Main Section Navigation Tabs */}
-      <div className="flex items-center border-b border-slate-200 gap-6 text-xs font-semibold text-slate-500">
-        <button
-          onClick={() => setActiveTab('feed')}
-          className={`flex items-center gap-2 border-b-2 pb-3 transition-colors ${
-            activeTab === 'feed'
-              ? 'border-blue-600 text-blue-600 font-bold'
-              : 'border-transparent hover:text-slate-900'
-          }`}
-        >
-          <Bell className="h-4 w-4" />
-          <span>Live Notification Feed ({notifications.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('channels')}
-          className={`flex items-center gap-2 border-b-2 pb-3 transition-colors ${
-            activeTab === 'channels'
-              ? 'border-blue-600 text-blue-600 font-bold'
-              : 'border-transparent hover:text-slate-900'
-          }`}
-        >
-          <Send className="h-4 w-4" />
-          <span>Delivery Channels (SMTP / WhatsApp / SMS)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('matrix')}
-          className={`flex items-center gap-2 border-b-2 pb-3 transition-colors ${
-            activeTab === 'matrix'
-              ? 'border-blue-600 text-blue-600 font-bold'
-              : 'border-transparent hover:text-slate-900'
-          }`}
-        >
-          <Sliders className="h-4 w-4" />
-          <span>Event Matrix & Preferences</span>
-        </button>
+      {/* Main Content Tabs */}
+      <div className="border-b border-slate-200">
+        <div className="flex gap-6 text-xs font-bold">
+          <button
+            onClick={() => setActiveTab('feed')}
+            className={`pb-3 transition border-b-2 ${
+              activeTab === 'feed'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Live Notification Feed
+          </button>
+          <button
+            onClick={() => setActiveTab('channels')}
+            className={`pb-3 transition border-b-2 ${
+              activeTab === 'channels'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Delivery Channels (SMTP / WhatsApp / SMS)
+          </button>
+          <button
+            onClick={() => setActiveTab('matrix')}
+            className={`pb-3 transition border-b-2 ${
+              activeTab === 'matrix'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Event Matrix & Preferences
+          </button>
+        </div>
       </div>
 
       {/* TAB 1: LIVE NOTIFICATION FEED */}
       {activeTab === 'feed' && (
         <div className="space-y-4">
-          {/* Controls Bar: Category Pills + Search */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-1.5">
+          {/* Category Filter Pills & Search Bar */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search notifications title, message, event type..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-9 pr-4 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 transition focus:border-indigo-500 focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedPriority}
+                  onChange={(e) => {
+                    setSelectedPriority(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                >
+                  <option value="all">All Priorities</option>
+                  <option value="LOW">Low</option>
+                  <option value="NORMAL">Normal</option>
+                  <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
+                </select>
+
+                {(selectedCategory !== 'all' || selectedPriority !== 'all' || searchQuery !== '') && (
+                  <button
+                    onClick={() => {
+                      setSelectedCategory('all');
+                      setSelectedPriority('all');
+                      setSearchQuery('');
+                      setCurrentPage(1);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Reset
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Category Filter Pills */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
               {[
                 { id: 'all', label: 'All' },
-                { id: 'unread', label: `Unread (${unreadNotificationsCount})` },
-                { id: 'employee', label: 'HR & Employee' },
+                { id: 'unread', label: `Unread (${unreadCount})` },
+                { id: 'hr_employee', label: 'HR & Employee' },
                 { id: 'payroll', label: 'Payroll' },
                 { id: 'attendance', label: 'Attendance' },
                 { id: 'leave', label: 'Leave' },
                 { id: 'recruitment', label: 'Recruitment' },
-                { id: 'document', label: 'Documents' },
+                { id: 'documents', label: 'Documents' },
                 { id: 'system', label: 'System' },
-              ].map((cat) => (
+              ].map((c) => (
                 <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === cat.id
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  key={c.id}
+                  onClick={() => {
+                    setSelectedCategory(c.id);
+                    setCurrentPage(1);
+                  }}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+                    selectedCategory === c.id
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  {cat.label}
+                  {c.label}
                 </button>
               ))}
             </div>
-
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search notifications..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
-              />
-            </div>
           </div>
 
-          {/* Notifications List Card */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            {filteredNotifications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
-                  <Bell className="h-6 w-6" />
-                </div>
-                <h4 className="mt-3 text-sm font-bold text-slate-800">No notifications found</h4>
-                <p className="mt-1 max-w-xs text-xs text-slate-500">
-                  No notifications match the selected filter category or search criteria.
+          {/* Error State */}
+          {errorMsg && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+                <span>{errorMsg}</span>
+              </div>
+              <button
+                onClick={fetchNotificationsFeed}
+                className="rounded-lg bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-700"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Notifications Feed Cards List */}
+          <div className="space-y-2.5">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-16 text-slate-400 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-2" />
+                <p className="text-xs font-semibold text-slate-600">Loading notifications from MongoDB Atlas...</p>
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-slate-400 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <Bell className="h-12 w-12 text-slate-300 mb-3" />
+                <p className="text-sm font-bold text-slate-700">
+                  {selectedCategory !== 'all' || searchQuery ? 'No notifications found for this filter' : 'No notifications yet'}
+                </p>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm text-center">
+                  {selectedCategory !== 'all' || searchQuery
+                    ? 'Try adjusting your search criteria or resetting filters.'
+                    : 'System and workflow alerts will appear here as EMS actions take place.'}
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
-                {filteredNotifications.map((notif) => {
-                  const priorityStyle = priorityBadges[notif.priority] || priorityBadges.normal;
-
-                  return (
-                    <div
-                      key={notif.id}
-                      className={`flex flex-col gap-3 p-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
-                        !notif.isRead ? 'bg-blue-50/20' : 'hover:bg-slate-50/60'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3.5">
-                        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100">
-                          {categoryIcons[notif.category] || <Bell className="h-4 w-4 text-slate-600" />}
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h4
-                              className={`text-xs font-bold ${
-                                !notif.isRead ? 'text-slate-900' : 'text-slate-700'
-                              }`}
-                            >
-                              {notif.title}
-                            </h4>
-
-                            {!notif.isRead && (
-                              <span className="flex h-2 w-2 rounded-full bg-blue-600" title="Unread" />
-                            )}
-
-                            <span
-                              className={`rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${priorityStyle.bg} ${priorityStyle.text} ${priorityStyle.border}`}
-                            >
-                              {notif.priority}
-                            </span>
-
-                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[9px] font-semibold text-slate-600 uppercase">
-                              {notif.category}
-                            </span>
-                          </div>
-
-                          <p className="text-xs text-slate-600 leading-relaxed max-w-3xl">{notif.message}</p>
-
-                          <div className="flex items-center gap-3 text-[10px] text-slate-400 pt-0.5">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {formatTimestamp(notif.createdAt)}
-                            </span>
-                            <span>•</span>
-                            <span>Target: {notif.recipientRole}</span>
-                          </div>
-                        </div>
+              notifications.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => setActiveDetailNotif(item)}
+                  className={`group relative cursor-pointer rounded-2xl border p-4 shadow-sm transition-all hover:shadow-md ${
+                    !item.isRead
+                      ? 'border-indigo-200 bg-indigo-50/40 ring-1 ring-indigo-500/10'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 border border-slate-200">
+                        {getCategoryIcon(item.category)}
                       </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex items-center gap-2 self-end sm:self-center">
-                        {notif.actionUrl && (
-                          <button
-                            onClick={() => router.push(notif.actionUrl)}
-                            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs"
-                          >
-                            <span>View</span>
-                            <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => {
-                            markNotificationAsRead(notif.id);
-                            showToast(notif.isRead ? 'Marked as unread' : 'Marked as read');
-                          }}
-                          className={`rounded-lg p-1.5 transition-colors ${
-                            notif.isRead
-                              ? 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
-                              : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                          }`}
-                          title={notif.isRead ? 'Mark as Unread' : 'Mark as Read'}
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                        </button>
-
-                        <button
-                          onClick={() => setDeleteConfirmId(notif.id)}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                          title="Delete Notification"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className={`text-xs ${!item.isRead ? 'font-extrabold text-slate-900' : 'font-bold text-slate-800'}`}>
+                            {item.title}
+                          </h4>
+                          {getPriorityBadge(item.priority)}
+                          {!item.isRead && (
+                            <span className="inline-flex items-center rounded-full bg-blue-600 px-2 py-0.5 text-[9px] font-bold text-white">
+                              NEW
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{item.message}</p>
+                        <div className="flex items-center gap-3 text-[10px] text-slate-400 font-medium">
+                          <span>{new Date(item.createdAt).toLocaleString()}</span>
+                          <span>•</span>
+                          <span className="uppercase">{item.category}</span>
+                        </div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+
+                    {/* Quick Row Actions */}
+                    <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveDetailNotif(item);
+                        }}
+                        className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-100"
+                        title="View Details"
+                      >
+                        <Eye className="h-3.5 w-3.5 text-indigo-600" />
+                      </button>
+
+                      <button
+                        onClick={(e) => (item.isRead ? handleMarkAsUnread(item.id, e) : handleMarkAsRead(item.id, e))}
+                        className={`rounded-lg border p-1.5 ${
+                          item.isRead
+                            ? 'border-slate-200 bg-white text-slate-400 hover:text-indigo-600'
+                            : 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100'
+                        }`}
+                        title={item.isRead ? 'Mark as Unread' : 'Mark as Read'}
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirmId(item.id);
+                        }}
+                        className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                        title="Delete Notification"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
             )}
           </div>
+
+          {/* Server-Side Pagination Footer */}
+          {notifications.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3.5 rounded-2xl border text-xs text-slate-500 shadow-sm">
+              <div>
+                Showing <span className="font-bold text-slate-800">{notifications.length}</span> of{' '}
+                <span className="font-bold text-slate-800">{totalCount}</span> alerts
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Prev
+                </button>
+                <span className="px-2 font-medium text-slate-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 disabled:opacity-40"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* TAB 2: DELIVERY CHANNELS */}
       {activeTab === 'channels' && (
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4 text-xs text-blue-900 flex items-start gap-3">
-            <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold text-blue-950">Multi-Channel Communication Gateway</p>
-              <p className="mt-0.5 text-blue-800">
-                Configure official delivery channels to dispatch automated email payslips, WhatsApp notifications, and urgent SMS broadcasts. In-App alerts are always active.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {/* 1. In-App Alerts Feed */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                    <Bell className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">In-App Notification Feed</h3>
-                    <p className="text-[11px] text-slate-500">Header bell dropdown & sidebar badge counter</p>
-                  </div>
-                </div>
-                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                  Always Active
-                </span>
-              </div>
-
-              <div className="rounded-xl bg-slate-50 p-3 text-xs space-y-1.5 text-slate-600">
-                <p className="flex justify-between">
-                  <span>Trigger Mode:</span> <strong className="text-slate-900">Real-time WebSocket / Event State</strong>
-                </p>
-                <p className="flex justify-between">
-                  <span>Unread Count Badge:</span> <strong className="text-slate-900">Live Header & Sidebar</strong>
-                </p>
-              </div>
-            </div>
-
-            {/* 2. SMTP Email Gateway */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-                    <Mail className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">Email Dispatch (SMTP)</h3>
-                    <p className="text-[11px] text-slate-500">Payslip PDFs, leave digests, job invitations</p>
-                  </div>
-                </div>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${
-                    notificationSettings?.smtp?.configured
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-amber-50 text-amber-700 border-amber-200'
-                  }`}
-                >
-                  {notificationSettings?.smtp?.configured ? 'Configured' : 'Not Configured'}
-                </span>
-              </div>
-
-              <div className="rounded-xl bg-slate-50 p-3 text-xs space-y-1.5 text-slate-600">
-                <p className="flex justify-between">
-                  <span>SMTP Host:</span> <strong className="text-slate-900">{notificationSettings?.smtp?.host || 'Not set'}</strong>
-                </p>
-                <p className="flex justify-between">
-                  <span>Sender Email:</span> <strong className="text-slate-900">{notificationSettings?.smtp?.fromEmail || 'Not set'}</strong>
-                </p>
-                <p className="flex justify-between">
-                  <span>Port & Encryption:</span> <strong className="text-slate-900">{notificationSettings?.smtp?.port} (TLS)</strong>
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  onClick={() => setActiveConfigModal('smtp')}
-                  className="flex-1 rounded-xl bg-blue-600 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700"
-                >
-                  Configure SMTP
-                </button>
-                <button
-                  onClick={() => {
-                    setTestModalChannel('smtp');
-                    setTestRecipient(notificationSettings?.smtp?.fromEmail || 'admin@company.com');
-                  }}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
-                >
-                  <Send className="h-3.5 w-3.5 text-blue-600" />
-                  <span>Send Test</span>
-                </button>
-              </div>
-            </div>
-
-            {/* 3. WhatsApp Business API */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                    <MessageSquare className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">WhatsApp Business API</h3>
-                    <p className="text-[11px] text-slate-500">Instant WhatsApp message triggers for approvals</p>
-                  </div>
-                </div>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${
-                    notificationSettings?.whatsapp?.configured
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-amber-50 text-amber-700 border-amber-200'
-                  }`}
-                >
-                  {notificationSettings?.whatsapp?.configured ? 'Configured' : 'Not Configured'}
-                </span>
-              </div>
-
-              <div className="rounded-xl bg-slate-50 p-3 text-xs space-y-1.5 text-slate-600">
-                <p className="flex justify-between">
-                  <span>Phone Number ID:</span>{' '}
-                  <strong className="text-slate-900">
-                    {notificationSettings?.whatsapp?.phoneNumberId || 'Not Configured'}
-                  </strong>
-                </p>
-                <p className="flex justify-between">
-                  <span>Business Account ID:</span>{' '}
-                  <strong className="text-slate-900">
-                    {notificationSettings?.whatsapp?.businessAccountId || 'Not Configured'}
-                  </strong>
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  onClick={() => setActiveConfigModal('whatsapp')}
-                  className="flex-1 rounded-xl bg-blue-600 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700"
-                >
-                  Configure WhatsApp
-                </button>
-                <button
-                  onClick={() => {
-                    setTestModalChannel('whatsapp');
-                    setTestRecipient('+91 98765 43210');
-                  }}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
-                >
-                  <Send className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>Send Test</span>
-                </button>
-              </div>
-            </div>
-
-            {/* 4. SMS Service Gateway */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                    <Smartphone className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">SMS Gateway (Twilio / Fast2SMS)</h3>
-                    <p className="text-[11px] text-slate-500">Urgent OTPs & critical emergency broadcasts</p>
-                  </div>
-                </div>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${
-                    notificationSettings?.sms?.configured
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-slate-100 text-slate-600 border-slate-200'
-                  }`}
-                >
-                  {notificationSettings?.sms?.configured ? 'Configured' : 'Not Configured'}
-                </span>
-              </div>
-
-              <div className="rounded-xl bg-slate-50 p-3 text-xs space-y-1.5 text-slate-600">
-                <p className="flex justify-between">
-                  <span>Provider:</span>{' '}
-                  <strong className="text-slate-900">{notificationSettings?.sms?.provider || 'Twilio'}</strong>
-                </p>
-                <p className="flex justify-between">
-                  <span>Sender Header ID:</span>{' '}
-                  <strong className="text-slate-900">{notificationSettings?.sms?.senderId || 'EMS-HR'}</strong>
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  onClick={() => setActiveConfigModal('sms')}
-                  className="flex-1 rounded-xl bg-blue-600 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700"
-                >
-                  Configure SMS Gateway
-                </button>
-                <button
-                  onClick={() => {
-                    setTestModalChannel('sms');
-                    setTestRecipient('+91 98765 43210');
-                  }}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
-                >
-                  <Send className="h-3.5 w-3.5 text-purple-600" />
-                  <span>Send Test</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: EVENT MATRIX & RETENTION PREFERENCES */}
-      {activeTab === 'matrix' && (
-        <div className="space-y-6">
-          {/* Retention Policy Card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-blue-600" />
-                <span>Notification Retention & Auto-Cleanup Policy</span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Automatically purge older notifications to optimize browser storage and maintain performance.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <label className="text-xs font-semibold text-slate-700">Auto-Purge After:</label>
-              <select
-                value={notificationSettings?.retentionDays || '90'}
-                onChange={(e) =>
-                  handleRetentionChange(e.target.value as '30' | '90' | '180' | '365' | 'never')
-                }
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-900 focus:border-blue-500 focus:outline-none shadow-xs"
-              >
-                <option value="30">30 Days</option>
-                <option value="90">90 Days (Recommended)</option>
-                <option value="180">180 Days</option>
-                <option value="365">365 Days (1 Year)</option>
-                <option value="never">Never (Keep Indefinitely)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Event Matrix Table */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 p-4 flex items-center justify-between">
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Event Dispatch Matrix</h3>
-                <p className="text-xs text-slate-500">Toggle which channels receive alerts for each specific HR event trigger</p>
+                <h3 className="text-sm font-bold text-slate-900">Multi-Channel Delivery Gateways</h3>
+                <p className="text-xs text-slate-500">
+                  Channel health inspection pulling directly from /admin/integrations
+                </p>
               </div>
+              <button
+                onClick={() => router.push('/admin/integrations')}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700"
+              >
+                <Sliders className="h-3.5 w-3.5" />
+                Manage Integrations
+              </button>
             </div>
 
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50 font-semibold text-slate-600">
-                  <th className="px-4 py-3.5">HR Event Trigger</th>
-                  <th className="px-4 py-3.5">Category</th>
-                  <th className="px-4 py-3.5 text-center">In-App Alert</th>
-                  <th className="px-4 py-3.5 text-center">Email (SMTP)</th>
-                  <th className="px-4 py-3.5 text-center">SMS</th>
-                  <th className="px-4 py-3.5 text-center">WhatsApp</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {(notificationSettings?.preferences || []).map((pref) => (
-                  <tr key={pref.id} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-3.5 font-bold text-slate-900">{pref.eventName}</td>
-                    <td className="px-4 py-3.5">
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 uppercase">
-                        {pref.category}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-center">
-                      <input
-                        type="checkbox"
-                        checked={pref.inApp}
-                        onChange={() => handleTogglePreference(pref.id, 'inApp')}
-                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                      />
-                    </td>
-                    <td className="px-4 py-3.5 text-center">
-                      <input
-                        type="checkbox"
-                        checked={pref.email}
-                        onChange={() => handleTogglePreference(pref.id, 'email')}
-                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                      />
-                    </td>
-                    <td className="px-4 py-3.5 text-center">
-                      <input
-                        type="checkbox"
-                        checked={pref.sms}
-                        onChange={() => handleTogglePreference(pref.id, 'sms')}
-                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                      />
-                    </td>
-                    <td className="px-4 py-3.5 text-center">
-                      <input
-                        type="checkbox"
-                        checked={pref.whatsapp}
-                        onChange={() => handleTogglePreference(pref.id, 'whatsapp')}
-                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                      />
-                    </td>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {channels.map((c) => (
+                <div key={c.id} className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-xs border border-slate-200">
+                        {c.type === 'WHATSAPP' ? (
+                          <MessageSquare className="h-4 w-4 text-emerald-600" />
+                        ) : c.type === 'EMAIL' ? (
+                          <Mail className="h-4 w-4 text-blue-600" />
+                        ) : c.type === 'SMS' ? (
+                          <Smartphone className="h-4 w-4 text-amber-600" />
+                        ) : (
+                          <Bell className="h-4 w-4 text-purple-600" />
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-slate-900">{c.name}</span>
+                    </div>
+
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                        c.status === 'CONNECTED'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {c.statusText}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">{c.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Delivery Logs Section */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-indigo-600" />
+                <h3 className="text-sm font-bold text-slate-900">Multi-Channel Delivery Audit Logs</h3>
+              </div>
+              <span className="text-[11px] text-slate-400">Server-side verified dispatches</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Channel</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Message ID / Error</th>
+                    <th className="px-4 py-3">Attempted Time</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {deliveryLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-slate-400">
+                        No multi-channel delivery attempts logged yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    deliveryLogs.map((l) => (
+                      <tr key={l.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 uppercase font-bold text-slate-900">{l.channel}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                              l.status === 'SENT' || l.status === 'DELIVERED'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-rose-100 text-rose-800'
+                            }`}
+                          >
+                            {l.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-[11px] text-slate-600">
+                          {l.providerMessageId || l.errorMessage || 'N/A'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 text-[11px]">
+                          {new Date(l.attemptedAt).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
-      {/* CONFIG MODAL: SMTP */}
-      {activeConfigModal === 'smtp' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Mail className="h-5 w-5 text-indigo-600" />
-                <span>Configure SMTP Mail Gateway</span>
-              </h3>
-              <button
-                onClick={() => setActiveConfigModal(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveSmtp} className="space-y-3 text-xs">
+      {/* TAB 3: EVENT MATRIX & PREFERENCES */}
+      {activeTab === 'matrix' && (
+        <div className="space-y-5">
+          {/* Retention Policy Box */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
               <div>
-                <label className="font-semibold text-slate-700">SMTP Host</label>
-                <input
-                  type="text"
-                  value={smtpForm.host}
-                  onChange={(e) => setSmtpForm({ ...smtpForm, host: e.target.value })}
-                  required
-                  placeholder="smtp.mailtrap.io"
-                  className="mt-1 w-full rounded-xl border border-slate-300 p-2.5 text-slate-900 focus:border-blue-500 focus:outline-none"
-                />
+                <h3 className="text-sm font-bold text-slate-900">Notification Retention Cleanup Policy</h3>
+                <p className="text-xs text-slate-500">
+                  Configure server-side retention cleanup period for organization notifications.
+                </p>
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-slate-700">Port</label>
-                  <input
-                    type="number"
-                    value={smtpForm.port}
-                    onChange={(e) => setSmtpForm({ ...smtpForm, port: parseInt(e.target.value) || 587 })}
-                    required
-                    className="mt-1 w-full rounded-xl border border-slate-300 p-2.5 text-slate-900 focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="font-semibold text-slate-700">Security</label>
-                  <select
-                    value={smtpForm.useTls ? 'TLS' : 'SSL'}
-                    onChange={(e) => setSmtpForm({ ...smtpForm, useTls: e.target.value === 'TLS' })}
-                    className="mt-1 w-full rounded-xl border border-slate-300 p-2.5 text-slate-900 focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="TLS">TLS / STARTTLS</option>
-                    <option value="SSL">SSL</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700">Sender Name</label>
-                <input
-                  type="text"
-                  value={smtpForm.fromName}
-                  onChange={(e) => setSmtpForm({ ...smtpForm, fromName: e.target.value })}
-                  required
-                  className="mt-1 w-full rounded-xl border border-slate-300 p-2.5 text-slate-900 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700">From Email Address</label>
-                <input
-                  type="email"
-                  value={smtpForm.fromEmail}
-                  onChange={(e) => setSmtpForm({ ...smtpForm, fromEmail: e.target.value })}
-                  required
-                  className="mt-1 w-full rounded-xl border border-slate-300 p-2.5 text-slate-900 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700">SMTP Username</label>
-                <input
-                  type="text"
-                  value={smtpForm.username}
-                  onChange={(e) => setSmtpForm({ ...smtpForm, username: e.target.value })}
-                  placeholder="smtp_user"
-                  className="mt-1 w-full rounded-xl border border-slate-300 p-2.5 text-slate-900 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setActiveConfigModal(null)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-blue-600 px-5 py-2 font-semibold text-white shadow-md hover:bg-blue-700"
-                >
-                  Save & Verify
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* CONFIG MODAL: WHATSAPP */}
-      {activeConfigModal === 'whatsapp' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-emerald-600" />
-                <span>Configure WhatsApp Business API</span>
-              </h3>
-              <button
-                onClick={() => setActiveConfigModal(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveWhatsapp} className="space-y-3 text-xs">
-              <div>
-                <label className="font-semibold text-slate-700">Phone Number ID</label>
-                <input
-                  type="text"
-                  value={whatsappForm.phoneNumberId}
-                  onChange={(e) => setWhatsappForm({ ...whatsappForm, phoneNumberId: e.target.value })}
-                  required
-                  placeholder="e.g. 109823471092834"
-                  className="mt-1 w-full rounded-xl border border-slate-300 p-2.5 text-slate-900 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700">WhatsApp Business Account ID</label>
-                <input
-                  type="text"
-                  value={whatsappForm.businessAccountId}
-                  onChange={(e) => setWhatsappForm({ ...whatsappForm, businessAccountId: e.target.value })}
-                  required
-                  placeholder="e.g. act_982347192384"
-                  className="mt-1 w-full rounded-xl border border-slate-300 p-2.5 text-slate-900 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700">System User Access Token</label>
-                <input
-                  type="password"
-                  defaultValue="••••••••••••••••••••••••"
-                  placeholder="EAAG..."
-                  className="mt-1 w-full rounded-xl border border-slate-300 p-2.5 text-slate-900 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setActiveConfigModal(null)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-emerald-600 px-5 py-2 font-semibold text-white shadow-md hover:bg-emerald-700"
-                >
-                  Save & Connect
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* CONFIG MODAL: SMS */}
-      {activeConfigModal === 'sms' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Smartphone className="h-5 w-5 text-purple-600" />
-                <span>Configure SMS Gateway</span>
-              </h3>
-              <button
-                onClick={() => setActiveConfigModal(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveSms} className="space-y-3 text-xs">
-              <div>
-                <label className="font-semibold text-slate-700">Provider Service</label>
+              <div className="flex items-center gap-2">
                 <select
-                  value={smsForm.provider}
-                  onChange={(e) => setSmsForm({ ...smsForm, provider: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-300 p-2.5 text-slate-900 focus:border-blue-500 focus:outline-none"
+                  value={retentionDays}
+                  onChange={(e) => handleSaveRetention(Number(e.target.value))}
+                  disabled={isUpdatingRetention}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none"
                 >
-                  <option value="Twilio SMS Gateway">Twilio SMS Gateway</option>
-                  <option value="Fast2SMS">Fast2SMS</option>
-                  <option value="Msg91">Msg91</option>
-                  <option value="Custom REST Gateway">Custom REST Gateway</option>
+                  <option value={7}>7 Days Retention</option>
+                  <option value={30}>30 Days Retention</option>
+                  <option value={60}>60 Days Retention</option>
+                  <option value={90}>90 Days Retention (Default)</option>
+                  <option value={180}>180 Days Retention</option>
+                  <option value={365}>365 Days Retention</option>
                 </select>
               </div>
+            </div>
+          </div>
 
-              <div>
-                <label className="font-semibold text-slate-700">Sender ID (DLT Header)</label>
-                <input
-                  type="text"
-                  value={smsForm.senderId}
-                  onChange={(e) => setSmsForm({ ...smsForm, senderId: e.target.value })}
-                  required
-                  placeholder="EMS-HR"
-                  className="mt-1 w-full rounded-xl border border-slate-300 p-2.5 text-slate-900 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
+          {/* Event Matrix Preferences Table */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <div className="border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-900">Multi-Channel Event Dispatch Matrix</h3>
+              <p className="text-xs text-slate-500">
+                Configure which channels are triggered per event type. Disabled channels in /admin/integrations cannot be checked.
+              </p>
+            </div>
 
-              <div>
-                <label className="font-semibold text-slate-700">API Key / Account SID</label>
-                <input
-                  type="password"
-                  defaultValue="AC••••••••••••••••••••••••"
-                  className="mt-1 w-full rounded-xl border border-slate-300 p-2.5 text-slate-900 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setActiveConfigModal(null)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-purple-600 px-5 py-2 font-semibold text-white shadow-md hover:bg-purple-700"
-                >
-                  Save Gateway
-                </button>
-              </div>
-            </form>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3.5">Event Type</th>
+                    <th className="px-4 py-3.5">Category</th>
+                    <th className="px-4 py-3.5 text-center">In-App</th>
+                    <th className="px-4 py-3.5 text-center">Email</th>
+                    <th className="px-4 py-3.5 text-center">WhatsApp</th>
+                    <th className="px-4 py-3.5 text-center">SMS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {preferences.map((p) => (
+                    <tr key={p.eventType} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-semibold text-slate-900">{p.eventType}</td>
+                      <td className="px-4 py-3 text-[11px] text-slate-500 uppercase">{p.category || 'SYSTEM'}</td>
+                      <td className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={p.inApp}
+                          onChange={(e) => handleUpdatePreference(p.eventType, 'inApp', e.target.checked)}
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={p.email}
+                          onChange={(e) => handleUpdatePreference(p.eventType, 'email', e.target.checked)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={p.whatsapp}
+                          onChange={(e) => handleUpdatePreference(p.eventType, 'whatsapp', e.target.checked)}
+                          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={p.sms}
+                          onChange={(e) => handleUpdatePreference(p.eventType, 'sms', e.target.checked)}
+                          className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
-      {/* TEST DISPATCH MODAL */}
-      {testModalChannel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+      {/* DETAIL VIEW MODAL */}
+      {activeDetailNotif && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                Send Test Notification ({testModalChannel.toUpperCase()})
-              </h3>
-              <button
-                onClick={() => setTestModalChannel(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              >
+              <div className="flex items-center gap-2">
+                {getCategoryIcon(activeDetailNotif.category)}
+                <h3 className="text-base font-bold text-slate-900">{activeDetailNotif.title}</h3>
+              </div>
+              <button onClick={() => setActiveDetailNotif(null)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <p className="text-slate-600">
-                Enter target email address or phone number to dispatch a simulated test notification payload.
-              </p>
-              <div>
-                <label className="font-semibold text-slate-700">Recipient Target</label>
-                <input
-                  type="text"
-                  value={testRecipient}
-                  onChange={(e) => setTestRecipient(e.target.value)}
-                  placeholder={
-                    testModalChannel === 'smtp' ? 'user@domain.com' : '+91 98765 43210'
-                  }
-                  className="mt-1 w-full rounded-xl border border-slate-300 p-2.5 text-slate-900 focus:border-blue-500 focus:outline-none"
-                />
+              <div className="flex items-center gap-2">
+                {getPriorityBadge(activeDetailNotif.priority)}
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 uppercase">
+                  {activeDetailNotif.category}
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {new Date(activeDetailNotif.createdAt).toLocaleString()}
+                </span>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setTestModalChannel(null)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSendTest}
-                  disabled={isTesting}
-                  className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 font-semibold text-white shadow-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {isTesting ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      <span>Sending...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4" />
-                      <span>Dispatch Test</span>
-                    </>
-                  )}
-                </button>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-700 leading-relaxed font-medium">
+                {activeDetailNotif.message}
               </div>
+
+              {activeDetailNotif.actionUrl && (
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      router.push(activeDetailNotif.actionUrl!);
+                      setActiveDetailNotif(null);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-indigo-700"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Open Related Record
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setActiveDetailNotif(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* DELETE CONFIRMATION DIALOG */}
+      {/* DELETE CONFIRMATION MODAL */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl space-y-4 text-xs">
-            <h3 className="text-sm font-bold text-slate-900">Delete Notification?</h3>
-            <p className="text-slate-600">
-              Are you sure you want to delete this notification item? This will remove the notification entry without affecting the underlying HR record.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <AlertCircle className="h-6 w-6" />
+              <h3 className="text-base font-bold text-slate-900">Delete Notification?</h3>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to remove this notification? This action cannot be undone.
             </p>
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 onClick={() => setDeleteConfirmId(null)}
-                className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-600 hover:bg-slate-50"
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
               >
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  deleteNotification(deleteConfirmId);
-                  setDeleteConfirmId(null);
-                  showToast('Notification deleted');
-                }}
-                className="rounded-xl bg-rose-600 px-4 py-2 font-semibold text-white shadow-md hover:bg-rose-700"
+                onClick={() => handleDeleteNotification(deleteConfirmId)}
+                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-rose-700"
               >
-                Delete
+                Delete Notification
               </button>
             </div>
           </div>
