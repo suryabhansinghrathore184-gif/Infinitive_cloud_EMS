@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   ArrowRight,
   RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
 
 function LoginForm() {
@@ -29,11 +30,16 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loggedOutToast, setLoggedOutToast] = useState(false);
+  const [resetSuccessToast, setResetSuccessToast] = useState(false);
 
   useEffect(() => {
     if (searchParams.get('logged_out') === 'true') {
       setLoggedOutToast(true);
       setTimeout(() => setLoggedOutToast(false), 4000);
+    }
+    if (searchParams.get('reset_success') === 'true') {
+      setResetSuccessToast(true);
+      setTimeout(() => setResetSuccessToast(false), 5000);
     }
   }, [searchParams]);
 
@@ -74,7 +80,7 @@ function LoginForm() {
       setIsLoading(false);
 
       if (!response.success) {
-        setErrorMessage(response.message || 'Authentication failed. Please try again.');
+        setErrorMessage(response.message || 'Authentication failed. Please check your credentials.');
         return;
       }
 
@@ -92,7 +98,7 @@ function LoginForm() {
       }
     } catch {
       setIsLoading(false);
-      setErrorMessage('An unexpected error occurred. Please try again.');
+      setErrorMessage('An unexpected error occurred. Please try again later.');
     }
   };
 
@@ -109,25 +115,33 @@ function LoginForm() {
 
       {/* Logged Out Toast */}
       {loggedOutToast && (
-        <div className="fixed right-6 top-6 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-semibold text-white shadow-2xl border border-emerald-500/30 animate-fade-in">
+        <div className="fixed right-6 top-6 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-semibold text-white shadow-2xl border border-emerald-500/30">
           <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           <span>You have been logged out successfully.</span>
+        </div>
+      )}
+
+      {/* Password Reset Toast */}
+      {resetSuccessToast && (
+        <div className="fixed right-6 top-6 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-semibold text-white shadow-2xl border border-emerald-500/30">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+          <span>Password reset successful! Please sign in with your new password.</span>
         </div>
       )}
 
       <div className="relative w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-2xl backdrop-blur-xl">
         {/* Logo & Header */}
         <div className="flex flex-col items-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/30">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white shadow-lg shadow-indigo-600/30">
             <Building2 className="h-7 w-7" />
           </div>
-          <h1 className="mt-4 text-xl font-bold tracking-tight text-white">EMS / HRMS Portal</h1>
-          <p className="mt-1 text-xs text-slate-400">Infinitive Cloud Enterprise Management System</p>
+          <h1 className="mt-4 text-xl font-extrabold tracking-tight text-white">EMS / HRMS Enterprise</h1>
+          <p className="mt-1 text-xs text-slate-400 font-medium">Infinitive Cloud Management System</p>
         </div>
 
         <div className="mt-6 border-t border-slate-800/80 pt-6">
-          <h2 className="text-lg font-bold text-white">Welcome Back</h2>
-          <p className="text-xs text-slate-400">Sign in to access your HR workspace & dashboard</p>
+          <h2 className="text-lg font-bold text-white">Sign In to Account</h2>
+          <p className="text-xs text-slate-400">Access your organization HR workspace & dashboard</p>
         </div>
 
         {/* Lockout Alert */}
@@ -137,7 +151,7 @@ function LoginForm() {
             <div>
               <p className="font-bold text-rose-100">Account Temporarily Locked</p>
               <p className="mt-1 text-rose-300/80 leading-relaxed">
-                Too many invalid password attempts. For security reasons, login is disabled for{' '}
+                Too many invalid password attempts. For security reasons, login is temporarily disabled for{' '}
                 <strong className="text-white font-mono">{getLockoutMinutes()} minutes</strong>.
               </p>
             </div>
@@ -162,10 +176,10 @@ function LoginForm() {
                 type="text"
                 required
                 disabled={isLockedOut || isLoading}
-                placeholder="admin@organization.com or EMP9201"
+                placeholder="user@organization.com or EMP1001"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden disabled:opacity-50"
               />
             </div>
           </div>
@@ -175,7 +189,7 @@ function LoginForm() {
               <label className="text-xs font-semibold text-slate-300">Password *</label>
               <Link
                 href="/forgot-password"
-                className="text-xs font-semibold text-blue-400 hover:text-blue-300 hover:underline"
+                className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 hover:underline"
               >
                 Forgot Password?
               </Link>
@@ -189,7 +203,7 @@ function LoginForm() {
                 placeholder="••••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2.5 pl-10 pr-10 text-xs text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2.5 pl-10 pr-10 text-xs text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden disabled:opacity-50"
               />
               <button
                 type="button"
@@ -207,48 +221,34 @@ function LoginForm() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-800 bg-slate-950 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                className="h-4 w-4 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
               />
-              <span>Remember me for 30 days</span>
+              <span>Remember session</span>
             </label>
           </div>
 
           <button
             type="submit"
             disabled={isLockedOut || isLoading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-500 transition-all disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 py-3 text-xs font-bold text-white shadow-lg shadow-indigo-600/30 hover:from-amber-600 hover:to-indigo-700 transition-all disabled:opacity-50 cursor-pointer"
           >
             {isLoading ? (
               <>
                 <RefreshCw className="h-4 w-4 animate-spin" />
-                <span>Authenticating...</span>
+                <span>Authenticating Credentials...</span>
               </>
             ) : (
               <>
-                <span>Sign In to Dashboard</span>
+                <span>Sign In</span>
                 <ArrowRight className="h-4 w-4" />
               </>
             )}
           </button>
         </form>
 
-        {/* Demo Credentials Helper Box */}
-        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/60 p-3.5 text-[11px] text-slate-400 space-y-1.5">
-          <p className="font-bold text-slate-200 uppercase tracking-wider text-[10px]">Demo Role Credentials:</p>
-          <div className="grid grid-cols-2 gap-1 text-[10px]">
-            <p>
-              <strong className="text-blue-400">Admin:</strong> admin@organization.com / admin123
-            </p>
-            <p>
-              <strong className="text-emerald-400">Super Admin:</strong> superadmin@organization.com / super123
-            </p>
-            <p>
-              <strong className="text-purple-400">Manager:</strong> manager@organization.com / manager123
-            </p>
-            <p>
-              <strong className="text-amber-400">Employee:</strong> employee@organization.com / emp123
-            </p>
-          </div>
+        <div className="mt-6 flex items-center justify-center gap-2 text-[10px] text-slate-500 border-t border-slate-800/80 pt-4 font-mono">
+          <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+          <span>Encrypted TLS 1.3 & Server Session Protected</span>
         </div>
       </div>
     </div>
@@ -261,8 +261,8 @@ export default function LoginPage() {
       fallback={
         <div className="flex min-h-screen w-full items-center justify-center bg-slate-950 text-white">
           <div className="flex flex-col items-center gap-3">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-            <p className="text-xs font-semibold text-slate-400">Loading Login Portal...</p>
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+            <p className="text-xs font-semibold text-slate-400">Loading Portal...</p>
           </div>
         </div>
       }

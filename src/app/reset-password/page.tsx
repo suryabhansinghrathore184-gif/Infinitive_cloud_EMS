@@ -4,12 +4,12 @@ import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
-import { Lock, ArrowLeft, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { Lock, ArrowLeft, AlertCircle, RefreshCw, Eye, EyeOff, Check, X } from 'lucide-react';
 
 function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get('token') || 'demo-reset-token';
+  const token = searchParams.get('token') || '';
   const { resetPassword } = useAuthStore();
 
   const [newPassword, setNewPassword] = useState('');
@@ -18,12 +18,23 @@ function ResetPasswordForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Policy Rules Real-time Checks
+  const hasMinLength = newPassword.length >= 8;
+  const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword);
+  const hasNumber = /\d/.test(newPassword);
+  const passwordsMatch = newPassword.length > 0 && newPassword === confirmPassword;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (newPassword.length < 6) {
-      setErrorMessage('Password must be at least 6 characters long.');
+    if (!token) {
+      setErrorMessage('Missing password reset token in link. Please request a new link.');
+      return;
+    }
+
+    if (!hasMinLength || !hasSpecial || !hasNumber) {
+      setErrorMessage('Password does not satisfy security policy requirements.');
       return;
     }
 
@@ -44,7 +55,7 @@ function ResetPasswordForm() {
       setIsLoading(false);
 
       if (!res.success) {
-        setErrorMessage(res.message);
+        setErrorMessage(res.message || 'Failed to reset password.');
         return;
       }
 
@@ -69,79 +80,118 @@ function ResetPasswordForm() {
         </Link>
 
         <div className="mt-6 flex flex-col items-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white shadow-lg shadow-indigo-600/30">
             <Lock className="h-7 w-7" />
           </div>
           <h2 className="mt-4 text-xl font-bold tracking-tight text-white">Create New Password</h2>
           <p className="mt-1 text-xs text-slate-400 leading-relaxed">
-            Choose a strong new password for your EMS account.
+            Specify a secure new password for your EMS account.
           </p>
         </div>
 
-        {errorMessage && (
-          <div className="mt-5 flex items-center gap-2.5 rounded-2xl border border-rose-500/30 bg-rose-950/40 p-3.5 text-xs font-semibold text-rose-300">
-            <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-slate-300">New Password *</label>
-            <div className="relative mt-1.5">
-              <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-500" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                minLength={6}
-                disabled={isLoading}
-                placeholder="••••••••••••"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2.5 pl-10 pr-10 text-xs text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none disabled:opacity-50"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-3 text-slate-500 hover:text-slate-300"
+        {!token ? (
+          <div className="mt-6 rounded-2xl border border-rose-500/30 bg-rose-950/40 p-4 text-xs font-semibold text-rose-300 text-center space-y-2">
+            <AlertCircle className="mx-auto h-8 w-8 text-rose-400" />
+            <p className="font-bold text-rose-200">Invalid Reset Link</p>
+            <p className="text-slate-400">No reset token found in URL. Please request a new link.</p>
+            <div className="pt-2">
+              <Link
+                href="/forgot-password"
+                className="inline-block rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-white hover:bg-slate-700"
               >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+                Request New Reset Link
+              </Link>
             </div>
           </div>
-
-          <div>
-            <label className="text-xs font-semibold text-slate-300">Confirm New Password *</label>
-            <div className="relative mt-1.5">
-              <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-500" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                minLength={6}
-                disabled={isLoading}
-                placeholder="••••••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2.5 pl-10 pr-10 text-xs text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none disabled:opacity-50"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading || !newPassword || !confirmPassword}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-xs font-bold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-all disabled:opacity-50"
-          >
-            {isLoading ? (
-              <>
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                <span>Updating Password...</span>
-              </>
-            ) : (
-              <span>Reset Password & Login</span>
+        ) : (
+          <>
+            {errorMessage && (
+              <div className="mt-5 flex items-center gap-2.5 rounded-2xl border border-rose-500/30 bg-rose-950/40 p-3.5 text-xs font-semibold text-rose-300">
+                <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
             )}
-          </button>
-        </form>
+
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-300">New Password *</label>
+                <div className="relative mt-1.5">
+                  <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-500" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    disabled={isLoading}
+                    placeholder="••••••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2.5 pl-10 pr-10 text-xs text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden disabled:opacity-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-3 text-slate-500 hover:text-slate-300"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-300">Confirm New Password *</label>
+                <div className="relative mt-1.5">
+                  <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-500" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    disabled={isLoading}
+                    placeholder="••••••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2.5 pl-10 pr-10 text-xs text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              {/* Password Policy Checklist */}
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3.5 text-[11px] space-y-1.5 text-slate-400">
+                <p className="font-bold text-slate-300 uppercase tracking-wider text-[10px]">Password Security Rules:</p>
+                <div className="space-y-1 text-[11px]">
+                  <div className={`flex items-center gap-1.5 ${hasMinLength ? 'text-emerald-400 font-semibold' : 'text-slate-500'}`}>
+                    {hasMinLength ? <Check className="h-3.5 w-3.5 shrink-0" /> : <X className="h-3.5 w-3.5 shrink-0" />}
+                    <span>At least 8 characters long</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${hasSpecial ? 'text-emerald-400 font-semibold' : 'text-slate-500'}`}>
+                    {hasSpecial ? <Check className="h-3.5 w-3.5 shrink-0" /> : <X className="h-3.5 w-3.5 shrink-0" />}
+                    <span>At least one special character (!@#$%^&*)</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${hasNumber ? 'text-emerald-400 font-semibold' : 'text-slate-500'}`}>
+                    {hasNumber ? <Check className="h-3.5 w-3.5 shrink-0" /> : <X className="h-3.5 w-3.5 shrink-0" />}
+                    <span>At least one number (0-9)</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${passwordsMatch ? 'text-emerald-400 font-semibold' : 'text-slate-500'}`}>
+                    {passwordsMatch ? <Check className="h-3.5 w-3.5 shrink-0" /> : <X className="h-3.5 w-3.5 shrink-0" />}
+                    <span>Passwords match</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading || !newPassword || !confirmPassword || !hasMinLength || !hasSpecial || !hasNumber || !passwordsMatch}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 py-3 text-xs font-bold text-white shadow-lg shadow-indigo-600/30 hover:from-amber-600 hover:to-indigo-700 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {isLoading ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Updating Password...</span>
+                  </>
+                ) : (
+                  <span>Reset Password & Proceed</span>
+                )}
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );

@@ -1,13 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 import { KeyRound, Mail, ArrowLeft, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
-  const router = useRouter();
   const { forgotPassword } = useAuthStore();
 
   const [email, setEmail] = useState('');
@@ -58,28 +56,28 @@ export default function ForgotPasswordPage() {
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/30">
               <CheckCircle2 className="h-7 w-7" />
             </div>
-            <h2 className="text-xl font-bold text-white">Reset Link Sent!</h2>
+            <h2 className="text-xl font-bold text-white">Reset Link Dispatched</h2>
             <p className="text-xs text-slate-400 leading-relaxed max-w-xs">
-              If an active account exists for <strong className="text-white">{email}</strong>, we have dispatched a password reset link to your inbox.
+              If an active account exists for <strong className="text-white">{email}</strong>, password reset instructions have been sent to your inbox.
             </p>
-            <div className="pt-4 w-full">
+            <div className="pt-2 w-full">
               <Link
-                href="/reset-password?token=demo-reset-token"
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-500 transition-all"
+                href="/login"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-800 py-3 text-xs font-bold text-white shadow-md hover:bg-slate-700 transition-all"
               >
-                <span>Proceed to Reset Password Page (Demo)</span>
+                <span>Return to Login Portal</span>
               </Link>
             </div>
           </div>
         ) : (
           <>
             <div className="mt-6 flex flex-col items-center text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/30">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white shadow-lg shadow-indigo-600/30">
                 <KeyRound className="h-7 w-7" />
               </div>
               <h2 className="mt-4 text-xl font-bold tracking-tight text-white">Forgot Your Password?</h2>
               <p className="mt-1 text-xs text-slate-400 leading-relaxed">
-                Enter your work email address below and we will send you instructions to reset your password.
+                Enter your registered email address and we will dispatch password recovery instructions.
               </p>
             </div>
 
@@ -92,7 +90,7 @@ export default function ForgotPasswordPage() {
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-300">Work Email Address *</label>
+                <label className="text-xs font-semibold text-slate-300">Registered Email Address *</label>
                 <div className="relative mt-1.5">
                   <Mail className="absolute left-3.5 top-3 h-4 w-4 text-slate-500" />
                   <input
@@ -102,7 +100,7 @@ export default function ForgotPasswordPage() {
                     placeholder="user@organization.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden disabled:opacity-50"
                   />
                 </div>
               </div>
@@ -110,15 +108,15 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={isLoading || !email}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-500 transition-all disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 py-3 text-xs font-bold text-white shadow-lg shadow-indigo-600/30 hover:from-amber-600 hover:to-indigo-700 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {isLoading ? (
                   <>
                     <RefreshCw className="h-4 w-4 animate-spin" />
-                    <span>Dispatching Link...</span>
+                    <span>Dispatching Instructions...</span>
                   </>
                 ) : (
-                  <span>Send Password Reset Link</span>
+                  <span>Send Password Reset Instructions</span>
                 )}
               </button>
             </form>

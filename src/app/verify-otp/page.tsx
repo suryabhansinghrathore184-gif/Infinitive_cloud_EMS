@@ -117,10 +117,9 @@ export default function VerifyOtpPage() {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/30">
             <ShieldCheck className="h-7 w-7" />
           </div>
-          <h2 className="mt-4 text-xl font-bold tracking-tight text-white">Two-Factor Verification</h2>
+          <h2 className="mt-4 text-xl font-bold tracking-tight text-white">Two-Factor Authentication</h2>
           <p className="mt-1 text-xs text-slate-400 leading-relaxed">
-            Enter the 6-digit authentication code sent to your email/mobile. (Use test code:{' '}
-            <strong className="text-emerald-400 font-mono">123456</strong>)
+            Enter the 6-digit authentication code sent to your registered email/phone.
           </p>
         </div>
 
@@ -144,7 +143,7 @@ export default function VerifyOtpPage() {
                 value={digit}
                 onChange={(e) => handleChange(idx, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(idx, e)}
-                className="h-12 w-12 rounded-xl border border-slate-800 bg-slate-950 text-center text-lg font-bold text-white focus:border-emerald-500 focus:outline-none"
+                className="h-12 w-12 rounded-xl border border-slate-800 bg-slate-950 text-center text-lg font-bold text-white focus:border-emerald-500 focus:outline-hidden"
               />
             ))}
           </div>
@@ -166,7 +165,7 @@ export default function VerifyOtpPage() {
           <button
             type="submit"
             disabled={isLoading || otp.join('').length !== 6}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-500 transition-all disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-500 transition-all disabled:opacity-50 cursor-pointer"
           >
             {isLoading ? (
               <>

@@ -19,6 +19,7 @@ export type NotificationCategory =
   | 'RECRUITMENT'
   | 'DOCUMENT'
   | 'SYSTEM'
+  | 'SECURITY'
   | 'ANNOUNCEMENT';
 
 export type NotificationPriority =
