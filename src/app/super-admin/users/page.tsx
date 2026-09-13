@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { SuperAdminLayout } from '@/components/layout/SuperAdminLayout';
+import { formatRoleLabel } from '@/lib/roleUtils';
+import { AddNewAccountCard } from '@/components/accounts/AddNewAccountCard';
 import {
   Users,
   Search,
@@ -125,6 +127,11 @@ export default function SuperAdminUsersPage() {
         { label: 'System Users', href: '/super-admin/users' },
       ]}
     >
+      {/* ADD NEW ACCOUNT CARD */}
+      <div className="mb-6">
+        <AddNewAccountCard userRole="SUPER_ADMIN" />
+      </div>
+
       {/* Header Overview */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -259,7 +266,7 @@ export default function SuperAdminUsersPage() {
                         }`}
                       >
                         <ShieldCheck className="h-3 w-3" />
-                        {user.role}
+                        {formatRoleLabel(user.role)}
                       </span>
                     </td>
                     <td className="py-3 px-4 font-mono text-[11px] text-slate-600">

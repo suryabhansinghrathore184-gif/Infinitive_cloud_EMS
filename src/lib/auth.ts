@@ -256,3 +256,6 @@ export function checkPermissions(
 
   return { isAllowed: true, statusCode: 200, message: 'Authorized' };
 }
+
+export { formatRoleLabel } from '@/lib/roleUtils';
+

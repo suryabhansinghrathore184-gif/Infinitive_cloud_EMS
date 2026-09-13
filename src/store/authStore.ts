@@ -25,6 +25,7 @@ export interface AuthState {
   isLockedOut: boolean;
   lockoutUntil: number | null;
   twoFactorToken: string | null;
+  pendingOtpEmail: string | null;
   authActivityLogs: AuthActivityLog[];
 }
 
@@ -37,6 +38,7 @@ const initialAuthState: AuthState = {
   isLockedOut: false,
   lockoutUntil: null,
   twoFactorToken: null,
+  pendingOtpEmail: null,
   authActivityLogs: [],
 };
 
@@ -162,6 +164,7 @@ export function useAuthStore() {
           isLockedOut: false,
           lockoutUntil: null,
           twoFactorToken: null,
+          pendingOtpEmail: null,
         }));
 
         recordActivity('LOGIN_SUCCESS', `Successfully logged in as ${data.session.user.role}`, data.session.user.email);
@@ -174,18 +177,42 @@ export function useAuthStore() {
     }
   };
 
-  const verifyOtp = async (otpCode: string): Promise<LoginResponse> => {
+  const requestOtp = async (email: string): Promise<{ success: boolean; message: string }> => {
     try {
+      const cleanEmail = email.trim().toLowerCase();
+      const response = await fetch('/api/v1/auth/request-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setState((prev) => ({ ...prev, pendingOtpEmail: cleanEmail }));
+        recordActivity('OTP_REQUESTED', `OTP verification code requested for ${cleanEmail}`, cleanEmail);
+      }
+      return data;
+    } catch {
+      return { success: false, message: 'Network error requesting OTP verification code.' };
+    }
+  };
+
+  const verifyOtp = async (otpCode: string, email?: string): Promise<LoginResponse> => {
+    try {
+      const targetEmail = email || state.pendingOtpEmail || undefined;
       const response = await fetch('/api/v1/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ twoFactorToken: state.twoFactorToken, otpCode }),
+        body: JSON.stringify({
+          email: targetEmail,
+          twoFactorToken: state.twoFactorToken,
+          otpCode,
+        }),
       });
 
       const data: LoginResponse = await response.json();
 
       if (!response.ok || !data.success) {
-        recordActivity('LOGIN_FAILED', `Invalid 2FA OTP attempt: ${otpCode}`);
+        recordActivity('LOGIN_FAILED', `Invalid OTP verification attempt`);
         return data;
       }
 
@@ -200,9 +227,10 @@ export function useAuthStore() {
           isLockedOut: false,
           lockoutUntil: null,
           twoFactorToken: null,
+          pendingOtpEmail: null,
         }));
 
-        recordActivity('OTP_VERIFIED', '2FA OTP verified successfully', data.session.user.email);
+        recordActivity('OTP_VERIFIED', 'OTP verified successfully', data.session.user.email);
       }
 
       return data;
@@ -211,7 +239,11 @@ export function useAuthStore() {
     }
   };
 
-  const resendOtp = async (): Promise<{ success: boolean; message: string }> => {
+  const resendOtp = async (email?: string): Promise<{ success: boolean; message: string }> => {
+    const targetEmail = email || state.pendingOtpEmail;
+    if (targetEmail) {
+      return requestOtp(targetEmail);
+    }
     try {
       const response = await fetch('/api/v1/auth/resend-otp', {
         method: 'POST',
@@ -290,10 +322,14 @@ export function useAuthStore() {
       case 'SUPER_ADMIN':
         return '/super-admin/dashboard';
       case 'HR/Admin':
+      case 'ADMIN':
+      case 'HR':
         return '/admin/dashboard';
       case 'Manager':
+      case 'MANAGER':
         return '/manager/dashboard';
       case 'Employee':
+      case 'EMPLOYEE':
         return '/employee/dashboard';
       default:
         return '/login';
@@ -321,8 +357,10 @@ export function useAuthStore() {
     isLockedOut: state.isLockedOut,
     loginAttempts: state.loginAttempts,
     lockoutUntil: state.lockoutUntil,
+    pendingOtpEmail: state.pendingOtpEmail,
     authActivityLogs: state.authActivityLogs || [],
     login,
+    requestOtp,
     verifyOtp,
     resendOtp,
     logout,

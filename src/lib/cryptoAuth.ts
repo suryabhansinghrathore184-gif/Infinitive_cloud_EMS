@@ -53,6 +53,9 @@ export function generateSecureToken(bytes = 32): string {
  * Generate a cryptographically secure 6-digit numeric OTP
  */
 export function generateNumericOTP(length = 6): string {
+  if (length === 6) {
+    return crypto.randomInt(100000, 1000000).toString();
+  }
   const digits = '0123456789';
   let otp = '';
   const randomBytes = crypto.randomBytes(length);

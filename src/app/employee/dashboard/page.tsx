@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useAuthStore } from '@/store/authStore';
+import { formatRoleLabel } from '@/lib/roleUtils';
 import { User, Clock, CalendarDays, FileText, CheckCircle2, MessageSquare } from 'lucide-react';
 
 export default function EmployeeDashboardPage() {
@@ -20,14 +21,14 @@ export default function EmployeeDashboardPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-bold text-slate-900">
-              Welcome, {user?.name || 'Employee'} 👋
+              Welcome back, {user?.name || 'Employee'}!
             </h2>
             <p className="text-xs text-slate-500">
               View your attendance record, leave balances, downloaded payslips, and personal documents.
             </p>
           </div>
           <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 border border-amber-200">
-            Role: {user?.role || 'Employee'}
+            {formatRoleLabel(user?.role || 'EMPLOYEE')}
           </span>
         </div>
 

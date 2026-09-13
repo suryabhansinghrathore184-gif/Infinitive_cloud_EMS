@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { SuperAdminLayout } from '@/components/layout/SuperAdminLayout';
+import { formatRoleLabel } from '@/lib/roleUtils';
 import {
   ShieldAlert,
   Search,
@@ -192,7 +193,7 @@ export default function SuperAdminAuditLogsPage() {
 
                     <td className="py-3 px-4">
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
-                        {log.role || 'USER'}
+                        {formatRoleLabel(log.role)}
                       </span>
                       <p className="text-[10px] font-mono text-slate-400 mt-0.5">{log.organizationId || 'GLOBAL'}</p>
                     </td>

@@ -54,7 +54,20 @@ export interface AuthActivityLog {
   id: string;
   userId?: string;
   userEmail?: string;
-  action: 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'LOGOUT' | 'OTP_VERIFIED' | 'PASSWORD_RESET_REQUESTED' | 'PASSWORD_RESET_SUCCESS' | 'SESSION_EXPIRED' | 'ACCOUNT_LOCKED';
+  action:
+    | 'LOGIN_SUCCESS'
+    | 'LOGIN_FAILED'
+    | 'LOGIN_FAILURE'
+    | 'LOGOUT'
+    | 'OTP_REQUESTED'
+    | 'OTP_VERIFICATION_FAILED'
+    | 'OTP_VERIFICATION_SUCCESS'
+    | 'OTP_VERIFIED'
+    | 'OTP_RATE_LIMITED'
+    | 'PASSWORD_RESET_REQUESTED'
+    | 'PASSWORD_RESET_SUCCESS'
+    | 'SESSION_EXPIRED'
+    | 'ACCOUNT_LOCKED';
   details: string;
   ipAddress: string;
   userAgent: string;

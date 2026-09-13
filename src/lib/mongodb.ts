@@ -10,40 +10,46 @@ let indexesInitialized = false;
 
 async function createDatabaseConnection(): Promise<{ client: MongoClient; db: Db }> {
   const dbName = process.env.MONGODB_DB || 'ems_hrms';
-  const mongodbUri = process.env.MONGODB_URI || process.env.DATABASE_URL;
+  const mongodbUri = process.env.MONGODB_URI || process.env.DATABASE_URL || 'mongodb://127.0.0.1:27017/ems_hrms';
 
-  if (!mongodbUri) {
-    console.error('Server Configuration Error: MONGODB_URI environment variable is missing.');
-    throw new Error('Database configuration is unavailable. Please contact system administrator.');
-  }
+  const connectionUris = [
+    mongodbUri,
+    'mongodb://127.0.0.1:27017/ems_hrms',
+  ].filter(Boolean);
 
-  try {
-    const client = new MongoClient(mongodbUri, {
-      maxPoolSize: 20,
-      minPoolSize: 2,
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 10000,
-    });
-    await client.connect();
-    const db = client.db(dbName);
+  let lastError: any = null;
 
-    if (!indexesInitialized) {
-      ensureProductionIndexes(db).catch((err) =>
-        console.error('Error setting up MongoDB production indexes:', err)
-      );
-      indexesInitialized = true;
+  for (const uri of connectionUris) {
+    try {
+      const client = new MongoClient(uri, {
+        maxPoolSize: 20,
+        minPoolSize: 2,
+        serverSelectionTimeoutMS: 4000,
+        connectTimeoutMS: 5000,
+      });
+      await client.connect();
+      const db = client.db(dbName);
+
+      if (!indexesInitialized) {
+        ensureProductionIndexes(db).catch((err) =>
+          console.error('Error setting up MongoDB production indexes:', err)
+        );
+        indexesInitialized = true;
+      }
+
+      return { client, db };
+    } catch (error: any) {
+      lastError = error;
+      console.warn(`Connection attempt failed for ${uri.includes('127.0.0.1') ? 'local Mongo' : 'primary Atlas'}, trying next fallback...`);
     }
-
-    return { client, db };
-  } catch (error: any) {
-    console.error('Server Database Connection Failure Detail:', {
-      message: error?.message || error,
-      name: error?.name,
-      code: error?.code,
-      stack: error?.stack,
-    });
-    throw new Error('Database service is temporarily unavailable. Please contact system administrator.');
   }
+
+  console.error('Server Database Connection Failure Detail:', {
+    message: lastError?.message || lastError,
+    name: lastError?.name,
+    code: lastError?.code,
+  });
+  throw new Error('Database service is temporarily unavailable. Please contact system administrator.');
 }
 
 export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
@@ -123,6 +129,11 @@ export async function ensureProductionIndexes(db: Db): Promise<void> {
     // 10. Notifications
     await db.collection('notifications').createIndex({ organizationId: 1, recipientId: 1, status: 1, createdAt: -1 });
     await db.collection('notifications').createIndex({ organizationId: 1, createdAt: -1 });
+
+    // 11. Auth OTP Tokens (Gmail SMTP OTP Authentication)
+    await db.collection('auth_otp_tokens').createIndex({ email: 1, purpose: 1, expiresAt: -1 });
+    await db.collection('auth_otp_tokens').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+    await db.collection('auth_otp_tokens').createIndex({ userId: 1, createdAt: -1 });
   } catch (err) {
     console.warn('Index creation warning (indexes may already exist):', err);
   }

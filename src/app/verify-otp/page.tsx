@@ -1,13 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { ShieldCheck, ArrowLeft, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, ArrowLeft, RefreshCw, AlertCircle, CheckCircle2, Mail } from 'lucide-react';
 
-export default function VerifyOtpPage() {
+function VerifyOtpContent() {
   const router = useRouter();
-  const { verifyOtp, resendOtp, getRoleDashboardRoute } = useAuthStore();
+  const searchParams = useSearchParams();
+  const queryEmail = searchParams.get('email');
+  const { verifyOtp, resendOtp, pendingOtpEmail, getRoleDashboardRoute } = useAuthStore();
+
+  const activeEmail = queryEmail || pendingOtpEmail || '';
 
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [timer, setTimer] = useState<number>(60);
@@ -55,25 +59,27 @@ export default function VerifyOtpPage() {
 
     const fullCode = otp.join('');
     if (fullCode.length !== 6) {
-      setErrorMessage('Please enter all 6 digits of your OTP code.');
+      setErrorMessage('Please enter all 6 digits of your verification code.');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const response = await verifyOtp(fullCode);
+      const response = await verifyOtp(fullCode, activeEmail || undefined);
       setIsLoading(false);
 
       if (!response.success) {
-        setErrorMessage(response.message || 'Invalid OTP code. Please try again.');
+        setErrorMessage(response.message || 'Invalid verification code. Please try again.');
         return;
       }
 
-      router.replace(getRoleDashboardRoute(response.session?.user.role));
+      // Successful OTP verification & redirect to proper dashboard route
+      const roleRoute = getRoleDashboardRoute(response.session?.user.role);
+      router.replace(roleRoute);
     } catch {
       setIsLoading(false);
-      setErrorMessage('Failed to verify OTP code. Please try again.');
+      setErrorMessage('Failed to verify code. Please try again.');
     }
   };
 
@@ -84,7 +90,7 @@ export default function VerifyOtpPage() {
     setCanResend(false);
     setTimer(60);
 
-    const res = await resendOtp();
+    const res = await resendOtp(activeEmail || undefined);
     if (res.success) {
       setToastMessage(res.message);
       setTimeout(() => setToastMessage(null), 4000);
@@ -117,10 +123,16 @@ export default function VerifyOtpPage() {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/30">
             <ShieldCheck className="h-7 w-7" />
           </div>
-          <h2 className="mt-4 text-xl font-bold tracking-tight text-white">Two-Factor Authentication</h2>
+          <h2 className="mt-4 text-xl font-bold tracking-tight text-white">Security Verification Code</h2>
           <p className="mt-1 text-xs text-slate-400 leading-relaxed">
-            Enter the 6-digit authentication code sent to your registered email/phone.
+            Enter the 6-digit verification code sent via Gmail SMTP.
           </p>
+          {activeEmail && (
+            <div className="mt-3 flex items-center gap-1.5 rounded-full bg-slate-800/80 px-3 py-1 text-xs text-emerald-400 border border-slate-700">
+              <Mail className="h-3.5 w-3.5" />
+              <span>{activeEmail}</span>
+            </div>
+          )}
         </div>
 
         {errorMessage && (
@@ -179,5 +191,22 @@ export default function VerifyOtpPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function VerifyOtpPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen w-full items-center justify-center bg-slate-950 text-white">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+            <p className="text-xs font-semibold text-slate-400">Loading Verification...</p>
+          </div>
+        </div>
+      }
+    >
+      <VerifyOtpContent />
+    </Suspense>
   );
 }

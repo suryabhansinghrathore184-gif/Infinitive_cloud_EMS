@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, UserPlus, Building2, Briefcase, Megaphone, CalendarOff, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { useEmsStore } from '@/store/emsStore';
+import { useAuthStore } from '@/store/authStore';
+import { formatRoleLabel } from '@/lib/roleUtils';
 
 interface WelcomeSectionProps {
   onAddEmployee?: () => void;
@@ -22,23 +24,25 @@ export const WelcomeSection: React.FC<WelcomeSectionProps> = ({
   onAddLeaveType,
 }) => {
   const { state } = useEmsStore();
+  const { user } = useAuthStore();
   const [currentDateFormatted, setCurrentDateFormatted] = useState<string>('');
 
   useEffect(() => {
     setCurrentDateFormatted(format(new Date(), 'EEEE, MMMM d, yyyy'));
   }, []);
 
-  const adminName = state.adminUser?.name || 'Administrator';
+  const displayName = user?.name || (user?.role?.toUpperCase().includes('SUPER') ? 'Super Administrator' : state.adminUser?.name || 'User');
+  const roleLabel = formatRoleLabel(user?.role || state.adminUser?.role);
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div>
         <div className="flex items-center gap-2">
           <h2 className="text-2xl font-extrabold text-slate-900 sm:text-3xl">
-            Welcome back, {adminName}
+            Welcome back, {displayName}!
           </h2>
           <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700 border border-indigo-200">
-            <Sparkles className="mr-1 h-3 w-3 text-indigo-600" /> HR Administrator
+            <Sparkles className="mr-1 h-3 w-3 text-indigo-600" /> {roleLabel}
           </span>
         </div>
         <p className="mt-1 text-xs text-slate-500 font-medium">

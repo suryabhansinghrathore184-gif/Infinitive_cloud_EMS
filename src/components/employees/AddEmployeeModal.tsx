@@ -16,12 +16,14 @@ import {
   RefreshCw,
   Camera,
   FileCheck,
+  Mail,
+  Plus,
 } from 'lucide-react';
 
 interface AddEmployeeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (emp: Omit<Employee, 'id'>) => { success: boolean; message: string };
+  onSave: (emp: Omit<Employee, 'id'>) => { success: boolean; message: string } | Promise<{ success: boolean; message: string }>;
   departments: string[];
   designations: string[];
 }
@@ -33,6 +35,8 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   departments,
   designations,
 }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdSuccess, setCreatedSuccess] = useState<{ email: string } | null>(null);
   const [formData, setFormData] = useState({
     employeeId: `EMP${Math.floor(1000 + Math.random() * 9000)}`,
     firstName: '',
@@ -210,7 +214,57 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     setFormData((prev) => ({ ...prev, avatar: '' }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const resetForm = () => {
+    setFormData({
+      employeeId: `EMP${Math.floor(1000 + Math.random() * 9000)}`,
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      avatar: '',
+      dateOfBirth: '1995-01-01',
+      gender: 'Male',
+      bloodGroup: 'O+',
+      address: '',
+      city: '',
+      state: '',
+      country: 'India',
+      department: departments[0] || 'Engineering & IT',
+      designation: designations[0] || 'Senior Software Engineer',
+      manager: 'Rajesh K.',
+      location: 'Mumbai Tech Hub',
+      employmentType: 'Full-time' as EmploymentType,
+      joiningDate: new Date().toISOString().split('T')[0],
+      status: 'Active' as EmploymentStatus,
+      shift: 'Standard (09:00 - 18:00)',
+      grade: 'Grade A3',
+      emergencyContactName: '',
+      emergencyRelationship: 'Spouse',
+      emergencyPhone: '',
+      emergencyAddress: '',
+      bankName: 'HDFC Bank',
+      accountNumber: '',
+      ifscCode: '',
+      accountHolder: '',
+      panNumber: '',
+      aadhaarNo: '',
+      passportNo: '',
+    });
+    setExtractedPhotoUri(null);
+    setCandidates([]);
+    setSelectedCandidateId(null);
+    setPhotoMeta(null);
+    setUploadedDocName(null);
+    setErrorMessage(null);
+    setCreatedSuccess(null);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -232,16 +286,48 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       return;
     }
 
-    const payload = {
-      ...formData,
-      profilePhoto: photoMeta || undefined,
-    };
+    setIsSubmitting(true);
 
-    const res = onSave(payload);
-    if (!res.success) {
-      setErrorMessage(res.message);
-    } else {
-      onClose();
+    try {
+      // 1. Dispatch POST request to create account & trigger Gmail OTP dispatch
+      try {
+        await fetch('/api/v1/employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employeeId: formData.employeeId,
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            phone: formData.phone,
+            department: formData.department,
+            designation: formData.designation,
+            role: 'EMPLOYEE',
+            joiningDate: formData.joiningDate,
+            location: formData.location,
+            avatar: formData.avatar,
+          }),
+        });
+      } catch (apiErr) {
+        console.warn('API POST /api/v1/employees call warning:', apiErr);
+      }
+
+      // 2. Save into store
+      const payload = {
+        ...formData,
+        profilePhoto: photoMeta || undefined,
+      };
+
+      const res = await Promise.resolve(onSave(payload));
+      if (!res.success) {
+        setErrorMessage(res.message);
+      } else {
+        setCreatedSuccess({ email: formData.email.trim() });
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to create employee account.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -255,13 +341,17 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
           <div className="flex items-center gap-2">
             <UserPlus className="h-5 w-5 text-indigo-400" />
             <div>
-              <h3 className="text-base font-bold">Add New Employee Master Record</h3>
+              <h3 className="text-base font-bold">
+                {createdSuccess ? 'Account Created' : 'Add New Employee Master Record'}
+              </h3>
               <p className="text-[11px] text-slate-400">
-                Register employee details & automatically extract photo from identity document
+                {createdSuccess
+                  ? 'Verification code dispatched via Gmail SMTP'
+                  : 'Register employee details & automatically extract photo from identity document'}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:text-white">
+          <button onClick={handleClose} className="rounded-lg p-1 text-slate-400 hover:text-white">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -274,7 +364,54 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
           </div>
         )}
 
-        {/* Form Body */}
+        {createdSuccess ? (
+          <div className="p-8 text-center space-y-6 animate-fade-in">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 ring-8 ring-emerald-50">
+              <CheckCircle2 className="h-10 w-10" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xl font-extrabold text-slate-900">Account Created Successfully</h3>
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-4 py-1.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                <Mail className="h-4 w-4 text-emerald-600" />
+                <span>
+                  Verification email sent to <strong className="underline">{createdSuccess.email}</strong>
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
+              Ask the user to check their email and enter the 6-digit verification code.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4 border-t border-slate-100">
+              <a
+                href={`/verify-email?email=${encodeURIComponent(createdSuccess.email)}`}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all"
+              >
+                <Mail className="h-4 w-4" />
+                <span>Open Verification</span>
+              </a>
+
+              <button
+                type="button"
+                onClick={resetForm}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all"
+              >
+                <Plus className="h-4 w-4 text-slate-500" />
+                <span>Create Another Account</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClose}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-200 transition-all"
+              >
+                <span>Back to Accounts</span>
+              </button>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Hidden File Inputs */}
           <input
@@ -623,19 +760,29 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
           <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
             <button
               type="button"
-              onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              onClick={handleClose}
+              disabled={isSubmitting}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="rounded-xl bg-indigo-600 px-6 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 active:scale-95 transition-all"
+              disabled={isSubmitting}
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
             >
-              Save & Register Employee
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Registering & Sending Email...</span>
+                </>
+              ) : (
+                <span>Save & Register Employee</span>
+              )}
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

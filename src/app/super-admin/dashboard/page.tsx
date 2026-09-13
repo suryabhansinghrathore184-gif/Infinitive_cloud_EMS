@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { SuperAdminLayout } from '@/components/layout/SuperAdminLayout';
+import { useAuthStore } from '@/store/authStore';
+import { formatRoleLabel } from '@/lib/roleUtils';
 import {
   Building2,
   Users,
@@ -42,6 +44,7 @@ interface SuperAdminStats {
 }
 
 export default function SuperAdminDashboardPage() {
+  const { user } = useAuthStore();
   const [stats, setStats] = useState<SuperAdminStats>({
     totalOrganizations: 0,
     activeOrganizations: 0,
@@ -79,6 +82,9 @@ export default function SuperAdminDashboardPage() {
     fetchStats();
   }, [fetchStats]);
 
+  const displayName = user?.name || 'Super Admin';
+  const roleLabel = formatRoleLabel(user?.role || 'SUPER_ADMIN');
+
   return (
     <SuperAdminLayout
       pageTitle="Super Admin Executive Dashboard"
@@ -88,9 +94,11 @@ export default function SuperAdminDashboardPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-extrabold text-slate-900">System Executive Overview</h2>
-            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-800 border border-amber-300">
-              ROOT AUTHORITATIVE
+            <h2 className="text-xl font-extrabold text-slate-900">
+              Welcome back, {displayName}!
+            </h2>
+            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-extrabold text-amber-800 border border-amber-300">
+              {roleLabel}
             </span>
           </div>
           <p className="text-xs text-slate-500">
@@ -198,18 +206,18 @@ export default function SuperAdminDashboardPage() {
             </Link>
 
             <Link
-              href="/super-admin/audit-logs"
+              href="/super-admin/security"
               className="flex flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50/80 p-3 hover:border-indigo-400 hover:bg-indigo-50/50 transition-all"
             >
               <div className="flex items-center justify-between font-bold text-slate-900">
-                <span>Audit Logs</span>
-                <ShieldAlert className="h-3.5 w-3.5 text-indigo-600" />
+                <span>Security Center</span>
+                <Lock className="h-3.5 w-3.5 text-indigo-600" />
               </div>
-              <span className="text-[10px] text-slate-500">System Streams</span>
+              <span className="text-[10px] text-slate-500">Policy & Audit</span>
             </Link>
 
             <Link
-              href="/admin/reports"
+              href="/super-admin/reports"
               className="flex flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50/80 p-3 hover:border-indigo-400 hover:bg-indigo-50/50 transition-all"
             >
               <div className="flex items-center justify-between font-bold text-slate-900">

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
+import { formatRoleLabel } from '@/lib/roleUtils';
 import {
   Menu,
   Bell,
@@ -49,6 +50,8 @@ export const SuperAdminHeader: React.FC<SuperAdminHeaderProps> = ({
     router.push('/login');
   };
 
+  const roleDisplay = formatRoleLabel(user?.role || 'SUPER_ADMIN');
+
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur-md sm:px-6 shadow-2xs">
       {/* Left Section: Sidebar Toggle & Breadcrumbs */}
@@ -92,16 +95,16 @@ export const SuperAdminHeader: React.FC<SuperAdminHeaderProps> = ({
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Quick Help */}
         <Link
-          href="/admin/helpdesk"
+          href="/super-admin/dashboard"
           className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-          title="System Helpdesk"
+          title="Super Admin Dashboard"
         >
           <HelpCircle className="h-5 w-5" />
         </Link>
 
         {/* Notifications */}
         <Link
-          href="/admin/notifications"
+          href="/super-admin/notifications"
           className="relative rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
           title="Notifications Center"
         >
@@ -134,7 +137,7 @@ export const SuperAdminHeader: React.FC<SuperAdminHeaderProps> = ({
                   ROOT
                 </span>
               </div>
-              <p className="text-[10px] text-slate-500 font-medium">System Super Admin</p>
+              <p className="text-[10px] text-slate-500 font-medium">{roleDisplay}</p>
             </div>
 
             <ChevronDown className="h-4 w-4 text-slate-400" />
@@ -147,18 +150,18 @@ export const SuperAdminHeader: React.FC<SuperAdminHeaderProps> = ({
                 <p className="font-bold text-slate-900">{user?.name || 'Super Admin'}</p>
                 <p className="text-[11px] text-slate-400 truncate">{user?.email || 'admin@organization.com'}</p>
                 <span className="mt-1.5 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-extrabold text-amber-700 border border-amber-200">
-                  SUPER_ADMIN (Root Privileges)
+                  {roleDisplay} (Root Privileges)
                 </span>
               </div>
 
               <div className="py-1 space-y-0.5">
                 <Link
-                  href="/admin/settings"
+                  href="/super-admin/settings"
                   onClick={() => setIsProfileOpen(false)}
                   className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-100 font-medium"
                 >
                   <User className="h-4 w-4 text-slate-500" />
-                  <span>My Profile</span>
+                  <span>My Profile & Settings</span>
                 </Link>
 
                 <Link

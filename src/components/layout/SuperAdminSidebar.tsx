@@ -53,38 +53,23 @@ const superAdminNavSections: NavSection[] = [
     ],
   },
   {
-    category: 'ORGANIZATION & STRUCTURE',
+    category: 'ORGANIZATION',
     items: [
       { name: 'Organizations', href: '/super-admin/organizations', icon: Building2 },
-      { name: 'Org Hierarchy', href: '/super-admin/organization-structure', icon: FolderTree },
+      { name: 'Organization Structure', href: '/super-admin/organization-structure', icon: FolderTree },
     ],
   },
   {
-    category: 'USER & ACCESS MANAGEMENT',
+    category: 'USER & ACCESS',
     items: [
       { name: 'System Users', href: '/super-admin/users', icon: Users },
-      { name: 'Roles & Matrix', href: '/super-admin/roles', icon: ShieldCheck },
+      { name: 'Roles & Permissions', href: '/super-admin/roles', icon: ShieldCheck },
     ],
   },
   {
-    category: 'PEOPLE MANAGEMENT',
+    category: 'PEOPLE',
     items: [
-      { name: 'Employees', href: '/super-admin/employees', icon: Users },
-    ],
-  },
-  {
-    category: 'SYSTEM MODULES',
-    items: [
-      { name: 'Attendance', href: '/admin/attendance', icon: Clock },
-      { name: 'Leave Management', href: '/admin/leave', icon: CalendarDays, badgeKey: 'pendingLeaves' },
-      { name: 'Payroll & Finance', href: '/admin/payroll', icon: CreditCard },
-      { name: 'Performance', href: '/admin/performance', icon: TrendingUp },
-      { name: 'Document Vault', href: '/admin/documents', icon: FileText },
-      { name: 'Recruitment', href: '/admin/recruitment', icon: UserPlus },
-      { name: 'Communication', href: '/admin/communication', icon: MessageSquare },
-      { name: 'Notifications', href: '/admin/notifications', icon: Bell, badgeKey: 'unreadNotifications' },
-      { name: 'HR Helpdesk', href: '/admin/helpdesk', icon: HelpCircle, badgeKey: 'openHelpdesk' },
-      { name: 'Reports & Analytics', href: '/admin/reports', icon: BarChart3 },
+      { name: 'Global Employees', href: '/super-admin/employees', icon: Users },
     ],
   },
   {
@@ -92,8 +77,15 @@ const superAdminNavSections: NavSection[] = [
     items: [
       { name: 'Security Center', href: '/super-admin/security', icon: Lock },
       { name: 'Audit Logs', href: '/super-admin/audit-logs', icon: ShieldAlert },
-      { name: 'Integrations', href: '/admin/integrations', icon: Puzzle },
+    ],
+  },
+  {
+    category: 'SYSTEM',
+    items: [
       { name: 'System Settings', href: '/super-admin/settings', icon: Settings },
+      { name: 'Integrations', href: '/super-admin/integrations', icon: Puzzle },
+      { name: 'Notifications', href: '/super-admin/notifications', icon: Bell, badgeKey: 'unreadNotifications' },
+      { name: 'Reports & Analytics', href: '/super-admin/reports', icon: BarChart3 },
     ],
   },
 ];

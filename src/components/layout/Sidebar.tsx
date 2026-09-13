@@ -24,9 +24,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  User,
 } from 'lucide-react';
 
 import { useEmsStore } from '@/store/emsStore';
+import { useAuthStore } from '@/store/authStore';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -45,7 +47,7 @@ interface NavSection {
   items: NavItem[];
 }
 
-const navSections: NavSection[] = [
+const adminNavSections: NavSection[] = [
   {
     category: 'MAIN',
     items: [
@@ -109,13 +111,85 @@ const navSections: NavSection[] = [
   },
 ];
 
+const managerNavSections: NavSection[] = [
+  {
+    category: 'MAIN',
+    items: [
+      { name: 'Dashboard', href: '/manager/dashboard', icon: LayoutDashboard },
+    ],
+  },
+  {
+    category: 'MY TEAM',
+    items: [
+      { name: 'Team Directory', href: '/manager/team', icon: Building2 },
+      { name: 'Team Employees', href: '/manager/employees', icon: Users },
+    ],
+  },
+  {
+    category: 'TIME & WORK',
+    items: [
+      { name: 'Team Attendance', href: '/manager/attendance', icon: Clock },
+      { name: 'Team Leave', href: '/manager/leave', icon: CalendarDays },
+      { name: 'Team Performance', href: '/manager/performance', icon: TrendingUp },
+    ],
+  },
+  {
+    category: 'COMMUNICATION',
+    items: [
+      { name: 'Communication', href: '/manager/communication', icon: MessageSquare },
+      { name: 'Notifications', href: '/manager/notifications', icon: Bell },
+      { name: 'Helpdesk', href: '/manager/helpdesk', icon: HelpCircle },
+    ],
+  },
+];
+
+const employeeNavSections: NavSection[] = [
+  {
+    category: 'MAIN',
+    items: [
+      { name: 'Dashboard', href: '/employee/dashboard', icon: LayoutDashboard },
+      { name: 'My Profile', href: '/employee/profile', icon: User },
+    ],
+  },
+  {
+    category: 'MY WORK',
+    items: [
+      { name: 'My Attendance', href: '/employee/attendance', icon: Clock },
+      { name: 'My Leave', href: '/employee/leave', icon: CalendarDays },
+      { name: 'My Payroll', href: '/employee/payroll', icon: CreditCard },
+      { name: 'My Documents', href: '/employee/documents', icon: FileText },
+      { name: 'My Performance', href: '/employee/performance', icon: TrendingUp },
+    ],
+  },
+  {
+    category: 'COMMUNICATION',
+    items: [
+      { name: 'Messages', href: '/employee/messages', icon: MessageSquare },
+      { name: 'Notifications', href: '/employee/notifications', icon: Bell },
+      { name: 'Helpdesk', href: '/employee/helpdesk', icon: HelpCircle },
+      { name: 'Settings', href: '/employee/settings', icon: Settings },
+    ],
+  },
+];
+
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const pathname = usePathname();
   const { unreadNotificationsCount } = useEmsStore();
+  const { user } = useAuthStore();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [helpdeskCount, setHelpdeskCount] = useState<number | null>(null);
   const [apiUnreadNotifCount, setApiUnreadNotifCount] = useState<number | null>(null);
   const [pendingLeaveCount, setPendingLeaveCount] = useState<number | null>(null);
+
+  const roleStr = (user?.role || '').toUpperCase();
+  const isManager = roleStr === 'MANAGER';
+  const isEmployee = roleStr === 'EMPLOYEE';
+
+  const activeNavSections = isManager
+    ? managerNavSections
+    : isEmployee
+    ? employeeNavSections
+    : adminNavSections;
 
   useEffect(() => {
     let isMounted = true;
@@ -155,13 +229,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       if (helpdeskCount > 99) return '99+';
       return String(helpdeskCount);
     }
-    if (item.name === 'Leave') {
+    if (item.name === 'Leave' || item.name === 'Team Leave') {
       if (pendingLeaveCount === null || pendingLeaveCount <= 0) return null;
       if (pendingLeaveCount > 99) return '99+';
       return String(pendingLeaveCount);
     }
     return item.badge || null;
   };
+
+  const homeHref = isManager ? '/manager/dashboard' : isEmployee ? '/employee/dashboard' : '/admin/dashboard';
 
   return (
     <>
@@ -181,7 +257,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       >
         {/* Header Branding */}
         <div className="flex h-16 items-center justify-between border-b border-slate-800/80 px-4">
-          <Link href="/admin/dashboard" className="flex items-center gap-3 overflow-hidden">
+          <Link href={homeHref} className="flex items-center gap-3 overflow-hidden">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 font-bold text-white shadow-md shadow-indigo-600/30">
               <Building2 className="h-5 w-5" />
             </div>
@@ -199,7 +275,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           {/* Desktop Collapse Toggle */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white lg:flex"
+            className="hidden rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white lg:flex cursor-pointer"
             title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
             {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -208,7 +284,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           {/* Mobile Close Button */}
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden cursor-pointer"
             aria-label="Close Sidebar"
           >
             <X className="h-5 w-5" />
@@ -217,7 +293,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
         {/* Navigation Sections */}
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5 scrollbar-thin scrollbar-thumb-slate-800">
-          {navSections.map((sec) => (
+          {activeNavSections.map((sec) => (
             <div key={sec.category} className="space-y-1">
               {!isCollapsed ? (
                 <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -229,8 +305,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
               {sec.items.map((item) => {
                 const Icon = item.icon;
-                const isActive =
-                  pathname === item.href || (pathname === '/' && item.href === '/admin/dashboard');
+                const isActive = pathname === item.href;
                 const badgeText = getDynamicBadge(item);
 
                 return (
@@ -290,7 +365,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             <div className="rounded-xl bg-slate-900/80 p-2.5 border border-slate-800 text-xs">
               <div className="flex items-center gap-2 font-semibold text-slate-200">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>HR Master Panel</span>
+                <span>{isManager ? 'Manager Panel' : isEmployee ? 'Employee Portal' : 'HR Master Panel'}</span>
               </div>
               <p className="mt-0.5 text-[10px] text-slate-400">Enterprise Edition v2.0</p>
             </div>

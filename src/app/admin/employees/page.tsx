@@ -6,6 +6,7 @@ import { useEmsStore } from '@/store/emsStore';
 import { Employee, EmploymentStatus } from '@/types/admin';
 import { AddEmployeeModal } from '@/components/employees/AddEmployeeModal';
 import { ImportEmployeesModal } from '@/components/employees/ImportEmployeesModal';
+import { AddNewAccountCard } from '@/components/accounts/AddNewAccountCard';
 import {
   Search,
   Filter,
@@ -94,6 +95,14 @@ export default function EmployeesPage() {
           <span>{toastMessage}</span>
         </div>
       )}
+
+      {/* ADD NEW ACCOUNT CARD */}
+      <div className="mb-6">
+        <AddNewAccountCard
+          onOpenModal={() => setIsAddModalOpen(true)}
+          userRole="ADMIN"
+        />
+      </div>
 
       {/* Action Header Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

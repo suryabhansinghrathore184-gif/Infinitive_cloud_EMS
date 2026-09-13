@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { SuperAdminLayout } from '@/components/layout/SuperAdminLayout';
+import { formatRoleLabel } from '@/lib/roleUtils';
 import {
   Users,
   Search,
@@ -279,7 +280,7 @@ export default function SuperAdminEmployeesPage() {
 
                       <td className="py-3 px-4">
                         <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700">
-                          {emp.role || 'EMPLOYEE'}
+                          {formatRoleLabel(emp.role)}
                         </span>
                       </td>
 

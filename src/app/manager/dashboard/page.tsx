@@ -4,6 +4,7 @@ import React from 'react';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useAuthStore } from '@/store/authStore';
+import { formatRoleLabel } from '@/lib/roleUtils';
 import { Users, CheckCircle2, Clock, CalendarDays, Award } from 'lucide-react';
 
 export default function ManagerDashboardPage() {
@@ -19,14 +20,14 @@ export default function ManagerDashboardPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-bold text-slate-900">
-              Welcome back, {user?.name || 'Manager'} 👋
+              Welcome back, {user?.name || 'Manager'}!
             </h2>
             <p className="text-xs text-slate-500">
               Manage your engineering team, track attendance, approve leaves, and conduct OKR reviews.
             </p>
           </div>
           <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700 border border-purple-200">
-            Role: {user?.role || 'Manager'}
+            {formatRoleLabel(user?.role || 'MANAGER')}
           </span>
         </div>
 

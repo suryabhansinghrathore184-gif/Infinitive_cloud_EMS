@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useEmsStore } from '@/store/emsStore';
 import { useAuthStore } from '@/store/authStore';
+import { formatRoleLabel } from '@/lib/roleUtils';
 import { LogoutConfirmModal } from '@/components/modals/LogoutConfirmModal';
 
 interface HeaderProps {
@@ -389,7 +390,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 <span className="truncate text-xs font-bold text-slate-900">{activeUser.name}</span>
                 <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-indigo-600" />
               </div>
-              <p className="truncate text-[10px] font-semibold text-slate-500">{activeUser.role}</p>
+              <p className="truncate text-[10px] font-semibold text-slate-500">{formatRoleLabel(activeUser.role)}</p>
             </div>
             <ChevronDown className="hidden h-3.5 w-3.5 shrink-0 text-slate-400 sm:block" />
           </button>
