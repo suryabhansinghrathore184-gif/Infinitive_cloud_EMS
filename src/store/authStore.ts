@@ -47,30 +47,6 @@ let globalState: AuthState = initialAuthState;
 let isHydratedGlobal = false;
 const listeners = new Set<() => void>();
 
-function getInitialState(): AuthState {
-  if (typeof window === 'undefined') return initialAuthState;
-  try {
-    const saved = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (saved) {
-      const parsed: AuthState = JSON.parse(saved);
-      if (parsed.isLockedOut && parsed.lockoutUntil && Date.now() > parsed.lockoutUntil) {
-        parsed.isLockedOut = false;
-        parsed.lockoutUntil = null;
-        parsed.loginAttempts = 0;
-      }
-      return parsed;
-    }
-  } catch {
-    // Fallback
-  }
-  return initialAuthState;
-}
-
-if (typeof window !== 'undefined') {
-  globalState = getInitialState();
-  isHydratedGlobal = true;
-}
-
 function updateGlobalState(updater: (prev: AuthState) => AuthState) {
   globalState = updater(globalState);
   if (typeof window !== 'undefined') {
@@ -84,14 +60,31 @@ function updateGlobalState(updater: (prev: AuthState) => AuthState) {
 }
 
 export function useAuthStore() {
+  const [isHydrated, setIsHydrated] = useState<boolean>(false);
   const [, setTick] = useState(0);
 
   useEffect(() => {
-    // Ensure client hydration
+    // Hydrate client state after initial mount to avoid React SSR hydration mismatches (#418 & #423)
     if (!isHydratedGlobal && typeof window !== 'undefined') {
-      globalState = getInitialState();
-      isHydratedGlobal = true;
+      try {
+        const saved = localStorage.getItem(AUTH_STORAGE_KEY);
+        if (saved) {
+          const parsed: AuthState = JSON.parse(saved);
+          if (parsed.isLockedOut && parsed.lockoutUntil && Date.now() > parsed.lockoutUntil) {
+            parsed.isLockedOut = false;
+            parsed.lockoutUntil = null;
+            parsed.loginAttempts = 0;
+          }
+          globalState = parsed;
+        }
+      } catch {
+        // Fallback
+      } finally {
+        isHydratedGlobal = true;
+      }
     }
+
+    setIsHydrated(true);
 
     const listener = () => setTick((t) => t + 1);
     listeners.add(listener);
