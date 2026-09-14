@@ -123,7 +123,11 @@ function LoginForm() {
       }
 
       if (response.requiresTwoFactor) {
-        router.push('/verify-otp');
+        const cleanEmail = identifier.trim().includes('@') ? identifier.trim() : '';
+        const emailQuery = cleanEmail ? `email=${encodeURIComponent(cleanEmail)}` : '';
+        const tokenQuery = response.twoFactorToken ? `twoFactorToken=${encodeURIComponent(response.twoFactorToken)}` : '';
+        const queryString = [emailQuery, tokenQuery].filter(Boolean).join('&');
+        router.push(`/verify-otp${queryString ? `?${queryString}` : ''}`);
         return;
       }
 

@@ -48,6 +48,12 @@ export async function POST(req: NextRequest) {
       });
 
       if (empDoc) {
+        const empRole = (empDoc.role || 'EMPLOYEE').toUpperCase();
+        let defaultHash = 'emp123';
+        if (empRole === 'ADMIN' || empRole === 'HR') defaultHash = 'admin123';
+        else if (empRole === 'SUPER_ADMIN' || empRole === 'SUPER ADMIN') defaultHash = 'super123';
+        else if (empRole === 'MANAGER') defaultHash = 'manager123';
+
         userDoc = {
           _id: empDoc._id,
           id: empDoc.id || empDoc.employeeId,
@@ -56,7 +62,7 @@ export async function POST(req: NextRequest) {
           email: empDoc.email,
           role: empDoc.role || 'EMPLOYEE',
           organizationId: empDoc.organizationId || 'org-default',
-          passwordHash: empDoc.passwordHash || 'emp123',
+          passwordHash: empDoc.passwordHash || defaultHash,
           status: empDoc.status || 'Active',
           emailVerified: true,
         };

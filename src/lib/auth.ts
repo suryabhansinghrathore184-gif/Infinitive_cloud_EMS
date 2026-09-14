@@ -80,11 +80,11 @@ export async function ensureDefaultUsersSeeded(): Promise<void> {
   if (seedCompleted) return;
   try {
     const { db } = await connectToDatabase();
-    const count = await db.collection('users').countDocuments({});
-    if (count === 0) {
-      const now = new Date();
-      for (const u of DEFAULT_USERS_SEED) {
-        const { hash, salt, formatted } = hashPassword(u.rawPassword);
+    const now = new Date();
+    for (const u of DEFAULT_USERS_SEED) {
+      const existingUser = await db.collection('users').findOne({ email: u.email });
+      if (!existingUser) {
+        const { salt, formatted } = hashPassword(u.rawPassword);
         const userDoc = {
           id: u.id,
           employeeId: u.employeeId,
@@ -106,7 +106,7 @@ export async function ensureDefaultUsersSeeded(): Promise<void> {
 
         await db.collection('users').updateOne(
           { email: u.email },
-          { $set: userDoc, $setOnInsert: { createdAt: now } },
+          { $setOnInsert: userDoc },
           { upsert: true }
         );
 
@@ -114,7 +114,7 @@ export async function ensureDefaultUsersSeeded(): Promise<void> {
         await db.collection('employees').updateOne(
           { organizationId: u.organizationId, employeeId: u.employeeId },
           {
-            $set: {
+            $setOnInsert: {
               organizationId: u.organizationId,
               employeeId: u.employeeId,
               firstName: u.name.split(' ')[0],
@@ -124,9 +124,9 @@ export async function ensureDefaultUsersSeeded(): Promise<void> {
               designation: u.designation,
               role: u.role,
               status: u.status,
+              createdAt: now,
               updatedAt: now,
             },
-            $setOnInsert: { createdAt: now },
           },
           { upsert: true }
         );
@@ -134,7 +134,7 @@ export async function ensureDefaultUsersSeeded(): Promise<void> {
     }
     seedCompleted = true;
   } catch (err) {
-    console.warn('Could not seed default users:', err);
+    console.warn('User seeding warning:', err);
   }
 }
 
