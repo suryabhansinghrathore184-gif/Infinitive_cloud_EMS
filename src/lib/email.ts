@@ -60,20 +60,20 @@ export async function sendOtpEmail({
 
     const mailTransporter = createGmailTransporter(gmailUser, gmailPass);
 
-    let subject = 'Your EMS/HRMS Verification Code';
-    let titleText = 'Enterprise Security Authentication';
-    let bodyText = 'You requested a One-Time Password (OTP) to authenticate into your EMS/HRMS workspace. Use the code below to complete your verification:';
+    let subject = `Your verification code is ${otp} - EMS/HRMS`;
+    let titleText = 'Account Verification';
+    let bodyText = 'You requested a 6-digit verification code to access your EMS/HRMS account:';
 
     if (purpose === 'ACCOUNT_INVITATION') {
-      subject = "You've Been Invited to EMS/HRMS";
+      subject = `Account Invitation Code: ${otp} - EMS/HRMS`;
       titleText = 'Account Setup Invitation';
-      bodyText = `You have been officially invited to join EMS/HRMS as <strong>${role}</strong>. Please use the 6-digit verification code below to complete your account setup and set your password:`;
+      bodyText = `You have been officially invited to join EMS/HRMS as <strong>${role}</strong>. Please use the verification code below to complete your account setup:`;
     } else if (purpose === 'EMAIL_VERIFICATION') {
-      subject = 'Confirm Your EMS/HRMS Account';
+      subject = `Confirm Your Email: ${otp} - EMS/HRMS`;
       titleText = 'Account Email Confirmation';
       bodyText = 'Your EMS/HRMS account has been created. Please use the 6-digit verification code below to confirm your email address:';
     } else if (purpose === '2FA') {
-      subject = 'Your EMS Security Verification Code';
+      subject = `Verification Code: ${otp} - EMS/HRMS`;
       titleText = 'Two-Factor Authentication';
       bodyText = 'Use the security verification code below to complete 2FA authentication:';
     }
@@ -154,11 +154,15 @@ export async function sendOtpEmail({
     `;
 
     const info = await mailTransporter.sendMail({
-      from: `"EMS Security" <${gmailUser}>`,
+      from: `"EMS HRMS" <${gmailUser}>`,
       to,
       subject,
       html: htmlContent,
-      text: `Hello ${greetingName},\n\nYour EMS/HRMS account has been created. Please use the verification code below to confirm your email address:\n\n${otp}\n\nThis code will expire in 10 minutes.\n\nRegards,\nEMS/HRMS Team`,
+      text: `Hello ${greetingName},\n\nYour EMS/HRMS verification code is: ${otp}\n\nThis code will expire in 10 minutes.\n\nRegards,\nEMS/HRMS Team`,
+      headers: {
+        'X-Priority': '1',
+        'Importance': 'high',
+      },
     });
 
     console.log(`Confirmation Email sent to ${to}. MessageId: ${info.messageId}`);
