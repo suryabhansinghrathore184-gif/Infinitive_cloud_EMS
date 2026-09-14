@@ -1,4 +1,5 @@
 import nodemailer, { Transporter } from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 export interface SendOtpEmailParams {
   to: string;
@@ -9,25 +10,14 @@ export interface SendOtpEmailParams {
   role?: string;
 }
 
-let transporter: Transporter | null = null;
-
-function getTransporter(): Transporter {
-  if (transporter) return transporter;
-
-  const rawUser = process.env.GMAIL_USER || process.env.SMTP_USER || '';
-  const rawPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '';
-
-  const gmailUser = rawUser.trim();
-  const gmailPass = rawPass.trim().replace(/\s+/g, '');
-
-  if (!gmailUser || !gmailPass) {
-    console.warn('GMAIL_USER or GMAIL_APP_PASSWORD is not configured in environment variables.');
-  }
-
+/**
+ * Creates a fresh, serverless-safe Nodemailer transporter for Gmail SMTP
+ */
+function createGmailTransporter(gmailUser: string, gmailPass: string): Transporter {
   const port = parseInt(process.env.SMTP_PORT || '465', 10);
   const isSecure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE !== 'false' : port === 465;
 
-  transporter = nodemailer.createTransport({
+  const smtpOptions: SMTPTransport.Options = {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port,
     secure: isSecure,
@@ -35,12 +25,15 @@ function getTransporter(): Transporter {
       user: gmailUser,
       pass: gmailPass,
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
     tls: {
       rejectUnauthorized: false,
     },
-  });
+  };
 
-  return transporter;
+  return nodemailer.createTransport(smtpOptions);
 }
 
 /**
@@ -65,7 +58,7 @@ export async function sendOtpEmail({
       return { success: false, error: 'Email service credentials not configured.' };
     }
 
-    const mailTransporter = getTransporter();
+    const mailTransporter = createGmailTransporter(gmailUser, gmailPass);
 
     let subject = 'Your EMS/HRMS Verification Code';
     let titleText = 'Enterprise Security Authentication';
