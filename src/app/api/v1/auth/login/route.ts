@@ -7,6 +7,16 @@ import { createNotification } from '@/lib/notifications/notificationService';
 
 export const dynamic = 'force-dynamic';
 
+export async function GET() {
+  return NextResponse.json({
+    success: true,
+    service: 'EMS/HRMS Authentication API',
+    endpoint: '/api/v1/auth/login',
+    method: 'POST',
+    status: 'Operational',
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
