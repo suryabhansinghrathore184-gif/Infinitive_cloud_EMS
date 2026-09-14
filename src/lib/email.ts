@@ -14,17 +14,23 @@ let transporter: Transporter | null = null;
 function getTransporter(): Transporter {
   if (transporter) return transporter;
 
-  const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
-  const gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+  const rawUser = process.env.GMAIL_USER || process.env.SMTP_USER || '';
+  const rawPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '';
+
+  const gmailUser = rawUser.trim();
+  const gmailPass = rawPass.trim().replace(/\s+/g, '');
 
   if (!gmailUser || !gmailPass) {
     console.warn('GMAIL_USER or GMAIL_APP_PASSWORD is not configured in environment variables.');
   }
 
+  const port = parseInt(process.env.SMTP_PORT || '465', 10);
+  const isSecure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE !== 'false' : port === 465;
+
   transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '465', 10),
-    secure: process.env.SMTP_SECURE !== 'false',
+    port,
+    secure: isSecure,
     auth: {
       user: gmailUser,
       pass: gmailPass,
@@ -49,8 +55,12 @@ export async function sendOtpEmail({
   role = 'EMPLOYEE',
 }: SendOtpEmailParams): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
-    const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
-    if (!gmailUser || (!process.env.GMAIL_APP_PASSWORD && !process.env.SMTP_PASS)) {
+    const rawUser = process.env.GMAIL_USER || process.env.SMTP_USER || '';
+    const rawPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '';
+    const gmailUser = rawUser.trim();
+    const gmailPass = rawPass.trim().replace(/\s+/g, '');
+
+    if (!gmailUser || !gmailPass) {
       console.error('Email sending failed: Missing GMAIL_USER or GMAIL_APP_PASSWORD credentials.');
       return { success: false, error: 'Email service credentials not configured.' };
     }

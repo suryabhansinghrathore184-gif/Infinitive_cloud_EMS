@@ -127,10 +127,25 @@ export async function POST(req: NextRequest) {
 
     if (!emailResult.success) {
       console.warn(`Failed to dispatch OTP email to ${cleanEmail}:`, emailResult.error);
+      await db.collection('auth_otp_tokens').deleteOne({
+        email: cleanEmail,
+        purpose,
+        otpHash,
+      });
+      await logAuditEvent(req, 'OTP_SEND_FAILED', {
+        details: { email: cleanEmail, purpose, reason: emailResult.error || 'SMTP_DISPATCH_FAILURE' },
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Unable to send the verification code right now. Please check server email settings or try again later.',
+        },
+        { status: 500 }
+      );
     }
 
     await logAuditEvent(req, 'OTP_REQUESTED', {
-      details: { email: cleanEmail, purpose, emailDelivered: emailResult.success },
+      details: { email: cleanEmail, purpose, emailDelivered: true },
     });
 
     return NextResponse.json({
