@@ -42,37 +42,63 @@ const initialAuthState: AuthState = {
   authActivityLogs: [],
 };
 
-export function useAuthStore() {
-  const [state, setState] = useState<AuthState>(initialAuthState);
-  const [isHydrated, setIsHydrated] = useState(false);
+// Global singleton state and listener set
+let globalState: AuthState = initialAuthState;
+let isHydratedGlobal = false;
+const listeners = new Set<() => void>();
 
-  // Hydrate from localStorage on client side
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (saved) {
-        const parsed: AuthState = JSON.parse(saved);
-        // Check lockout status on hydration
-        if (parsed.isLockedOut && parsed.lockoutUntil && Date.now() > parsed.lockoutUntil) {
-          parsed.isLockedOut = false;
-          parsed.lockoutUntil = null;
-          parsed.loginAttempts = 0;
-        }
-        setState(parsed);
+function getInitialState(): AuthState {
+  if (typeof window === 'undefined') return initialAuthState;
+  try {
+    const saved = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (saved) {
+      const parsed: AuthState = JSON.parse(saved);
+      if (parsed.isLockedOut && parsed.lockoutUntil && Date.now() > parsed.lockoutUntil) {
+        parsed.isLockedOut = false;
+        parsed.lockoutUntil = null;
+        parsed.loginAttempts = 0;
       }
-    } catch {
-      // Fallback
-    } finally {
-      setIsHydrated(true);
+      return parsed;
     }
-  }, []);
+  } catch {
+    // Fallback
+  }
+  return initialAuthState;
+}
 
-  // Save state to localStorage
-  useEffect(() => {
-    if (isHydrated) {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(state));
+if (typeof window !== 'undefined') {
+  globalState = getInitialState();
+  isHydratedGlobal = true;
+}
+
+function updateGlobalState(updater: (prev: AuthState) => AuthState) {
+  globalState = updater(globalState);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(globalState));
+    } catch {
+      // Storage error fallback
     }
-  }, [state, isHydrated]);
+  }
+  listeners.forEach((listener) => listener());
+}
+
+export function useAuthStore() {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    // Ensure client hydration
+    if (!isHydratedGlobal && typeof window !== 'undefined') {
+      globalState = getInitialState();
+      isHydratedGlobal = true;
+    }
+
+    const listener = () => setTick((t) => t + 1);
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }, []);
 
   const recordActivity = (
     action: AuthActivityLog['action'],
@@ -81,8 +107,8 @@ export function useAuthStore() {
   ) => {
     const log: AuthActivityLog = {
       id: `act-auth-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      userEmail: userEmail || state.user?.email || 'Guest',
-      userId: state.user?.id,
+      userEmail: userEmail || globalState.user?.email || 'Guest',
+      userId: globalState.user?.id,
       action,
       details,
       ipAddress: '127.0.0.1 (Client)',
@@ -90,24 +116,22 @@ export function useAuthStore() {
       timestamp: new Date().toISOString(),
     };
 
-    setState((prev) => ({
+    updateGlobalState((prev) => ({
       ...prev,
       authActivityLogs: [log, ...(prev.authActivityLogs || []).slice(0, 49)],
     }));
   };
 
   const login = async (payload: LoginPayload): Promise<LoginResponse> => {
-    // Check account lockout
-    if (state.isLockedOut) {
-      if (state.lockoutUntil && Date.now() < state.lockoutUntil) {
-        const minsLeft = Math.ceil((state.lockoutUntil - Date.now()) / (60 * 1000));
+    if (globalState.isLockedOut) {
+      if (globalState.lockoutUntil && Date.now() < globalState.lockoutUntil) {
+        const minsLeft = Math.ceil((globalState.lockoutUntil - Date.now()) / (60 * 1000));
         return {
           success: false,
           message: `Account is temporarily locked due to repeated failed login attempts. Please try again in ${minsLeft} minute(s).`,
         };
       } else {
-        // Reset lockout
-        setState((prev) => ({ ...prev, isLockedOut: false, lockoutUntil: null, loginAttempts: 0 }));
+        updateGlobalState((prev) => ({ ...prev, isLockedOut: false, lockoutUntil: null, loginAttempts: 0 }));
       }
     }
 
@@ -121,7 +145,7 @@ export function useAuthStore() {
       const data: LoginResponse = await response.json();
 
       if (!response.ok || !data.success) {
-        const newAttempts = state.loginAttempts + 1;
+        const newAttempts = globalState.loginAttempts + 1;
         let isLocked = false;
         let lockUntil: number | null = null;
 
@@ -133,7 +157,7 @@ export function useAuthStore() {
           recordActivity('LOGIN_FAILED', `Failed login attempt for ${payload.identifier}`, payload.identifier);
         }
 
-        setState((prev) => ({
+        updateGlobalState((prev) => ({
           ...prev,
           loginAttempts: newAttempts,
           isLockedOut: isLocked,
@@ -145,7 +169,7 @@ export function useAuthStore() {
 
       // Check if 2FA is required
       if (data.requiresTwoFactor && data.twoFactorToken) {
-        setState((prev) => ({
+        updateGlobalState((prev) => ({
           ...prev,
           twoFactorToken: data.twoFactorToken || null,
         }));
@@ -154,7 +178,7 @@ export function useAuthStore() {
 
       // Successful login
       if (data.session) {
-        setState((prev) => ({
+        updateGlobalState((prev) => ({
           ...prev,
           user: data.session!.user,
           accessToken: data.session!.accessToken,
@@ -187,7 +211,7 @@ export function useAuthStore() {
       });
       const data = await response.json();
       if (data.success) {
-        setState((prev) => ({ ...prev, pendingOtpEmail: cleanEmail }));
+        updateGlobalState((prev) => ({ ...prev, pendingOtpEmail: cleanEmail }));
         recordActivity('OTP_REQUESTED', `OTP verification code requested for ${cleanEmail}`, cleanEmail);
       }
       return data;
@@ -196,15 +220,20 @@ export function useAuthStore() {
     }
   };
 
-  const verifyOtp = async (otpCode: string, email?: string): Promise<LoginResponse> => {
+  const verifyOtp = async (
+    otpCode: string,
+    email?: string,
+    twoFactorTokenOverride?: string
+  ): Promise<LoginResponse> => {
     try {
-      const targetEmail = email || state.pendingOtpEmail || undefined;
+      const targetEmail = email || globalState.pendingOtpEmail || undefined;
+      const targetToken = twoFactorTokenOverride || globalState.twoFactorToken || undefined;
       const response = await fetch('/api/v1/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: targetEmail,
-          twoFactorToken: state.twoFactorToken,
+          twoFactorToken: targetToken,
           otpCode,
         }),
       });
@@ -217,7 +246,7 @@ export function useAuthStore() {
       }
 
       if (data.session) {
-        setState((prev) => ({
+        updateGlobalState((prev) => ({
           ...prev,
           user: data.session!.user,
           accessToken: data.session!.accessToken,
@@ -240,7 +269,7 @@ export function useAuthStore() {
   };
 
   const resendOtp = async (email?: string): Promise<{ success: boolean; message: string }> => {
-    const targetEmail = email || state.pendingOtpEmail;
+    const targetEmail = email || globalState.pendingOtpEmail;
     if (targetEmail) {
       return requestOtp(targetEmail);
     }
@@ -248,11 +277,11 @@ export function useAuthStore() {
       const response = await fetch('/api/v1/auth/resend-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ twoFactorToken: state.twoFactorToken }),
+        body: JSON.stringify({ twoFactorToken: globalState.twoFactorToken }),
       });
       const data = await response.json();
       if (data.success && data.twoFactorToken) {
-        setState((prev) => ({ ...prev, twoFactorToken: data.twoFactorToken }));
+        updateGlobalState((prev) => ({ ...prev, twoFactorToken: data.twoFactorToken }));
       }
       return data;
     } catch {
@@ -262,24 +291,26 @@ export function useAuthStore() {
 
   const logout = async (): Promise<void> => {
     try {
-      if (state.accessToken) {
+      if (globalState.accessToken) {
         await fetch('/api/v1/auth/logout', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${state.accessToken}`,
+            Authorization: `Bearer ${globalState.accessToken}`,
           },
         });
       }
     } catch {
       // Ignore network errors during logout
     } finally {
-      recordActivity('LOGOUT', 'User logged out and session cleared', state.user?.email);
-      setState({
+      recordActivity('LOGOUT', 'User logged out and session cleared', globalState.user?.email);
+      updateGlobalState((prev) => ({
         ...initialAuthState,
-        authActivityLogs: state.authActivityLogs, // Retain logs for audit visibility
-      });
-      localStorage.removeItem(AUTH_STORAGE_KEY);
+        authActivityLogs: prev.authActivityLogs,
+      }));
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+      }
     }
   };
 
@@ -316,28 +347,17 @@ export function useAuthStore() {
   };
 
   const getRoleDashboardRoute = (role?: AuthUser['role']): string => {
-    const userRole = role || state.user?.role;
-    switch (userRole) {
-      case 'Super Admin':
-      case 'SUPER_ADMIN':
-        return '/super-admin/dashboard';
-      case 'HR/Admin':
-      case 'ADMIN':
-      case 'HR':
-        return '/admin/dashboard';
-      case 'Manager':
-      case 'MANAGER':
-        return '/manager/dashboard';
-      case 'Employee':
-      case 'EMPLOYEE':
-        return '/employee/dashboard';
-      default:
-        return '/login';
-    }
+    const rawRole = role || globalState.user?.role || '';
+    const norm = rawRole.toUpperCase().replace(/[\s_\-\/]+/g, '');
+    if (norm === 'SUPERADMIN') return '/super-admin/dashboard';
+    if (norm === 'ADMIN' || norm === 'HR' || norm === 'HRADMIN' || norm === 'HRMANAGER') return '/admin/dashboard';
+    if (norm === 'MANAGER') return '/manager/dashboard';
+    if (norm === 'EMPLOYEE') return '/employee/dashboard';
+    return '/login';
   };
 
   const updateUserAvatar = (avatarUrl: string) => {
-    setState((prev) => {
+    updateGlobalState((prev) => {
       if (!prev.user) return prev;
       return {
         ...prev,
@@ -350,15 +370,15 @@ export function useAuthStore() {
   };
 
   return {
-    state,
-    isHydrated,
-    user: state.user,
-    isAuthenticated: state.isAuthenticated,
-    isLockedOut: state.isLockedOut,
-    loginAttempts: state.loginAttempts,
-    lockoutUntil: state.lockoutUntil,
-    pendingOtpEmail: state.pendingOtpEmail,
-    authActivityLogs: state.authActivityLogs || [],
+    state: globalState,
+    isHydrated: isHydratedGlobal,
+    user: globalState.user,
+    isAuthenticated: globalState.isAuthenticated,
+    isLockedOut: globalState.isLockedOut,
+    loginAttempts: globalState.loginAttempts,
+    lockoutUntil: globalState.lockoutUntil,
+    pendingOtpEmail: globalState.pendingOtpEmail,
+    authActivityLogs: globalState.authActivityLogs || [],
     login,
     requestOtp,
     verifyOtp,

@@ -9,6 +9,7 @@ function VerifyOtpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryEmail = searchParams.get('email');
+  const queryToken = searchParams.get('twoFactorToken');
   const { verifyOtp, resendOtp, pendingOtpEmail, getRoleDashboardRoute } = useAuthStore();
 
   const activeEmail = queryEmail || pendingOtpEmail || '';
@@ -66,7 +67,7 @@ function VerifyOtpContent() {
     setIsLoading(true);
 
     try {
-      const response = await verifyOtp(fullCode, activeEmail || undefined);
+      const response = await verifyOtp(fullCode, activeEmail || undefined, queryToken || undefined);
       setIsLoading(false);
 
       if (!response.success) {
