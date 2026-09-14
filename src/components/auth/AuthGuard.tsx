@@ -38,7 +38,23 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) 
     // 3. Authenticated user trying to access unauthorized role route
     if (isAuthenticated && allowedRoles && allowedRoles.length > 0) {
       const userRole = user?.role || '';
-      const hasPermission = allowedRoles.includes(userRole);
+      
+      const normalizeRole = (r: string) => r.toUpperCase().replace(/[\s_\-\/]+/g, '');
+      const normUserRole = normalizeRole(userRole);
+
+      const hasPermission = allowedRoles.some((allowed) => {
+        const normAllowed = normalizeRole(allowed);
+        if (normAllowed === normUserRole) return true;
+        if (normUserRole === 'SUPERADMIN') return true;
+        if (normUserRole === 'EMPLOYEE' && normAllowed === 'EMPLOYEE') return true;
+        if (normUserRole === 'MANAGER' && normAllowed === 'MANAGER') return true;
+        if (
+          (normUserRole === 'ADMIN' || normUserRole === 'HR') &&
+          (normAllowed === 'ADMIN' || normAllowed === 'HR' || normAllowed === 'HRADMIN' || normAllowed === 'HRMANAGER')
+        )
+          return true;
+        return false;
+      });
 
       if (!hasPermission) {
         setAuthError(`Access Denied: Your account role (${userRole}) is not authorized to view ${pathname}.`);
