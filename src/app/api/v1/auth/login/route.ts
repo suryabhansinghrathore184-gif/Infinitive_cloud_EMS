@@ -4,6 +4,7 @@ import { ensureDefaultUsersSeeded, UserRole } from '@/lib/auth';
 import { verifyPassword, hashPassword, generateSecureToken, generateNumericOTP, hashToken } from '@/lib/cryptoAuth';
 import { getSecurityConfig, checkAccountLockout, recordFailedLogin, recordSuccessfulLogin } from '@/lib/securityPolicy';
 import { createNotification } from '@/lib/notifications/notificationService';
+import { sendOtpEmail } from '@/lib/email';
 
 export const dynamic = 'force-dynamic';
 
@@ -148,7 +149,19 @@ export async function POST(req: NextRequest) {
         createdAt: now,
       });
 
-      // Dispatch real email / notification
+      // Dispatch real email via Nodemailer/Gmail SMTP
+      try {
+        await sendOtpEmail({
+          to: userDoc.email,
+          otp: otpCode,
+          purpose: '2FA',
+          userName: userDoc.name || `${userDoc.firstName || ''} ${userDoc.lastName || ''}`.trim(),
+        });
+      } catch (emailErr) {
+        console.warn('2FA Email dispatch warning:', emailErr);
+      }
+
+      // Dispatch internal system notification
       try {
         await createNotification({
           organizationId: userDoc.organizationId || 'org-default',
