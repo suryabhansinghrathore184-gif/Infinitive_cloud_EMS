@@ -1,105 +1,85 @@
 'use client';
 
-import React from 'react';
-import Link from 'next/link';
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AuthGuard } from '@/components/auth/AuthGuard';
-import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useAuthStore } from '@/store/authStore';
-import { formatRoleLabel } from '@/lib/roleUtils';
-import { User, Clock, CalendarDays, FileText, CheckCircle2, MessageSquare } from 'lucide-react';
+import { Building2, LogOut, ShieldCheck, Clock, RefreshCw } from 'lucide-react';
 
 export default function EmployeeDashboardPage() {
-  const { user } = useAuthStore();
+  const router = useRouter();
+  const { user, logout } = useAuthStore();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    await logout();
+    router.replace('/login?logged_out=true');
+  };
 
   return (
-    <AuthGuard allowedRoles={['Employee', 'Super Admin']}>
-      <AdminLayout
-        pageTitle="Employee Portal"
-        breadcrumbs={[{ label: 'My Workspace', href: '/employee/dashboard' }]}
-      >
-        {/* Welcome Header */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <AuthGuard allowedRoles={['EMPLOYEE', 'SUPER_ADMIN']}>
+      <div className="flex min-h-screen w-full items-center justify-center bg-slate-950 p-4 font-sans text-slate-100">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-indigo-900/30 via-slate-950 to-slate-950 pointer-events-none" />
+
+        <div className="relative w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-2xl backdrop-blur-xl text-center space-y-6">
+          {/* Header Icon */}
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-600 to-sky-500 text-white shadow-lg shadow-indigo-600/30">
+            <Building2 className="h-8 w-8" />
+          </div>
+
           <div>
-            <h2 className="text-xl font-bold text-slate-900">
-              Welcome back, {user?.name || 'Employee'}!
-            </h2>
-            <p className="text-xs text-slate-500">
-              View your attendance record, leave balances, downloaded payslips, and personal documents.
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/10 px-3 py-1 text-xs font-bold text-indigo-400 border border-indigo-500/20">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+              Authenticated as {user?.role || 'EMPLOYEE'}
+            </span>
+            <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-white">
+              Employee Panel Coming Soon
+            </h1>
+            <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+              Welcome, <strong className="text-white font-semibold">{user?.name || user?.email || 'Employee'}</strong>! Your account has been authenticated successfully. The Employee self-service workspace is currently under development.
             </p>
           </div>
-          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 border border-amber-200">
-            {formatRoleLabel(user?.role || 'EMPLOYEE')}
-          </span>
-        </div>
 
-        {/* Employee Summary Cards */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[11px] font-semibold">Today Status</span>
-              <Clock className="h-4 w-4 text-emerald-500" />
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-left text-xs space-y-2 font-mono text-slate-400">
+            <div className="flex items-center justify-between">
+              <span>Employee ID:</span>
+              <span className="font-bold text-slate-200">{user?.employeeId || 'EMP1001'}</span>
             </div>
-            <p className="mt-2 text-2xl font-black text-emerald-600">Checked In</p>
-            <p className="mt-0.5 text-[10px] text-slate-400">Time: 09:14 AM (GPS)</p>
+            <div className="flex items-center justify-between border-t border-slate-800/80 pt-2">
+              <span>Email:</span>
+              <span className="font-bold text-slate-200">{user?.email || 'employee@organization.com'}</span>
+            </div>
+            <div className="flex items-center justify-between border-t border-slate-800/80 pt-2">
+              <span>Session Status:</span>
+              <span className="font-bold text-emerald-400 flex items-center gap-1">
+                <Clock className="h-3 w-3" /> Active
+              </span>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[11px] font-semibold">Leave Balance</span>
-              <CalendarDays className="h-4 w-4 text-blue-500" />
-            </div>
-            <p className="mt-2 text-2xl font-black text-slate-900">18 Days</p>
-            <p className="mt-0.5 text-[10px] text-blue-600 font-semibold">12 Casual + 6 Sick</p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[11px] font-semibold">Latest Payslip</span>
-              <FileText className="h-4 w-4 text-purple-500" />
-            </div>
-            <p className="mt-2 text-base font-extrabold text-slate-900">August 2026</p>
-            <p className="mt-0.5 text-[10px] text-purple-600 font-bold">Ready to Download</p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[11px] font-semibold">Self Rating</span>
-              <CheckCircle2 className="h-4 w-4 text-amber-500" />
-            </div>
-            <p className="mt-2 text-2xl font-black text-slate-900">4.5 / 5.0</p>
-            <p className="mt-0.5 text-[10px] text-slate-400">H1 Review Complete</p>
-          </div>
-        </div>
-
-        {/* Employee Self-Service Shortcuts */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-          <h3 className="text-sm font-bold text-slate-900">Employee Self-Service (ESS) Hub</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-1.5">
-              <h4 className="font-bold text-slate-900">Apply Time-Off</h4>
-              <p className="text-[11px] text-slate-500">Submit casual, sick, or earned leave requests to your manager.</p>
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-1.5">
-              <h4 className="font-bold text-slate-900">Download Salary Slips</h4>
-              <p className="text-[11px] text-slate-500">View and print confidential monthly payslip PDFs.</p>
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-1.5">
-              <h4 className="font-bold text-slate-900">Update Profile Details</h4>
-              <p className="text-[11px] text-slate-500">Manage emergency contacts, address, and profile photo.</p>
-            </div>
-            <Link
-              href="/employee/messages"
-              className="rounded-xl border border-indigo-100 bg-indigo-50/60 hover:bg-indigo-100/70 p-4 space-y-1.5 transition-colors group"
+          <div className="border-t border-slate-800/80 pt-4">
+            <p className="text-xs text-slate-400 mb-4">You may safely log out of your session below:</p>
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 py-3 text-xs font-bold text-white border border-slate-700 shadow-lg transition-all disabled:opacity-50 cursor-pointer"
             >
-              <h4 className="font-bold text-indigo-900 flex items-center justify-between">
-                <span>HR Direct Messages</span>
-                <MessageSquare className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform" />
-              </h4>
-              <p className="text-[11px] text-indigo-700">Read private HR notices and reply to HR messages.</p>
-            </Link>
+              {isLoggingOut ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin text-slate-400" />
+                  <span>Logging Out...</span>
+                </>
+              ) : (
+                <>
+                  <LogOut className="h-4 w-4 text-rose-400" />
+                  <span>Log Out of Employee Session</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
-      </AdminLayout>
+      </div>
     </AuthGuard>
   );
 }

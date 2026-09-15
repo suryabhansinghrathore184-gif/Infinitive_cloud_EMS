@@ -11,16 +11,19 @@ interface AdminLayoutProps {
   children: React.ReactNode;
   pageTitle?: string;
   breadcrumbs?: { label: string; href?: string }[];
+  allowedRoles?: string[];
 }
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
   children,
   breadcrumbs = [],
+  allowedRoles,
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const rolesToGuard = allowedRoles || ['HR/Admin', 'Super Admin', 'ADMIN', 'HR', 'SUPER_ADMIN'];
 
   return (
-    <AuthGuard allowedRoles={['HR/Admin', 'Super Admin']}>
+    <AuthGuard allowedRoles={rolesToGuard}>
       <div className="flex h-screen w-full overflow-hidden bg-slate-50 font-sans text-slate-800 antialiased">
         {/* Sidebar */}
         <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
