@@ -130,6 +130,14 @@ export async function ensureDefaultUsersSeeded(): Promise<void> {
           },
           { upsert: true }
         );
+      } else {
+        // Ensure existing seed users maintain their correct canonical role, employeeId, and id
+        if (!existingUser.role || existingUser.role !== u.role || !existingUser.employeeId || !existingUser.id) {
+          await db.collection('users').updateOne(
+            { email: u.email },
+            { $set: { role: u.role, employeeId: u.employeeId, id: u.id, updatedAt: now } }
+          );
+        }
       }
     }
     seedCompleted = true;
@@ -195,10 +203,27 @@ export function getAuthContext(req: NextRequest): AuthContext {
           ? 'MANAGER'
           : 'EMPLOYEE';
 
+      let resolvedEmail = uId.includes('@') ? uId : '';
+      if (!resolvedEmail) {
+        if (uId === 'usr-super-01' || normRole === 'SUPER_ADMIN') {
+          resolvedEmail = 'superadmin@organization.com';
+        } else if (uId === 'usr-admin-01' || normRole === 'ADMIN') {
+          resolvedEmail = 'admin@organization.com';
+        } else if (uId === 'usr-mgr-01' || normRole === 'MANAGER') {
+          resolvedEmail = 'manager@organization.com';
+        } else if (uId === 'usr-emp-01' || normRole === 'EMPLOYEE') {
+          resolvedEmail = 'employee@organization.com';
+        } else {
+          resolvedEmail = `${uId}@organization.com`;
+        }
+      }
+
+      const resolvedName = normRole === 'SUPER_ADMIN' ? 'Super Administrator' : normRole === 'ADMIN' ? 'Suryabhan Singh Rathore' : normRole === 'MANAGER' ? 'Vikramaditya Sharma' : 'Aarav Sharma';
+
       return {
-        userId: uId || 'usr-admin-01',
-        email: `${uId}@organization.com`,
-        name: 'Authenticated User',
+        userId: uId || (normRole === 'SUPER_ADMIN' ? 'usr-super-01' : normRole === 'ADMIN' ? 'usr-admin-01' : normRole === 'MANAGER' ? 'usr-mgr-01' : 'usr-emp-01'),
+        email: resolvedEmail,
+        name: resolvedName,
         role: normRole,
         organizationId: orgId || 'org-default',
         employeeId: empId,
@@ -217,22 +242,27 @@ export function getAuthContext(req: NextRequest): AuthContext {
       ? 'EMPLOYEE'
       : 'ADMIN';
 
+    const empIdFallback = detectedRole === 'SUPER_ADMIN' ? 'SUP0001' : detectedRole === 'ADMIN' ? 'EMP9201' : detectedRole === 'MANAGER' ? 'MGR1001' : 'EMP1001';
+    const emailFallback = detectedRole === 'SUPER_ADMIN' ? 'superadmin@organization.com' : detectedRole === 'ADMIN' ? 'admin@organization.com' : detectedRole === 'MANAGER' ? 'manager@organization.com' : 'employee@organization.com';
+    const userIdFallback = detectedRole === 'SUPER_ADMIN' ? 'usr-super-01' : detectedRole === 'ADMIN' ? 'usr-admin-01' : detectedRole === 'MANAGER' ? 'usr-mgr-01' : 'usr-emp-01';
+    const nameFallback = detectedRole === 'SUPER_ADMIN' ? 'Super Administrator' : detectedRole === 'ADMIN' ? 'Suryabhan Singh Rathore' : detectedRole === 'MANAGER' ? 'Vikramaditya Sharma' : 'Aarav Sharma';
+
     return {
-      userId: 'usr-admin-01',
-      email: 'admin@organization.com',
-      name: 'Admin User',
+      userId: userIdFallback,
+      email: emailFallback,
+      name: nameFallback,
       role: detectedRole,
       organizationId: 'org-default',
-      employeeId: 'EMP9201',
+      employeeId: empIdFallback,
       isAuthenticated: true,
       sessionId: sessionToken,
     };
   }
 
-  // Default Authenticated Context Fallback (prevents background fetch 401 errors)
+  // Default Authenticated Context Fallback (Super Admin default)
   return {
-    userId: 'usr-admin-01',
-    email: 'admin@organization.com',
+    userId: 'usr-super-01',
+    email: 'superadmin@organization.com',
     name: 'Super Administrator',
     role: 'SUPER_ADMIN',
     organizationId: 'org-default',

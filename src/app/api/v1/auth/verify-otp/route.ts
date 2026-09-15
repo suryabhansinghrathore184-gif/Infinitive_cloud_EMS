@@ -179,7 +179,12 @@ export async function POST(req: NextRequest) {
       ? 'MANAGER'
       : 'EMPLOYEE';
 
-    const empId = userDoc.employeeId || 'EMP1001';
+    const empId = userDoc.employeeId || (
+      isSuperAdmin ? 'SUP0001' :
+      normalizedRole === 'ADMIN' ? 'EMP9201' :
+      normalizedRole === 'MANAGER' ? 'MGR1001' :
+      'EMP1001'
+    );
     const orgId = userDoc.organizationId || 'org-default';
     const userIdStr = userDoc.id || userDoc._id.toString();
 
