@@ -9,7 +9,7 @@ export async function POST(
 ) {
   try {
     const auth = getAuthContext(req);
-    const perm = checkPermissions(auth, ['SUPER_ADMIN', 'ADMIN']);
+    const perm = checkPermissions(auth, ['SUPER_ADMIN']);
     if (!perm.isAllowed) {
       return NextResponse.json({ success: false, message: perm.message }, { status: perm.statusCode });
     }

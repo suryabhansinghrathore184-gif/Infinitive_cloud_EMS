@@ -12,7 +12,7 @@ import { decryptSecret, maskSecret, isEncryptionConfigured } from '@/lib/integra
 export async function GET(req: NextRequest) {
   try {
     const auth = getAuthContext(req);
-    const perm = checkPermissions(auth, ['SUPER_ADMIN', 'ADMIN', 'HR']);
+    const perm = checkPermissions(auth, ['SUPER_ADMIN']);
     if (!perm.isAllowed) {
       return NextResponse.json({ success: false, message: perm.message }, { status: perm.statusCode });
     }
@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
     // Compute dynamic summary metrics
     const integrationsList = [
       {
-        id: 'integ-gridfs',
+        id: 'gridfs',
         provider: 'gridfs',
         name: 'MongoDB GridFS Storage Driver',
         category: 'Document Storage',
@@ -165,7 +165,7 @@ export async function GET(req: NextRequest) {
         },
       },
       {
-        id: 'integ-whatsapp',
+        id: 'whatsapp',
         provider: 'whatsapp',
         name: 'WhatsApp Business API',
         category: 'Messaging & Alerts',
@@ -183,7 +183,7 @@ export async function GET(req: NextRequest) {
         config: whatsappMaskedConfig,
       },
       {
-        id: 'integ-biometric',
+        id: 'biometric',
         provider: 'biometric',
         name: 'Biometric Attendance Gateway',
         category: 'Hardware Integration',
@@ -201,7 +201,7 @@ export async function GET(req: NextRequest) {
         config: biometricMaskedConfig,
       },
       {
-        id: 'integ-microsoft',
+        id: 'microsoft',
         provider: 'microsoft',
         name: 'Microsoft 365 / Teams',
         category: 'Enterprise Suite',
@@ -228,10 +228,35 @@ export async function GET(req: NextRequest) {
       disabled: integrationsList.filter((i) => i.status === 'DISABLED').length,
     };
 
+    // Activity Stream from audit_logs
+    const activityLogs = await db
+      .collection('audit_logs')
+      .find({
+        $or: [
+          { action: { $regex: /INTEGRATION/i } },
+          { action: { $regex: /BIOMETRIC/i } },
+          { action: { $in: ['TEST_INTEGRATION', 'CONFIGURE_INTEGRATION', 'ENABLE_INTEGRATION', 'DISABLE_INTEGRATION', 'DISCONNECT_INTEGRATION', 'SYNC_BIOMETRIC_PUNCHES'] } }
+        ]
+      })
+      .sort({ timestamp: -1, createdAt: -1 })
+      .limit(10)
+      .toArray();
+
+    const activityStream = activityLogs.map((log) => ({
+      id: log._id?.toString() || Math.random().toString(),
+      action: log.action,
+      userEmail: log.userEmail || log.userId || 'System Admin',
+      timestamp: log.timestamp || log.createdAt || new Date().toISOString(),
+      details: log.details || {},
+    }));
+
     return NextResponse.json({
       success: true,
       metrics,
       integrations: integrationsList,
+      data: integrationsList,
+      activityStream,
+      lastHealthCheck: new Date().toISOString(),
       encryptionConfigured: isEncryptionConfigured(),
     });
   } catch (err: any) {
