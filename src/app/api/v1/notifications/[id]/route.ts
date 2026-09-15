@@ -27,9 +27,12 @@ export async function DELETE(
     } catch {}
 
     const query: any = {
-      organizationId: auth.organizationId,
       $or: objectId ? [{ id }, { _id: objectId }] : [{ id }],
     };
+
+    if (auth.role !== 'SUPER_ADMIN') {
+      query.organizationId = auth.organizationId;
+    }
 
     const notif = await db.collection('notifications').findOne(query);
 
@@ -50,11 +53,12 @@ export async function DELETE(
     );
 
     // Audit Event
-    await logAuditEvent(req, 'DELETE_NOTIFICATION', {
+    await logAuditEvent(req, 'NOTIFICATION_DELETED', {
       details: {
         notificationId: id,
         title: notif.title,
         eventType: notif.eventType,
+        category: notif.category,
       },
     });
 

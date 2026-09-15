@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthContext, checkPermissions } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/mongodb';
+import { logAuditEvent } from '@/lib/audit';
 import { ObjectId } from 'mongodb';
 
 export const dynamic = 'force-dynamic';
@@ -26,9 +27,12 @@ export async function PATCH(
     } catch {}
 
     const query: any = {
-      organizationId: auth.organizationId,
       $or: objectId ? [{ id }, { _id: objectId }] : [{ id }],
     };
+
+    if (auth.role !== 'SUPER_ADMIN') {
+      query.organizationId = auth.organizationId;
+    }
 
     const notif = await db.collection('notifications').findOne(query);
 
@@ -47,6 +51,15 @@ export async function PATCH(
         },
       }
     );
+
+    // Audit Event
+    await logAuditEvent(req, 'NOTIFICATION_READ', {
+      details: {
+        notificationId: id,
+        category: notif.category,
+        title: notif.title,
+      },
+    });
 
     return NextResponse.json({
       success: true,
