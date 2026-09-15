@@ -47,7 +47,7 @@ export const SuperAdminHeader: React.FC<SuperAdminHeaderProps> = ({
 
   const handleLogout = async () => {
     await logout();
-    router.push('/login');
+    router.push('/super-admin/dashboard');
   };
 
   const roleDisplay = formatRoleLabel(user?.role || 'SUPER_ADMIN');

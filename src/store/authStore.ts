@@ -355,7 +355,7 @@ export function useAuthStore() {
     if (norm === 'ADMIN' || norm === 'HR' || norm === 'HRADMIN' || norm === 'HRMANAGER') return '/admin/dashboard';
     if (norm === 'MANAGER') return '/manager/dashboard';
     if (norm === 'EMPLOYEE') return '/employee/dashboard';
-    return '/login';
+    return '/super-admin/dashboard';
   };
 
   const updateUserAvatar = (avatarUrl: string) => {

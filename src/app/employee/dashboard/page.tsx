@@ -14,7 +14,7 @@ export default function EmployeeDashboardPage() {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     await logout();
-    router.replace('/login?logged_out=true');
+    router.replace('/super-admin/dashboard');
   };
 
   return (

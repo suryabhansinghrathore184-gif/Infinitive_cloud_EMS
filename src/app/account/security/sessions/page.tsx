@@ -100,7 +100,7 @@ export default function UserSessionsPage() {
           {/* Header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-4">
             <div>
-              <Link href="/login" className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-white mb-2">
+              <Link href="/super-admin/dashboard" className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-white mb-2">
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Back to Dashboard
               </Link>

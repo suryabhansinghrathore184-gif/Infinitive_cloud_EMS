@@ -35,7 +35,7 @@ export const PublicHeader: React.FC = () => {
         {/* Employee Login Button */}
         <div className="flex items-center gap-3">
           <Link
-            href="/login"
+            href="/super-admin/dashboard"
             className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-blue-500 hover:to-indigo-500 transition"
           >
             <Lock className="h-3.5 w-3.5" />

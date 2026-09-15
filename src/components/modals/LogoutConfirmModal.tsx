@@ -23,8 +23,8 @@ export const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({ isOpen, 
       await logout();
       onClose();
       // Replace history state so back button cannot navigate back into protected pages
-      window.history.pushState(null, '', '/login');
-      router.replace('/login?logged_out=true');
+      window.history.pushState(null, '', '/super-admin/dashboard');
+      router.replace('/super-admin/dashboard');
     } catch {
       setIsLoggingOut(false);
       onClose();
