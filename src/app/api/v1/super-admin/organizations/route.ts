@@ -17,17 +17,35 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
 
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '20', 10)));
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '10', 10)));
     const search = searchParams.get('search')?.trim() || '';
     const statusFilter = searchParams.get('status')?.trim() || 'All';
+    const industryFilter = searchParams.get('industry')?.trim() || 'All';
+    const locationFilter = searchParams.get('location')?.trim() || 'All';
 
     let query: any = {};
     if (statusFilter !== 'All') {
       query.status = statusFilter;
     }
+    if (industryFilter !== 'All') {
+      query.$or = [
+        { 'organization.industry': new RegExp(industryFilter, 'i') },
+        { industry: new RegExp(industryFilter, 'i') },
+      ];
+    }
+    if (locationFilter !== 'All') {
+      const locRegex = new RegExp(locationFilter, 'i');
+      query.$or = [
+        { 'organization.city': locRegex },
+        { 'organization.country': locRegex },
+        { city: locRegex },
+        { country: locRegex },
+      ];
+    }
     if (search) {
       const regex = new RegExp(search, 'i');
       query.$or = [
+        { name: regex },
         { 'organization.name': regex },
         { 'organization.code': regex },
         { 'organization.industry': regex },
@@ -35,14 +53,29 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    const totalCount = await db.collection('organization_settings').countDocuments(query);
-    const orgDocs = await db
-      .collection('organization_settings')
-      .find(query)
-      .sort({ createdAt: -1, updatedAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .toArray();
+    // Concurrent DB queries for pagination & summary KPIs
+    const [
+      totalOrgsCount,
+      activeOrgsCount,
+      inactiveOrgsCount,
+      totalEmployeesCount,
+      totalUsersCount,
+      filteredCount,
+      orgDocs,
+    ] = await Promise.all([
+      db.collection('organization_settings').countDocuments(),
+      db.collection('organization_settings').countDocuments({ status: { $ne: 'Inactive' } }),
+      db.collection('organization_settings').countDocuments({ status: 'Inactive' }),
+      db.collection('employees').countDocuments(),
+      db.collection('users').countDocuments(),
+      db.collection('organization_settings').countDocuments(query),
+      db.collection('organization_settings')
+        .find(query)
+        .sort({ createdAt: -1, updatedAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .toArray(),
+    ]);
 
     // Map each organization with employee count and user count from database
     const orgsWithCounts = await Promise.all(
@@ -60,14 +93,14 @@ export async function GET(req: NextRequest) {
           name: orgDetails.name || doc.name || 'Enterprise Organization',
           legalName: orgDetails.legalName || orgDetails.name || 'Enterprise HRMS Ltd.',
           code: orgDetails.code || 'ORG-001',
-          industry: orgDetails.industry || 'Technology & HR SaaS',
-          email: orgDetails.contactEmail || orgDetails.email || 'admin@organization.com',
-          phone: orgDetails.contactPhone || orgDetails.phone || '+91 22 1000 2000',
-          city: orgDetails.city || 'Mumbai',
-          state: orgDetails.state || 'Maharashtra',
-          country: orgDetails.country || 'India',
-          timezone: orgDetails.timezone || 'Asia/Kolkata (IST +05:30)',
-          currency: orgDetails.currency || 'INR (₹)',
+          industry: orgDetails.industry || doc.industry || 'Technology & HR SaaS',
+          email: orgDetails.contactEmail || orgDetails.email || doc.email || 'admin@organization.com',
+          phone: orgDetails.contactPhone || orgDetails.phone || doc.phone || '+91 22 1000 2000',
+          city: orgDetails.city || doc.city || 'Mumbai',
+          state: orgDetails.state || doc.state || 'Maharashtra',
+          country: orgDetails.country || doc.country || 'India',
+          timezone: orgDetails.timezone || doc.timezone || 'Asia/Kolkata (IST +05:30)',
+          currency: orgDetails.currency || doc.currency || 'INR (₹)',
           status: doc.status || 'Active',
           employeeCount: empCount,
           userCount: userCount,
@@ -81,11 +114,18 @@ export async function GET(req: NextRequest) {
       success: true,
       data: {
         organizations: orgsWithCounts,
+        summaryKpis: {
+          totalOrganizations: Math.max(1, totalOrgsCount),
+          activeOrganizations: Math.max(1, activeOrgsCount),
+          inactiveOrganizations: inactiveOrgsCount,
+          totalWorkforce: totalEmployeesCount,
+          totalSystemUsers: Math.max(totalUsersCount, totalEmployeesCount),
+        },
         pagination: {
-          total: totalCount,
+          total: filteredCount,
           page,
           limit,
-          totalPages: Math.ceil(totalCount / limit) || 1,
+          totalPages: Math.ceil(filteredCount / limit) || 1,
         },
       },
     });
@@ -116,12 +156,12 @@ export async function POST(req: NextRequest) {
     const newOrgId = `org-${Date.now()}`;
 
     // Check duplicate code
-    const existing = await db.collection('organization_settings').findOne({
-      $or: [{ 'organization.code': orgCode }, { organizationId: newOrgId }],
+    const existingCode = await db.collection('organization_settings').findOne({
+      $or: [{ 'organization.code': orgCode }, { code: orgCode }],
     });
 
-    if (existing) {
-      return NextResponse.json({ success: false, message: `Organization code "${orgCode}" already exists.` }, { status: 400 });
+    if (existingCode) {
+      return NextResponse.json({ success: false, message: `Organization code "${orgCode}" already exists. Please choose a unique code.` }, { status: 400 });
     }
 
     const newOrgDoc = {
@@ -132,7 +172,7 @@ export async function POST(req: NextRequest) {
         name: name.trim(),
         legalName: legalName?.trim() || name.trim(),
         code: orgCode,
-        industry: industry?.trim() || 'Software & Enterprise Services',
+        industry: industry?.trim() || 'Software & Technology',
         email: email?.trim() || '',
         phone: phone?.trim() || '',
         city: city?.trim() || 'Mumbai',
@@ -147,7 +187,7 @@ export async function POST(req: NextRequest) {
 
     const res = await db.collection('organization_settings').insertOne(newOrgDoc as any);
 
-    await logAuditEvent(req, 'CREATE_ORGANIZATION', { details: { organizationId: newOrgId, name, code: orgCode } });
+    await logAuditEvent(req, 'ORGANIZATION_CREATED', { details: { organizationId: newOrgId, name, code: orgCode } });
 
     return NextResponse.json({
       success: true,

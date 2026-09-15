@@ -30,12 +30,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
 
     const effectiveOrgId = doc.organizationId || doc._id.toString();
-    const [empCount, userCount, depts, locs] = await Promise.all([
+    const [empCount, activeEmpCount, userCount, depts, locs] = await Promise.all([
       db.collection('employees').countDocuments({ organizationId: effectiveOrgId }),
+      db.collection('employees').countDocuments({ organizationId: effectiveOrgId, status: 'Active' }),
       db.collection('users').countDocuments({ organizationId: effectiveOrgId }),
       db.collection('departments').find({ organizationId: effectiveOrgId }).toArray(),
       db.collection('locations').find({ organizationId: effectiveOrgId }).toArray(),
     ]);
+
+    await logAuditEvent(req, 'ORGANIZATION_VIEWED', { details: { organizationId: effectiveOrgId, name: doc.name } });
 
     return NextResponse.json({
       success: true,
@@ -46,11 +49,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         status: doc.status || 'Active',
         details: doc.organization || {},
         employeeCount: empCount,
+        activeEmployeeCount: activeEmpCount,
+        inactiveEmployeeCount: Math.max(0, empCount - activeEmpCount),
         userCount: userCount,
         departments: depts,
         locations: locs,
-        createdAt: doc.createdAt,
-        updatedAt: doc.updatedAt,
+        createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
+        updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : new Date().toISOString(),
       },
     });
   } catch (error: any) {
@@ -107,11 +112,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       { $set: updateFields }
     );
 
-    await logAuditEvent(req, 'UPDATE_ORGANIZATION', { details: { targetId, updateFields } });
+    // Audit logs for status change & updates
+    if (status && status !== existing.status) {
+      const actionType = status === 'Active' ? 'ORGANIZATION_ACTIVATED' : 'ORGANIZATION_DEACTIVATED';
+      await logAuditEvent(req, actionType, { details: { targetId, previousStatus: existing.status, newStatus: status } });
+    } else {
+      await logAuditEvent(req, 'ORGANIZATION_UPDATED', { details: { targetId, updateFields } });
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Organization updated successfully.',
+      message: status ? `Organization status updated to ${status}.` : 'Organization updated successfully.',
       data: { ...existing, ...updateFields },
     });
   } catch (error: any) {
