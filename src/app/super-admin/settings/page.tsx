@@ -77,6 +77,7 @@ export default function SuperAdminSettingsPage() {
 
   const [settings, setSettings] = useState<SystemSettingsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -112,43 +113,57 @@ export default function SuperAdminSettingsPage() {
     }
   }, [user]);
 
-  // Fetch Settings & Profile Info
+  // Robust, decoupled data fetcher avoiding infinite loading state
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
-    try {
-      const [settingsRes, meRes, healthRes] = await Promise.all([
-        fetch('/api/v1/super-admin/settings'),
-        fetch('/api/v1/auth/me'),
-        fetch('/api/v1/super-admin/settings/health'),
-      ]);
+    setLoadError(null);
 
+    // 1. Fetch System Settings
+    try {
+      const settingsRes = await fetch('/api/v1/super-admin/settings');
       if (settingsRes.ok) {
         const result = await settingsRes.json();
         if (result.success && result.data) {
           setSettings(result.data);
+        } else {
+          setLoadError(result.message || 'Failed to load system settings from server.');
         }
+      } else {
+        const errJson = await settingsRes.json().catch(() => ({}));
+        setLoadError(errJson.message || `Server returned error status ${settingsRes.status}`);
       }
+    } catch (err: any) {
+      console.error('Error fetching global settings:', err);
+      setLoadError(err.message || 'Network communication error while connecting to system settings API.');
+    } finally {
+      setIsLoading(false);
+    }
 
+    // 2. Fetch User Profile Info (Safely decoupled)
+    try {
+      const meRes = await fetch('/api/v1/auth/me');
       if (meRes.ok) {
         const meResult = await meRes.json();
-        if (meResult.success && meResult.user) {
-          if (meResult.user.avatar) {
-            setProfileAvatar(meResult.user.avatar);
-            updateUserAvatar(meResult.user.avatar);
-          }
+        if (meResult.success && meResult.user && meResult.user.avatar) {
+          setProfileAvatar(meResult.user.avatar);
+          updateUserAvatar(meResult.user.avatar);
         }
       }
+    } catch (meErr) {
+      console.warn('Non-blocking error fetching user profile:', meErr);
+    }
 
+    // 3. Fetch Health status (Safely decoupled)
+    try {
+      const healthRes = await fetch('/api/v1/super-admin/settings/health');
       if (healthRes.ok) {
         const healthResult = await healthRes.json();
         if (healthResult.success && healthResult.data) {
           setDbHealth(healthResult.data);
         }
       }
-    } catch (err) {
-      console.error('Error fetching global settings:', err);
-    } finally {
-      setIsLoading(false);
+    } catch (healthErr) {
+      console.warn('Non-blocking error fetching DB health:', healthErr);
     }
   }, [updateUserAvatar]);
 
@@ -197,7 +212,9 @@ export default function SuperAdminSettingsPage() {
       const result = await res.json();
       if (res.ok && result.success) {
         setMessage({ type: 'success', text: 'Global system settings saved successfully.' });
-        fetchSettings();
+        if (result.data) {
+          setSettings(result.data);
+        }
       } else {
         setMessage({ type: 'error', text: result.message || 'Failed to save system settings.' });
       }
@@ -212,37 +229,30 @@ export default function SuperAdminSettingsPage() {
   const validateAndSelectFile = async (file: File) => {
     setFileError(null);
 
-    // 1. Extension check
     const ext = file.name.split('.').pop()?.toLowerCase();
     if (!ext || !['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
       setFileError('Invalid file extension. Only .jpg, .jpeg, .png, and .webp files are allowed.');
       return;
     }
 
-    // 2. MIME type check
     if (!ALLOWED_MIME_TYPES.includes(file.type.toLowerCase())) {
       setFileError('Invalid image format. Supported formats: JPG, JPEG, PNG, WEBP.');
       return;
     }
 
-    // 3. File size check
     if (file.size > MAX_FILE_SIZE) {
       const mbSize = (file.size / (1024 * 1024)).toFixed(2);
       setFileError(`File size (${mbSize} MB) exceeds maximum allowed size of 5 MB.`);
       return;
     }
 
-    // 4. Magic byte signature check
     try {
       const arrayBuffer = await file.slice(0, 4).arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
       let isValidMagic = false;
 
-      // JPEG: FF D8 FF
       if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) isValidMagic = true;
-      // PNG: 89 50 4E 47
       if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) isValidMagic = true;
-      // WEBP: RIFF header 52 49 46 46
       if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) isValidMagic = true;
 
       if (!isValidMagic) {
@@ -517,13 +527,28 @@ export default function SuperAdminSettingsPage() {
         </div>
       </div>
 
-      {/* Settings Grid */}
-      {isLoading || !settings ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-16 text-slate-400">
+      {/* Settings Grid States: Loading, Error, or Settings Content */}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-16 text-slate-400 shadow-xs">
           <RefreshCw className="h-8 w-8 animate-spin text-indigo-600" />
-          <p className="mt-3 text-xs font-medium text-slate-600">Loading system settings...</p>
+          <p className="mt-3 text-xs font-medium text-slate-600">Loading system settings from MongoDB...</p>
         </div>
-      ) : (
+      ) : loadError && !settings ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-rose-200 bg-rose-50/50 p-12 text-center shadow-xs space-y-3">
+          <AlertCircle className="h-10 w-10 text-rose-600" />
+          <div>
+            <h3 className="text-base font-extrabold text-rose-950">Unable to load system settings</h3>
+            <p className="mt-1 text-xs text-rose-700 max-w-md">{loadError}</p>
+          </div>
+          <button
+            onClick={fetchSettings}
+            className="flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2 text-xs font-bold text-white shadow-md transition-colors cursor-pointer mt-2"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>Retry Settings Load</span>
+          </button>
+        </div>
+      ) : settings ? (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Section 2: Access & Maintenance Controls */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
@@ -863,7 +888,7 @@ export default function SuperAdminSettingsPage() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* UPDATE PROFILE PHOTO MODAL */}
       {isUploadModalOpen && (
