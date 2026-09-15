@@ -134,6 +134,15 @@ export async function ensureProductionIndexes(db: Db): Promise<void> {
     await db.collection('auth_otp_tokens').createIndex({ email: 1, purpose: 1, expiresAt: -1 });
     await db.collection('auth_otp_tokens').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
     await db.collection('auth_otp_tokens').createIndex({ userId: 1, createdAt: -1 });
+
+    // 12. Authoritative User Sessions Store
+    const existingColls = await db.listCollections({ name: 'user_sessions' }).toArray();
+    if (existingColls.length === 0) {
+      await db.createCollection('user_sessions');
+    }
+    await db.collection('user_sessions').createIndex({ sessionToken: 1 }, { unique: true, sparse: true });
+    await db.collection('user_sessions').createIndex({ userId: 1, expiresAt: -1 });
+    await db.collection('user_sessions').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   } catch (err) {
     console.warn('Index creation warning (indexes may already exist):', err);
   }
