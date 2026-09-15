@@ -24,7 +24,7 @@ interface RoleModulePermission {
 }
 
 const ROLES = [
-  { key: 'SUPER_ADMIN', label: 'Super Admin', color: 'bg-amber-100 text-amber-800 border-amber-300' },
+  { key: 'SUPER_ADMIN', label: 'Super Admin', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   { key: 'ADMIN', label: 'Admin (Tenant)', color: 'bg-purple-100 text-purple-800 border-purple-200' },
   { key: 'HR', label: 'HR Admin', color: 'bg-blue-100 text-blue-800 border-blue-200' },
   { key: 'MANAGER', label: 'Manager', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
@@ -153,7 +153,7 @@ export default function SuperAdminRolesPage() {
           <button
             onClick={handleSave}
             disabled={isSaving || isLoading}
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-amber-600 hover:to-indigo-700 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
           >
             {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             <span>Save Matrix Policies</span>
@@ -181,7 +181,7 @@ export default function SuperAdminRolesPage() {
         <div className="text-xs text-slate-600 space-y-1">
           <p className="font-bold text-slate-900">RBAC Enforcement Rules</p>
           <p>
-            <strong className="text-amber-800 font-bold">SUPER_ADMIN</strong> maintains root system-level authorization. Adjusting module permissions updates server-side authorization enforcement across API routes. Last synchronized:{' '}
+            <strong className="text-indigo-700 font-bold">SUPER_ADMIN</strong> maintains root system-level authorization. Adjusting module permissions updates server-side authorization enforcement across API routes. Last synchronized:{' '}
             <span className="font-mono text-slate-500">{updatedAt ? new Date(updatedAt).toLocaleString() : 'N/A'}</span> by{' '}
             <span className="font-semibold text-slate-700">{updatedBy}</span>.
           </p>
@@ -198,7 +198,7 @@ export default function SuperAdminRolesPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
                 <tr>
                   <th className="py-4 px-5 min-w-[220px]">System Module</th>
                   {ROLES.map((r) => (

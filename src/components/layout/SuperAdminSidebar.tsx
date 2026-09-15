@@ -9,15 +9,6 @@ import {
   FolderTree,
   Users,
   ShieldCheck,
-  Clock,
-  CalendarDays,
-  CreditCard,
-  TrendingUp,
-  FileText,
-  UserPlus,
-  MessageSquare,
-  Bell,
-  HelpCircle,
   BarChart3,
   Settings,
   ShieldAlert,
@@ -26,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Lock,
+  Bell,
 } from 'lucide-react';
 
 interface SuperAdminSidebarProps {
@@ -99,7 +91,6 @@ export const SuperAdminSidebar: React.FC<SuperAdminSidebarProps> = ({ isOpen, on
     openHelpdesk: 0,
   });
 
-  // Restore collapsed preference
   useEffect(() => {
     try {
       const saved = localStorage.getItem('super_admin_sidebar_collapsed');
@@ -153,7 +144,7 @@ export const SuperAdminSidebar: React.FC<SuperAdminSidebarProps> = ({ isOpen, on
       {/* Mobile Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-xs lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-xs lg:hidden"
           onClick={onClose}
         />
       )}
@@ -167,15 +158,16 @@ export const SuperAdminSidebar: React.FC<SuperAdminSidebarProps> = ({ isOpen, on
         {/* Header Branding */}
         <div className="flex h-16 items-center justify-between border-b border-slate-800/80 px-4">
           <Link href="/super-admin/dashboard" className="flex items-center gap-3 overflow-hidden">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 font-bold text-white shadow-md shadow-indigo-600/30">
-              <ShieldCheck className="h-5 w-5 text-white" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 font-bold text-white shadow-md shadow-indigo-600/30">
+              <Building2 className="h-5 w-5" />
             </div>
             {!isCollapsed && (
               <div className="truncate">
                 <div className="flex items-center gap-1">
-                  <span className="text-base font-extrabold tracking-tight text-white">SUPER ADMIN</span>
+                  <span className="text-base font-extrabold tracking-tight text-white">EMS</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">/ HRMS</span>
                 </div>
-                <p className="text-[10px] text-amber-400 font-semibold tracking-wide uppercase">Global System Control</p>
+                <p className="text-[10px] text-slate-400 font-medium">Super Admin Control</p>
               </div>
             )}
           </Link>
@@ -183,7 +175,7 @@ export const SuperAdminSidebar: React.FC<SuperAdminSidebarProps> = ({ isOpen, on
           {/* Desktop Collapse Toggle */}
           <button
             onClick={toggleCollapse}
-            className="hidden rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white lg:flex"
+            className="hidden rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white lg:flex cursor-pointer"
             title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
             {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -192,7 +184,7 @@ export const SuperAdminSidebar: React.FC<SuperAdminSidebarProps> = ({ isOpen, on
           {/* Mobile Close Button */}
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden cursor-pointer"
             aria-label="Close Sidebar"
           >
             <X className="h-5 w-5" />
@@ -222,16 +214,16 @@ export const SuperAdminSidebar: React.FC<SuperAdminSidebarProps> = ({ isOpen, on
                     href={item.href}
                     onClick={onClose}
                     title={isCollapsed ? item.name : undefined}
-                    className={`group relative flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium transition-all ${
+                    className={`group relative flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-all ${
                       isActive
-                        ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-sm shadow-indigo-600/40 font-bold'
-                        : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100'
+                        ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30 font-semibold'
+                        : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-100'
                     } ${isCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
                   >
                     <div className="flex items-center gap-3">
                       <Icon
                         className={`h-4.5 w-4.5 shrink-0 transition-colors ${
-                          isActive ? 'text-amber-400' : 'text-slate-400 group-hover:text-slate-200'
+                          isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
                         }`}
                       />
                       {!isCollapsed && <span>{item.name}</span>}
@@ -239,10 +231,10 @@ export const SuperAdminSidebar: React.FC<SuperAdminSidebarProps> = ({ isOpen, on
 
                     {!isCollapsed && badgeText && (
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                           isActive
                             ? 'bg-white/20 text-white'
-                            : 'bg-indigo-950 text-indigo-400 border border-indigo-800/60'
+                            : 'bg-slate-800 text-indigo-400 group-hover:bg-slate-700'
                         }`}
                       >
                         {badgeText}
@@ -270,21 +262,16 @@ export const SuperAdminSidebar: React.FC<SuperAdminSidebarProps> = ({ isOpen, on
         {/* Footer Status Panel */}
         <div className="border-t border-slate-800/80 p-3">
           {!isCollapsed ? (
-            <div className="rounded-xl bg-slate-900/90 p-2.5 border border-slate-800 text-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-semibold text-slate-200">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>Super Admin</span>
-                </div>
-                <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-400 border border-amber-500/30">
-                  ROOT
-                </span>
+            <div className="rounded-xl bg-slate-900/80 p-2.5 border border-slate-800 text-xs">
+              <div className="flex items-center gap-2 font-semibold text-slate-200">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Super Admin Control</span>
               </div>
-              <p className="mt-1 text-[10px] text-slate-400 font-mono">Enterprise v2.0 Global</p>
+              <p className="mt-0.5 text-[10px] text-slate-400 font-medium">Enterprise Edition v2.0</p>
             </div>
           ) : (
             <div className="flex justify-center" title="Super Admin Active">
-              <ShieldCheck className="h-5 w-5 text-amber-400" />
+              <ShieldCheck className="h-5 w-5 text-emerald-400" />
             </div>
           )}
         </div>

@@ -228,7 +228,7 @@ export default function SuperAdminOrganizationsPage() {
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-amber-600 hover:to-indigo-700"
+            className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-indigo-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
             <span>+ Add Organization</span>
@@ -548,7 +548,7 @@ export default function SuperAdminOrganizationsPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 px-4 py-1.5 font-bold text-white shadow-xs hover:from-amber-600 hover:to-indigo-700 disabled:opacity-50"
+                  className="rounded-xl bg-indigo-600 px-4 py-2 font-bold text-white shadow-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                 >
                   {isSubmitting ? 'Provisioning...' : 'Provision Organization'}
                 </button>

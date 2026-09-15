@@ -211,34 +211,34 @@ export default function OrganizationStructurePage() {
                 {/* Level 1: Organization Header */}
                 <div
                   onClick={() => toggleOrg(org.id)}
-                  className="flex cursor-pointer items-center justify-between bg-slate-900 px-5 py-4 text-white transition-colors hover:bg-slate-950"
+                  className="flex cursor-pointer items-center justify-between bg-slate-50 border-b border-slate-200/80 px-5 py-4 text-slate-900 transition-colors hover:bg-slate-100/80"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 font-bold text-white shadow-md">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 font-bold text-white shadow-md shadow-indigo-600/30">
                       <Building2 className="h-5 w-5" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-extrabold">{org.name}</h3>
-                        <span className="rounded bg-indigo-500/20 px-2 py-0.5 text-[10px] font-bold text-indigo-300 border border-indigo-500/30">
+                        <h3 className="text-sm font-extrabold text-slate-900">{org.name}</h3>
+                        <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200">
                           {org.code}
                         </span>
                         <span
                           className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
-                            org.status === 'Active' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                            org.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
                           }`}
                         >
                           {org.status}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400">
+                      <p className="text-[11px] text-slate-500">
                         {org.departments.length} Departments &bull; {org.employeeCount} Total Workforce
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 text-xs text-amber-400 font-semibold bg-slate-800/80 px-3 py-1 rounded-lg border border-slate-700">
+                    <div className="flex items-center gap-1 text-xs text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-200">
                       <UserCheck className="h-3.5 w-3.5" />
                       <span>{org.employeeCount} Staff</span>
                     </div>

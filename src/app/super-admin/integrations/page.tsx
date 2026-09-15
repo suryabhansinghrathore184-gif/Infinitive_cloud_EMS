@@ -254,7 +254,7 @@ export default function SuperAdminIntegrationsPage() {
 
                   <button
                     onClick={() => showToast(`Opening configuration drawer for ${provider.name}`, 'success')}
-                    className="flex items-center gap-1 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800"
+                    className="flex items-center gap-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition-colors"
                   >
                     <Settings className="h-3.5 w-3.5" />
                     <span>Configure</span>

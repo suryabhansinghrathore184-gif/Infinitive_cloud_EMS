@@ -5,17 +5,21 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { formatRoleLabel } from '@/lib/roleUtils';
+import { LogoutConfirmModal } from '@/components/modals/LogoutConfirmModal';
 import {
   Menu,
   Bell,
   HelpCircle,
   User,
   Settings,
-  Shield,
   LogOut,
   ChevronDown,
   ShieldAlert,
   Search,
+  ShieldCheck,
+  X,
+  ChevronRight,
+  Sparkles,
 } from 'lucide-react';
 
 interface SuperAdminHeaderProps {
@@ -27,175 +31,195 @@ interface SuperAdminHeaderProps {
 export const SuperAdminHeader: React.FC<SuperAdminHeaderProps> = ({
   onToggleSidebar,
   pageTitle = 'Super Admin Control Center',
-  breadcrumbs = [],
 }) => {
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on click outside
+  const activeUser = user || {
+    name: 'Super Administrator',
+    email: 'superadmin@organization.com',
+    role: 'SUPER_ADMIN',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+  };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsProfileOpen(false);
+      }
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsSearchOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = async () => {
-    await logout();
-    router.push('/super-admin/dashboard');
-  };
-
-  const roleDisplay = formatRoleLabel(user?.role || 'SUPER_ADMIN');
+  const roleDisplay = formatRoleLabel(activeUser.role || 'SUPER_ADMIN');
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur-md sm:px-6 shadow-2xs">
-      {/* Left Section: Sidebar Toggle & Breadcrumbs */}
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur-md sm:px-6 shadow-xs">
+      {/* Left Section: Mobile Menu Toggle & Title */}
       <div className="flex items-center gap-3">
         <button
           onClick={onToggleSidebar}
-          className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 lg:hidden"
+          className="rounded-xl p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 lg:hidden"
           aria-label="Toggle Sidebar"
         >
           <Menu className="h-5 w-5" />
         </button>
-
-        <div className="flex flex-col">
-          <h1 className="text-sm font-extrabold text-slate-900 sm:text-base leading-tight">
+        <div className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 font-bold text-indigo-600 text-xs border border-indigo-200">
+            SA
+          </span>
+          <h1 className="text-base font-bold tracking-tight text-slate-900 hidden sm:block">
             {pageTitle}
           </h1>
+        </div>
+      </div>
 
-          {breadcrumbs.length > 0 && (
-            <nav className="hidden items-center gap-1.5 text-[11px] text-slate-400 sm:flex">
-              <Link href="/super-admin/dashboard" className="hover:text-indigo-600">
-                Super Admin
-              </Link>
-              {breadcrumbs.map((crumb, idx) => (
-                <React.Fragment key={idx}>
-                  <span>/</span>
-                  {crumb.href ? (
-                    <Link href={crumb.href} className="hover:text-indigo-600 font-medium">
-                      {crumb.label}
-                    </Link>
-                  ) : (
-                    <span className="font-semibold text-slate-600">{crumb.label}</span>
-                  )}
-                </React.Fragment>
-              ))}
-            </nav>
+      {/* Center: Global Instant Search */}
+      <div ref={searchRef} className="relative max-w-md flex-1 px-4 sm:px-8">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setIsSearchOpen(true);
+            }}
+            onFocus={() => setIsSearchOpen(true)}
+            placeholder="Search system, organizations, users, logs..."
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-12 text-xs text-slate-800 placeholder-slate-400 transition-colors focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium"
+          />
+          {searchQuery ? (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+              ⌘K
+            </kbd>
           )}
         </div>
       </div>
 
       {/* Right Section: Notifications, Help & Profile Dropdown */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        {/* Quick Help */}
+      <div className="flex items-center gap-2.5">
         <Link
           href="/super-admin/dashboard"
-          className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-          title="Super Admin Dashboard"
+          className="relative rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          title="Super Admin Support & Documentation"
         >
           <HelpCircle className="h-5 w-5" />
         </Link>
 
-        {/* Notifications */}
-        <Link
-          href="/super-admin/notifications"
-          className="relative rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-          title="Notifications Center"
-        >
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-amber-500 animate-ping"></span>
-        </Link>
+        <div className="relative">
+          <Link
+            href="/super-admin/notifications"
+            className="relative rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            title="System Notifications"
+          >
+            <Bell className="h-5 w-5" />
+            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-indigo-600 animate-pulse"></span>
+          </Link>
+        </div>
 
-        <div className="h-6 w-px bg-slate-200 mx-1"></div>
+        <div className="h-5 w-[1px] bg-slate-200"></div>
 
         {/* User Profile Dropdown */}
-        <div className="relative" ref={dropdownRef}>
+        <div className="relative shrink-0" ref={dropdownRef}>
           <button
             onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-1.5 pl-2 hover:bg-slate-100 transition-colors"
+            className="flex h-10 max-w-[200px] sm:max-w-[240px] items-center gap-2 rounded-xl p-1 transition-colors hover:bg-slate-100 min-w-0 cursor-pointer"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-amber-500 to-indigo-600 text-white font-bold text-xs shadow-xs">
-              {user?.avatar ? (
-                <img src={user.avatar} alt={user.name} className="h-full w-full rounded-lg object-cover" />
-              ) : (
-                <Shield className="h-4 w-4 text-white" />
-              )}
+            <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full ring-2 ring-indigo-500/30">
+              <img
+                src={activeUser.avatar}
+                alt={activeUser.name}
+                className="h-9 w-9 rounded-full object-cover"
+              />
+              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500 ring-2 ring-white"></span>
             </div>
-
-            <div className="hidden text-left sm:block">
-              <div className="flex items-center gap-1">
-                <span className="text-xs font-bold text-slate-900 truncate max-w-[110px]">
-                  {user?.name || 'Super Admin'}
-                </span>
-                <span className="rounded bg-amber-100 px-1 py-0.2 text-[9px] font-extrabold text-amber-800 border border-amber-300">
-                  ROOT
-                </span>
+            <div className="hidden min-w-0 flex-1 text-left sm:block">
+              <div className="flex items-center gap-1 min-w-0">
+                <span className="truncate text-xs font-bold text-slate-900">{activeUser.name}</span>
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-indigo-600" />
               </div>
-              <p className="text-[10px] text-slate-500 font-medium">{roleDisplay}</p>
+              <p className="truncate text-[10px] font-semibold text-slate-500">{roleDisplay}</p>
             </div>
-
-            <ChevronDown className="h-4 w-4 text-slate-400" />
+            <ChevronDown className="hidden h-3.5 w-3.5 shrink-0 text-slate-400 sm:block" />
           </button>
 
-          {/* Profile Dropdown Menu */}
+          {/* Profile Menu Dropdown */}
           {isProfileOpen && (
-            <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white p-2 shadow-2xl border border-slate-100 text-xs animate-fade-in z-50">
-              <div className="border-b border-slate-100 p-3">
-                <p className="font-bold text-slate-900">{user?.name || 'Super Admin'}</p>
-                <p className="text-[11px] text-slate-400 truncate">{user?.email || 'admin@organization.com'}</p>
-                <span className="mt-1.5 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-extrabold text-amber-700 border border-amber-200">
-                  {roleDisplay} (Root Privileges)
+            <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl z-50 text-xs animate-fade-in">
+              <div className="border-b border-slate-100 px-3 py-2">
+                <p className="text-xs font-bold text-slate-900">{activeUser.name}</p>
+                <p className="text-[11px] text-slate-500 truncate">{activeUser.email}</p>
+                <span className="mt-1 inline-block rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-200">
+                  {roleDisplay}
                 </span>
               </div>
-
-              <div className="py-1 space-y-0.5">
+              <div className="py-1 text-slate-700">
                 <Link
                   href="/super-admin/settings"
                   onClick={() => setIsProfileOpen(false)}
-                  className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-100 font-medium"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 hover:bg-slate-100 font-medium"
                 >
                   <User className="h-4 w-4 text-slate-500" />
                   <span>My Profile & Settings</span>
                 </Link>
-
-                <Link
-                  href="/super-admin/settings"
-                  onClick={() => setIsProfileOpen(false)}
-                  className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-100 font-medium"
-                >
-                  <Settings className="h-4 w-4 text-slate-500" />
-                  <span>System Settings</span>
-                </Link>
-
                 <Link
                   href="/super-admin/security"
                   onClick={() => setIsProfileOpen(false)}
-                  className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-100 font-medium"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 hover:bg-slate-100 font-medium"
                 >
                   <ShieldAlert className="h-4 w-4 text-slate-500" />
                   <span>Security Center</span>
                 </Link>
+                <Link
+                  href="/super-admin/settings"
+                  onClick={() => setIsProfileOpen(false)}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 hover:bg-slate-100 font-medium"
+                >
+                  <Settings className="h-4 w-4 text-slate-500" />
+                  <span>System Settings</span>
+                </Link>
               </div>
-
-              <div className="border-t border-slate-100 pt-1">
+              <div className="border-t border-slate-100 pt-1 text-rose-600">
                 <button
-                  onClick={handleLogout}
-                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-rose-600 hover:bg-rose-50 font-bold"
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    setIsLogoutModalOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 hover:bg-rose-50 font-bold cursor-pointer"
                 >
                   <LogOut className="h-4 w-4 text-rose-600" />
-                  <span>Log Out</span>
+                  <span>Sign Out</span>
                 </button>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      <LogoutConfirmModal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+      />
     </header>
   );
 };

@@ -106,7 +106,7 @@ export default function SuperAdminSettingsPage() {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-extrabold text-slate-900">System Core Configuration</h2>
-            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-800 border border-amber-300">
+            <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-700 border border-indigo-200">
               GLOBAL ROOT
             </span>
           </div>
@@ -128,7 +128,7 @@ export default function SuperAdminSettingsPage() {
           <button
             onClick={handleSave}
             disabled={isSaving || isLoading || !settings}
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-amber-600 hover:to-indigo-700 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-xs font-bold text-white shadow-md transition-colors disabled:opacity-50"
           >
             {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             <span>Save System Controls</span>

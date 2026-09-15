@@ -255,7 +255,7 @@ export default function SuperAdminUsersPage() {
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                           user.role === 'SUPER_ADMIN' || user.role === 'Super Admin'
-                            ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                             : user.role === 'ADMIN'
                             ? 'bg-purple-100 text-purple-800 border border-purple-200'
                             : user.role === 'HR' || user.role === 'HR Administrator'

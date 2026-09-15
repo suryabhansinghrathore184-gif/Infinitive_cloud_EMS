@@ -193,7 +193,7 @@ export default function SuperAdminNotificationsPage() {
               onClick={() => setFilterType(type)}
               className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
                 filterType === type
-                  ? 'bg-slate-900 text-white shadow-xs'
+                  ? 'bg-indigo-600 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >

@@ -292,7 +292,7 @@ export default function SuperAdminAuditLogsPage() {
             <div className="flex justify-end pt-2 border-t">
               <button
                 onClick={() => setSelectedLog(null)}
-                className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-bold text-white hover:bg-slate-800"
+                className="rounded-xl border border-slate-200 bg-white px-5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Close Inspector
               </button>

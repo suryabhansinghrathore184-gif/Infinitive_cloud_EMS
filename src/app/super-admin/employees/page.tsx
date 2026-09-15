@@ -159,7 +159,7 @@ export default function SuperAdminEmployeesPage() {
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-amber-600 hover:to-indigo-700"
+            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-xs font-bold text-white shadow-md transition-colors"
           >
             <Plus className="h-4 w-4" />
             <span>+ Add Employee</span>
@@ -456,7 +456,7 @@ export default function SuperAdminEmployeesPage() {
                 <button
                   type="submit"
                   disabled={isCreating}
-                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-amber-600 hover:to-indigo-700 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-xs font-bold text-white shadow-md transition-colors disabled:opacity-50"
                 >
                   {isCreating ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : null}
                   <span>Create Employee</span>
