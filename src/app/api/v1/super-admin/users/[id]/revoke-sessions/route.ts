@@ -6,7 +6,7 @@ import { ObjectId } from 'mongodb';
 
 export const dynamic = 'force-dynamic';
 
-// POST /api/v1/super-admin/users/[id]/revoke-sessions - Revoke specific session or ALL sessions
+// POST /api/v1/super-admin/users/[id]/revoke-sessions - Revoke specific session or ALL sessions in user_sessions collection
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const auth = getAuthContext(req);
@@ -34,16 +34,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ success: false, message: 'User record not found' }, { status: 404 });
     }
 
-    const now = new Date().toISOString();
-
     if (revokeAll || !sessionId) {
-      // Invalidate all tokens for user in auth_tokens
-      await db.collection('auth_tokens').deleteMany({
+      // Invalidate all active sessions for user in user_sessions
+      const deleteResult = await db.collection('user_sessions').deleteMany({
         $or: [{ userId: userDoc.id }, { email: userDoc.email }],
       });
 
       await logAuditEvent(req, 'USER_SESSIONS_REVOKED', {
-        details: { targetUserId: userDoc.id || userDoc._id.toString(), email: userDoc.email },
+        details: { targetUserId: userDoc.id || userDoc._id.toString(), email: userDoc.email, count: deleteResult.deletedCount },
       });
 
       return NextResponse.json({
@@ -51,13 +49,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         message: `All active sessions for user ${userDoc.email} have been revoked.`,
       });
     } else {
-      // Delete specific session token
-      let sessionQuery: any = { _id: sessionId };
+      // Delete specific session from user_sessions
+      let sessionQuery: any = {
+        $or: [{ userId: userDoc.id }, { email: userDoc.email }],
+      };
+
       if (ObjectId.isValid(sessionId)) {
-        sessionQuery = { $or: [{ _id: new ObjectId(sessionId) }, { _id: sessionId }] };
+        sessionQuery.$or = [
+          { _id: new ObjectId(sessionId) },
+          { sessionToken: sessionId },
+        ];
+      } else {
+        sessionQuery.sessionToken = sessionId;
       }
 
-      await db.collection('auth_tokens').deleteOne(sessionQuery);
+      await db.collection('user_sessions').deleteOne(sessionQuery);
 
       await logAuditEvent(req, 'USER_SESSION_REVOKED', {
         details: { targetUserId: userDoc.id || userDoc._id.toString(), email: userDoc.email, sessionId },

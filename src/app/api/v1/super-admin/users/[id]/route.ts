@@ -17,6 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     const userId = params.id;
     const { db } = await connectToDatabase();
+    const now = new Date();
 
     let query: any = {};
     if (ObjectId.isValid(userId)) {
@@ -40,21 +41,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       { projection: { password: 0 } }
     );
 
-    // Fetch active session tokens from auth_tokens collection
+    // Fetch active session tokens from authoritative user_sessions collection
     const activeSessionsDocs = await db
-      .collection('auth_tokens')
+      .collection('user_sessions')
       .find({
         $or: [{ userId: userDoc.id }, { email: userDoc.email }],
-        expiresAt: { $gt: new Date().toISOString() },
+        expiresAt: { $gt: now },
+        status: 'ACTIVE',
       })
       .toArray();
 
     // Map sessions securely without revealing token values
     const safeSessions = activeSessionsDocs.map((s) => ({
       id: s._id.toString(),
-      type: s.type || 'SESSION',
-      createdAt: s.createdAt,
-      expiresAt: s.expiresAt,
+      type: 'ACTIVE_SESSION',
+      createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : now.toISOString(),
+      expiresAt: s.expiresAt ? new Date(s.expiresAt).toISOString() : now.toISOString(),
       ipAddress: s.ipAddress || '127.0.0.1',
       userAgent: s.userAgent || 'Web Browser',
       status: 'Active',

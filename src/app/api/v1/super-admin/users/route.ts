@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
     const orgFilter = searchParams.get('organizationId')?.trim() || 'All';
     const verificationFilter = searchParams.get('verification')?.trim() || 'All';
 
+    const now = new Date();
+
     // 1. Fetch Summary KPI Counts
     const [
       totalUsers,
@@ -46,7 +48,7 @@ export async function GET(req: NextRequest) {
         ],
       }),
       db.collection('users').countDocuments({ status: { $in: ['LOCKED', 'Locked', 'Suspended'] } }),
-      db.collection('auth_tokens').countDocuments({ expiresAt: { $gt: new Date().toISOString() } }),
+      db.collection('user_sessions').countDocuments({ expiresAt: { $gt: now }, status: 'ACTIVE' }),
       db.collection('organization_settings').find({}).toArray(),
     ]);
 
@@ -134,7 +136,7 @@ export async function GET(req: NextRequest) {
       .limit(limit)
       .toArray();
 
-    // Map each user record with organization details and active session count
+    // Map each user record with organization details and active session count from user_sessions
     const formattedUsers = await Promise.all(
       userDocs.map(async (u) => {
         const uOrgId = u.organizationId || 'org-default';
@@ -144,9 +146,10 @@ export async function GET(req: NextRequest) {
           code: uOrgId.toUpperCase().slice(0, 6),
         };
 
-        const sessionCount = await db.collection('auth_tokens').countDocuments({
+        const sessionCount = await db.collection('user_sessions').countDocuments({
           $or: [{ userId: u.id }, { email: u.email }],
-          expiresAt: { $gt: new Date().toISOString() },
+          expiresAt: { $gt: now },
+          status: 'ACTIVE',
         });
 
         const isVerified = u.emailVerified === true || u.emailVerificationStatus === 'VERIFIED';

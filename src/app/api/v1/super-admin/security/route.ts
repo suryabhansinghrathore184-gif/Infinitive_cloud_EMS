@@ -35,9 +35,11 @@ export async function GET(req: NextRequest) {
     }
 
     const { db } = await connectToDatabase();
-    const nowIso = new Date().toISOString();
-    const last24hIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const last7dIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const now = new Date();
+    const last24hDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const last7dDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const last24hIso = last24hDate.toISOString();
+    const last7dIso = last7dDate.toISOString();
 
     const [
       secSettingsDoc,
@@ -57,7 +59,7 @@ export async function GET(req: NextRequest) {
       db.collection('users').countDocuments(),
       db.collection('users').countDocuments({ $or: [{ isTwoFactorEnabled: true }, { role: 'SUPER_ADMIN' }] }),
       db.collection('users').countDocuments({ status: { $in: ['LOCKED', 'Locked', 'Suspended'] } }),
-      db.collection('auth_tokens').countDocuments({ expiresAt: { $gt: nowIso } }),
+      db.collection('user_sessions').countDocuments({ expiresAt: { $gt: now }, status: 'ACTIVE' }),
       db.collection('audit_logs').countDocuments({
         action: { $regex: /LOGIN_FAILED|UNAUTHORIZED|LOCKED|SUSPICIOUS/i },
         timestamp: { $gte: last24hIso },
@@ -72,7 +74,7 @@ export async function GET(req: NextRequest) {
       db.collection('audit_logs').countDocuments({
         timestamp: { $gte: last7dIso },
       }),
-      db.collection('auth_tokens').find({ expiresAt: { $gt: nowIso } }).sort({ createdAt: -1 }).limit(20).toArray(),
+      db.collection('user_sessions').find({ expiresAt: { $gt: now }, status: 'ACTIVE' }).sort({ createdAt: -1 }).limit(20).toArray(),
       db.collection('audit_logs').find({}).sort({ timestamp: -1 }).limit(30).toArray(),
       db.collection('audit_logs').find({
         action: { $regex: /LOGIN_FAILED|UNAUTHORIZED|OTP_VERIFICATION_FAILED/i },
@@ -86,7 +88,7 @@ export async function GET(req: NextRequest) {
       updatedBy: secSettingsDoc?.updatedBy || DEFAULT_SECURITY_CONFIG.updatedBy,
     };
 
-    // Format active sessions without exposing raw session tokens
+    // Format active sessions strictly from user_sessions collection without raw session tokens
     const formattedSessions = activeSessionDocs.map((s) => ({
       id: s._id.toString(),
       userId: s.userId || 'N/A',
@@ -95,8 +97,8 @@ export async function GET(req: NextRequest) {
       organizationId: s.organizationId || 'GLOBAL',
       userAgent: s.userAgent || 'Web Browser',
       ipAddress: s.ipAddress || '127.0.0.1',
-      createdAt: s.createdAt || nowIso,
-      expiresAt: s.expiresAt,
+      createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : now.toISOString(),
+      expiresAt: s.expiresAt ? new Date(s.expiresAt).toISOString() : now.toISOString(),
     }));
 
     // Format audit event stream with dynamic severity assignment
@@ -117,7 +119,7 @@ export async function GET(req: NextRequest) {
         details: log.details || {},
         ipAddress: log.ipAddress || '127.0.0.1',
         severity,
-        timestamp: log.timestamp ? new Date(log.timestamp).toISOString() : nowIso,
+        timestamp: log.timestamp ? new Date(log.timestamp).toISOString() : now.toISOString(),
       };
     });
 
@@ -128,7 +130,7 @@ export async function GET(req: NextRequest) {
       action: log.action,
       ipAddress: log.ipAddress || '127.0.0.1',
       reason: log.details?.reason || 'Invalid Password or Unverified OTP',
-      timestamp: log.timestamp ? new Date(log.timestamp).toISOString() : nowIso,
+      timestamp: log.timestamp ? new Date(log.timestamp).toISOString() : now.toISOString(),
     }));
 
     // Email OTP Health & SMTP status check

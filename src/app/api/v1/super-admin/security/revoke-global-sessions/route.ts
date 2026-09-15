@@ -5,7 +5,7 @@ import { logAuditEvent } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
-// POST /api/v1/super-admin/security/revoke-global-sessions - Revoke all non-current active session tokens
+// POST /api/v1/super-admin/security/revoke-global-sessions - Revoke all active sessions in authoritative user_sessions collection
 export async function POST(req: NextRequest) {
   try {
     const auth = getAuthContext(req);
@@ -16,8 +16,11 @@ export async function POST(req: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // Revoke all tokens in auth_tokens
-    const deleteResult = await db.collection('auth_tokens').deleteMany({});
+    // Revoke all active sessions in authoritative user_sessions collection
+    const deleteResult = await db.collection('user_sessions').deleteMany({});
+    
+    // Also clean up temporary auth tokens if any exist
+    await db.collection('auth_tokens').deleteMany({ type: { $ne: 'EMAIL_VERIFICATION' } });
 
     await logAuditEvent(req, 'GLOBAL_SESSIONS_REVOKED', {
       details: {
@@ -28,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Global session emergency revocation complete. ${deleteResult.deletedCount} active token(s) revoked.`,
+      message: `Global session emergency revocation complete. ${deleteResult.deletedCount} active session(s) revoked.`,
     });
   } catch (error: any) {
     console.error('Error revoking global sessions:', error);
