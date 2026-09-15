@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const auth = getAuthContext(req);
-    const perm = checkPermissions(auth, ['SUPER_ADMIN', 'ADMIN']);
+    const perm = checkPermissions(auth, ['SUPER_ADMIN']);
     if (!perm.isAllowed) {
       return NextResponse.json({ success: false, message: perm.message }, { status: perm.statusCode });
     }
