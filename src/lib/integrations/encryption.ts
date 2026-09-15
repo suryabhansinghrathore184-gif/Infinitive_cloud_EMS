@@ -12,18 +12,18 @@ const IV_LENGTH = 12; // 96 bits for GCM
 const PAYLOAD_PREFIX = 'v1:';
 
 export function isEncryptionConfigured(): boolean {
-  const key = process.env.INTEGRATION_ENCRYPTION_KEY;
-  return Boolean(key && key.trim().length >= 32);
+  const key = process.env.INTEGRATION_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
+  return Boolean(key && key.trim().length >= 16);
 }
 
 function getMasterKey(): Buffer {
-  const rawKey = process.env.INTEGRATION_ENCRYPTION_KEY;
-  if (!rawKey || rawKey.trim().length < 32) {
+  const rawKey = process.env.INTEGRATION_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
+  if (!rawKey || rawKey.trim().length < 16) {
     throw new Error(
-      'INTEGRATION_ENCRYPTION_KEY is missing or invalid in server environment. Minimum 32-character key required.'
+      'INTEGRATION_ENCRYPTION_KEY or ENCRYPTION_KEY is missing or invalid in server environment. Encryption key required to process secrets safely.'
     );
   }
-  // Use SHA-256 of the provided key string to ensure exactly 32 bytes
+  // Use SHA-256 of the provided key string to ensure exactly 32 bytes for AES-256-GCM
   return crypto.createHash('sha256').update(rawKey).digest();
 }
 
@@ -72,15 +72,10 @@ export function decryptSecret(encryptedPayload: string): string {
 }
 
 /**
- * Masks a secret string for safe browser display (e.g., "••••••••1234").
- * Never exposes raw secret values in API GET responses.
+ * Masks a secret string for safe browser display.
+ * Returns strictly '••••••••' when secret exists. Never exposes raw secret values or suffixes.
  */
 export function maskSecret(secret?: string): string {
-  if (!secret) return '';
-  const str = secret.trim();
-  if (str.length <= 4) {
-    return '••••••••';
-  }
-  const lastFour = str.slice(-4);
-  return `••••••••${lastFour}`;
+  if (!secret || !secret.trim()) return '';
+  return '••••••••';
 }

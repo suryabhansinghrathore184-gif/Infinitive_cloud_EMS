@@ -33,6 +33,24 @@ export async function POST(
       enabled: body.enabled !== false,
     };
 
+    // Check if new secrets are being provided and ensure encryption is configured
+    const hasNewSecret =
+      (body.accessToken && !body.accessToken.includes('••••')) ||
+      (body.webhookVerifyToken && !body.webhookVerifyToken.includes('••••')) ||
+      (body.apiKey && !body.apiKey.includes('••••')) ||
+      (body.clientSecret && !body.clientSecret.includes('••••'));
+
+    if (hasNewSecret && !isEncryptionConfigured()) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            'Server encryption key (INTEGRATION_ENCRYPTION_KEY or ENCRYPTION_KEY) is missing or invalid. Refusing to store secrets in plaintext.',
+        },
+        { status: 500 }
+      );
+    }
+
     // Encrypt sensitive secret fields if provided and not masked ("••••••••")
     if (provider === 'whatsapp') {
       if (body.phoneNumberId !== undefined) updateFields.phoneNumberId = body.phoneNumberId;
@@ -41,10 +59,10 @@ export async function POST(
       if (body.graphVersion !== undefined) updateFields.graphVersion = body.graphVersion;
 
       if (body.accessToken && !body.accessToken.includes('••••')) {
-        updateFields.accessToken = isEncryptionConfigured() ? encryptSecret(body.accessToken) : body.accessToken;
+        updateFields.accessToken = encryptSecret(body.accessToken);
       }
       if (body.webhookVerifyToken && !body.webhookVerifyToken.includes('••••')) {
-        updateFields.webhookVerifyToken = isEncryptionConfigured() ? encryptSecret(body.webhookVerifyToken) : body.webhookVerifyToken;
+        updateFields.webhookVerifyToken = encryptSecret(body.webhookVerifyToken);
       }
     } else if (provider === 'biometric') {
       if (body.providerName !== undefined) updateFields.provider = body.providerName;
@@ -56,7 +74,7 @@ export async function POST(
       if (body.employeeMappings !== undefined) updateFields.employeeMappings = body.employeeMappings;
 
       if (body.apiKey && !body.apiKey.includes('••••')) {
-        updateFields.apiKey = isEncryptionConfigured() ? encryptSecret(body.apiKey) : body.apiKey;
+        updateFields.apiKey = encryptSecret(body.apiKey);
       }
     } else if (provider === 'microsoft') {
       if (body.tenantId !== undefined) updateFields.tenantId = body.tenantId;
@@ -65,7 +83,7 @@ export async function POST(
       if (body.tenantName !== undefined) updateFields.tenantName = body.tenantName;
 
       if (body.clientSecret && !body.clientSecret.includes('••••')) {
-        updateFields.clientSecret = isEncryptionConfigured() ? encryptSecret(body.clientSecret) : body.clientSecret;
+        updateFields.clientSecret = encryptSecret(body.clientSecret);
       }
     }
 

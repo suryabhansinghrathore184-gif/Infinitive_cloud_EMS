@@ -5,7 +5,7 @@ import { connectToDatabase } from '@/lib/mongodb';
 export async function GET(req: NextRequest) {
   try {
     const auth = getAuthContext(req);
-    const perm = checkPermissions(auth, ['SUPER_ADMIN', 'ADMIN', 'HR']);
+    const perm = checkPermissions(auth, ['SUPER_ADMIN']);
     if (!perm.isAllowed) {
       return NextResponse.json({ success: false, message: perm.message }, { status: perm.statusCode });
     }

@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
     if (error || !code) {
       console.error('Microsoft OAuth Callback Error:', errorDescription || error);
-      return NextResponse.redirect(new URL('/admin/integrations?error=oauth_failed', req.url));
+      return NextResponse.redirect(new URL('/super-admin/integrations?error=oauth_failed', req.url));
     }
 
     let organizationId = 'org-default';
@@ -55,19 +55,20 @@ export async function GET(req: NextRequest) {
 
     if (!tokenRes.ok || tokenData.error) {
       console.error('Microsoft Token Exchange Failed:', tokenData.error_description || tokenData.error);
-      return NextResponse.redirect(new URL('/admin/integrations?error=token_exchange_failed', req.url));
+      return NextResponse.redirect(new URL('/super-admin/integrations?error=token_exchange_failed', req.url));
     }
 
     // Save tokens securely in MongoDB
     const nowISO = new Date().toISOString();
     const { db } = await connectToDatabase();
 
-    const encAccessToken = isEncryptionConfigured() ? encryptSecret(tokenData.access_token) : tokenData.access_token;
-    const encRefreshToken = tokenData.refresh_token
-      ? isEncryptionConfigured()
-        ? encryptSecret(tokenData.refresh_token)
-        : tokenData.refresh_token
-      : null;
+    if (!isEncryptionConfigured()) {
+      console.error('Microsoft Token Save Failed: Server ENCRYPTION_KEY is missing.');
+      return NextResponse.redirect(new URL('/super-admin/integrations?error=encryption_key_missing', req.url));
+    }
+
+    const encAccessToken = encryptSecret(tokenData.access_token);
+    const encRefreshToken = tokenData.refresh_token ? encryptSecret(tokenData.refresh_token) : null;
 
     await db.collection('integrations').updateOne(
       { organizationId, provider: 'microsoft' },
@@ -88,9 +89,9 @@ export async function GET(req: NextRequest) {
       { upsert: true }
     );
 
-    return NextResponse.redirect(new URL('/admin/integrations?success=microsoft_connected', req.url));
+    return NextResponse.redirect(new URL('/super-admin/integrations?success=microsoft_connected', req.url));
   } catch (err: any) {
     console.error('Microsoft OAuth Callback Exception:', err);
-    return NextResponse.redirect(new URL('/admin/integrations?error=internal_error', req.url));
+    return NextResponse.redirect(new URL('/super-admin/integrations?error=internal_error', req.url));
   }
 }
