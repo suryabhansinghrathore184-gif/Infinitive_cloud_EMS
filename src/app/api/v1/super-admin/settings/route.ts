@@ -26,13 +26,20 @@ export async function GET(req: NextRequest) {
       supportEmail: 'support@ems-hrms.com',
       smtpHost: 'smtp.gmail.com',
       smtpPort: 587,
-      smtpConfigured: true,
+      smtpConfigured: Boolean(process.env.SMTP_HOST || process.env.GMAIL_USER),
       storageBackend: 'MongoDB GridFS',
       dataRetentionDays: 365,
+      currency: 'INR (₹)',
+      dateFormat: 'DD/MM/YYYY',
+      language: 'English (US)',
       updatedAt: new Date().toISOString(),
     };
 
-    const config = globalDoc?.config || defaultConfig;
+    const config = {
+      ...defaultConfig,
+      ...(globalDoc?.config || {}),
+      smtpConfigured: Boolean(process.env.SMTP_HOST || process.env.GMAIL_USER || globalDoc?.config?.smtpConfigured),
+    };
 
     return NextResponse.json({
       success: true,
@@ -76,7 +83,22 @@ export async function PATCH(req: NextRequest) {
       { upsert: true }
     );
 
-    await logAuditEvent(req, 'UPDATE_GLOBAL_SYSTEM_SETTINGS', { details: { updatedBy: auth.email, changes: body } });
+    // Audit logging for specific system control updates
+    if (typeof body.maintenanceMode === 'boolean' && body.maintenanceMode !== currentConfig.maintenanceMode) {
+      await logAuditEvent(req, 'MAINTENANCE_MODE_CHANGED', {
+        details: { enabled: body.maintenanceMode, updatedBy: auth.email },
+      });
+    }
+
+    if (typeof body.allowSelfSignup === 'boolean' && body.allowSelfSignup !== currentConfig.allowSelfSignup) {
+      await logAuditEvent(req, 'SELF_REGISTRATION_CHANGED', {
+        details: { allowed: body.allowSelfSignup, updatedBy: auth.email },
+      });
+    }
+
+    await logAuditEvent(req, 'SYSTEM_SETTINGS_UPDATED', {
+      details: { updatedBy: auth.email, changes: body },
+    });
 
     return NextResponse.json({
       success: true,
