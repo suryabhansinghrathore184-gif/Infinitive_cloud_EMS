@@ -30,19 +30,10 @@ export interface AuthState {
 }
 
 const initialAuthState: AuthState = {
-  user: {
-    id: 'usr-super-01',
-    employeeId: 'SUP0001',
-    name: 'Super Administrator',
-    email: 'superadmin@organization.com',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-    role: 'SUPER_ADMIN',
-    department: 'Executive Board',
-    designation: 'Platform Super Admin',
-  },
-  accessToken: 'open-access-token',
-  refreshToken: 'open-refresh-token',
-  isAuthenticated: true,
+  user: null,
+  accessToken: null,
+  refreshToken: null,
+  isAuthenticated: false,
   loginAttempts: 0,
   isLockedOut: false,
   lockoutUntil: null,
@@ -355,7 +346,7 @@ export function useAuthStore() {
     if (norm === 'ADMIN' || norm === 'HR' || norm === 'HRADMIN' || norm === 'HRMANAGER') return '/admin/dashboard';
     if (norm === 'MANAGER') return '/manager/dashboard';
     if (norm === 'EMPLOYEE') return '/employee/dashboard';
-    return '/super-admin/dashboard';
+    return '/login';
   };
 
   const updateUserAvatar = (avatarUrl: string) => {

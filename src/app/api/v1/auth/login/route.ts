@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import { ensureDefaultUsersSeeded, UserRole } from '@/lib/auth';
+import { ensureDefaultUsersSeeded } from '@/lib/auth';
 import { verifyPassword, hashPassword, generateSecureToken, generateNumericOTP, hashToken } from '@/lib/cryptoAuth';
 import { getSecurityConfig, checkAccountLockout, recordFailedLogin, recordSuccessfulLogin } from '@/lib/securityPolicy';
 import { createNotification } from '@/lib/notifications/notificationService';
 import { sendOtpEmail } from '@/lib/email';
+import { IS_DEMO_MODE, DEMO_ACCOUNTS } from '@/lib/demoConfig';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   return NextResponse.json({
     success: true,
-    service: 'EMS/HRMS Authentication API',
+    service: 'EMS/HRMS Authentication API (Demo & Real Auth Ready)',
     endpoint: '/api/v1/auth/login',
     method: 'POST',
+    isDemoMode: IS_DEMO_MODE,
     status: 'Operational',
   });
 }
@@ -30,10 +32,90 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await ensureDefaultUsersSeeded();
-
-    const { db } = await connectToDatabase();
     const cleanIdentifier = identifier.trim().toLowerCase();
+
+    // 1. Check Demo Mode Accounts when DEMO_MODE is active
+    if (IS_DEMO_MODE) {
+      const demoAccount = DEMO_ACCOUNTS.find(
+        (acc) => acc.email.toLowerCase() === cleanIdentifier && acc.password === password
+      );
+
+      if (demoAccount) {
+        const { db } = await connectToDatabase();
+        await ensureDefaultUsersSeeded();
+
+        const nowMs = Date.now();
+        const sessionDurationMs = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+        const expiresAtMs = nowMs + sessionDurationMs;
+
+        const accessToken = `jwt-session-${demoAccount.id}-org-default-${demoAccount.role}-${demoAccount.employeeId}-${nowMs}`;
+        const refreshToken = `jwt-refresh-${demoAccount.id}-${nowMs}`;
+
+        // Upsert active demo session in user_sessions collection
+        await db.collection('user_sessions').updateOne(
+          { sessionToken: accessToken },
+          {
+            $set: {
+              sessionToken: accessToken,
+              sessionTokenHash: hashToken(accessToken),
+              userId: demoAccount.id,
+              email: demoAccount.email,
+              name: demoAccount.name,
+              role: demoAccount.role,
+              organizationId: 'org-default',
+              employeeId: demoAccount.employeeId,
+              userAgent: req.headers.get('user-agent') || 'Browser',
+              ipAddress: req.headers.get('x-forwarded-for') || '127.0.0.1',
+              status: 'ACTIVE',
+              isDemoSession: true,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              expiresAt: new Date(expiresAtMs),
+            },
+          },
+          { upsert: true }
+        );
+
+        const userData = {
+          id: demoAccount.id,
+          employeeId: demoAccount.employeeId,
+          name: demoAccount.name,
+          email: demoAccount.email,
+          avatar: demoAccount.role === 'SUPER_ADMIN'
+            ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
+            : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
+          role: demoAccount.role,
+          department: demoAccount.role === 'SUPER_ADMIN' ? 'Executive Board' : 'Human Resources',
+          designation: demoAccount.role === 'SUPER_ADMIN' ? 'Platform Super Admin' : 'HR Administrator',
+          isTwoFactorEnabled: false,
+        };
+
+        const response = NextResponse.json({
+          success: true,
+          message: `Demo sign-in successful as ${demoAccount.label}. Redirecting to dashboard...`,
+          session: {
+            user: userData,
+            accessToken,
+            refreshToken,
+            expiresAt: expiresAtMs,
+          },
+        });
+
+        response.cookies.set('ems_session', accessToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: Math.floor(sessionDurationMs / 1000),
+        });
+
+        return response;
+      }
+    }
+
+    // 2. Production Real Authentication Flow
+    await ensureDefaultUsersSeeded();
+    const { db } = await connectToDatabase();
 
     // Check Account Lockout status
     const lockout = await checkAccountLockout(db, cleanIdentifier);
@@ -80,7 +162,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // If user not found, record failed login attempt generically
     if (!userDoc) {
       await recordFailedLogin(req, db, cleanIdentifier);
       return NextResponse.json(
@@ -89,7 +170,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify account active status
     if (userDoc.status === 'Inactive' || userDoc.status === 'Suspended') {
       return NextResponse.json(
         { success: false, message: 'Your account is inactive or suspended. Please contact your organization administrator.' },
@@ -116,20 +196,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Upgrade legacy plain text password to hashed format automatically
-    if (userDoc.password && !userDoc.passwordHash) {
-      const { formatted, salt } = hashPassword(password);
-      await db.collection('users').updateOne(
-        { _id: userDoc._id },
-        { $set: { passwordHash: formatted, salt }, $unset: { password: '' } }
-      );
-    }
-
     const secConfig = await getSecurityConfig(db);
     const userRoleStr = (userDoc.role || 'EMPLOYEE').toUpperCase();
     const isSuperAdmin = userRoleStr === 'SUPER_ADMIN' || userRoleStr === 'SUPER ADMIN';
 
-    // Check if 2FA / OTP verification is required
     const requires2FA = userDoc.isTwoFactorEnabled || secConfig.mfaEnforced || (isSuperAdmin && secConfig.mfaForSuperAdminsOnly);
 
     if (requires2FA) {
@@ -137,7 +207,7 @@ export async function POST(req: NextRequest) {
       const otpCode = generateNumericOTP(6);
       const hashedOtp = hashToken(otpCode);
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes
+      const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
 
       await db.collection('auth_tokens').insertOne({
         type: '2FA_OTP',
@@ -149,7 +219,6 @@ export async function POST(req: NextRequest) {
         createdAt: now,
       });
 
-      // Dispatch real email via Nodemailer/Gmail SMTP
       try {
         await sendOtpEmail({
           to: userDoc.email,
@@ -161,23 +230,6 @@ export async function POST(req: NextRequest) {
         console.warn('2FA Email dispatch warning:', emailErr);
       }
 
-      // Dispatch internal system notification
-      try {
-        await createNotification({
-          organizationId: userDoc.organizationId || 'org-default',
-          recipientType: 'EMPLOYEE',
-          recipientId: userDoc.employeeId || userDoc.email,
-          eventType: '2fa_otp',
-          category: 'SECURITY',
-          title: 'EMS Security Code',
-          message: `Your 2FA authentication code is: ${otpCode}. Code expires in 10 minutes.`,
-          priority: 'HIGH',
-          recipientEmail: userDoc.email,
-        });
-      } catch (notifErr) {
-        console.warn('Notification dispatch note:', notifErr);
-      }
-
       return NextResponse.json({
         success: true,
         message: 'Password verified. 2FA verification code sent to your registered email.',
@@ -186,7 +238,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Successful Login: Reset failed attempts & record success
     await recordSuccessfulLogin(req, db, userDoc);
 
     const nowMs = Date.now();
@@ -210,11 +261,9 @@ export async function POST(req: NextRequest) {
     const orgId = userDoc.organizationId || 'org-default';
     const userIdStr = userDoc.id || userDoc._id.toString();
 
-    // Session token
     const accessToken = `jwt-session-${userIdStr}-${orgId}-${normalizedRole}-${empId}-${nowMs}`;
     const refreshToken = `jwt-refresh-${userIdStr}-${nowMs}`;
 
-    // Store active session in user_sessions collection
     await db.collection('user_sessions').insertOne({
       sessionToken: accessToken,
       sessionTokenHash: hashToken(accessToken),
@@ -232,7 +281,6 @@ export async function POST(req: NextRequest) {
       expiresAt: new Date(expiresAtMs),
     });
 
-    // Prepare User Payload
     const userData = {
       id: userIdStr,
       employeeId: empId,
@@ -245,7 +293,6 @@ export async function POST(req: NextRequest) {
       isTwoFactorEnabled: Boolean(userDoc.isTwoFactorEnabled),
     };
 
-    // Construct response with HTTP-only session cookie
     const response = NextResponse.json({
       success: true,
       message: 'Login successful. Redirecting to your dashboard...',
@@ -257,7 +304,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Set secure HTTP-only cookie
     response.cookies.set('ems_session', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
