@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 const DEFAULT_AVATAR =
-  'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80';
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80';
 
 // POST /api/v1/settings/profile/photo - Upload Profile Image to MongoDB GridFS
 export async function POST(req: NextRequest) {
@@ -34,6 +34,14 @@ export async function POST(req: NextRequest) {
     if (!file) {
       return NextResponse.json(
         { success: false, message: 'No image file selected.' },
+        { status: 400 }
+      );
+    }
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!ext || !['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid file extension. Only .jpg, .jpeg, .png, and .webp files are supported.' },
         { status: 400 }
       );
     }
@@ -61,6 +69,24 @@ export async function POST(req: NextRequest) {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+
+    // Verify binary magic bytes
+    let isValidMagic = false;
+    if (buffer.length >= 4) {
+      // JPEG: FF D8 FF
+      if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) isValidMagic = true;
+      // PNG: 89 50 4E 47
+      if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) isValidMagic = true;
+      // WEBP: RIFF header 52 49 46 46
+      if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) isValidMagic = true;
+    }
+
+    if (!isValidMagic) {
+      return NextResponse.json(
+        { success: false, message: 'Corrupted image file or spoofed magic byte header signature verification failed.' },
+        { status: 400 }
+      );
+    }
 
     if (previousFileId) {
       try {
@@ -92,7 +118,7 @@ export async function POST(req: NextRequest) {
       { upsert: true }
     );
 
-    await logAuditEvent(req, 'UPLOAD_PROFILE_PHOTO', {
+    await logAuditEvent(req, 'PROFILE_PHOTO_UPDATED', {
       details: { userId: auth.userId, fileId, filename: file.name, size: file.size },
     });
 
@@ -201,7 +227,7 @@ export async function DELETE(req: NextRequest) {
       $set: { avatar: DEFAULT_AVATAR, updatedAt: new Date() },
     });
 
-    await logAuditEvent(req, 'REMOVE_PROFILE_PHOTO', {
+    await logAuditEvent(req, 'PROFILE_PHOTO_REMOVED', {
       details: { userId: auth.userId, fileId },
     });
 

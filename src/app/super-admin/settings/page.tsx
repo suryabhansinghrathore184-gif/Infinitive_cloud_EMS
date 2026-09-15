@@ -47,6 +47,26 @@ interface SystemSettingsData {
   updatedAt: string;
 }
 
+interface DbHealthData {
+  dbName: string;
+  mongoStatus: string;
+  gridfsStatus: string;
+  photosBucketStatus: string;
+  documentsBucketStatus: string;
+  totalPhotos: number;
+  totalDocuments: number;
+  lastCheckedAt: string;
+}
+
+interface SmtpTestData {
+  provider: string;
+  host: string;
+  port: number;
+  tls: string;
+  status: string;
+  message: string;
+}
+
 const DEFAULT_AVATAR =
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80';
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -72,15 +92,18 @@ export default function SuperAdminSettingsPage() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Remove Photo Modal State
+  const [isRemovePhotoModalOpen, setIsRemovePhotoModalOpen] = useState(false);
+
   // Maintenance Confirmation Modal State
   const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
   const [pendingMaintenanceVal, setPendingMaintenanceVal] = useState<boolean | null>(null);
 
-  // Diagnostics State
+  // Real Diagnostics State
   const [isCheckingDb, setIsCheckingDb] = useState(false);
-  const [dbHealthStatus, setDbHealthStatus] = useState<'Healthy' | 'Error' | null>(null);
+  const [dbHealth, setDbHealth] = useState<DbHealthData | null>(null);
   const [isTestingSmtp, setIsTestingSmtp] = useState(false);
-  const [smtpTestResult, setSmtpTestResult] = useState<string | null>(null);
+  const [smtpTestResult, setSmtpTestResult] = useState<SmtpTestData | null>(null);
 
   // Sync avatar when user state updates
   useEffect(() => {
@@ -93,9 +116,10 @@ export default function SuperAdminSettingsPage() {
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [settingsRes, meRes] = await Promise.all([
+      const [settingsRes, meRes, healthRes] = await Promise.all([
         fetch('/api/v1/super-admin/settings'),
         fetch('/api/v1/auth/me'),
+        fetch('/api/v1/super-admin/settings/health'),
       ]);
 
       if (settingsRes.ok) {
@@ -114,6 +138,13 @@ export default function SuperAdminSettingsPage() {
           }
         }
       }
+
+      if (healthRes.ok) {
+        const healthResult = await healthRes.json();
+        if (healthResult.success && healthResult.data) {
+          setDbHealth(healthResult.data);
+        }
+      }
     } catch (err) {
       console.error('Error fetching global settings:', err);
     } finally {
@@ -129,7 +160,6 @@ export default function SuperAdminSettingsPage() {
     if (!settings) return;
 
     if (key === 'maintenanceMode' && val === true && !settings.maintenanceMode) {
-      // Prompt confirmation before enabling maintenance mode
       setPendingMaintenanceVal(true);
       setIsMaintenanceModalOpen(true);
       return;
@@ -178,31 +208,31 @@ export default function SuperAdminSettingsPage() {
     }
   };
 
-  // Profile Photo Validation (MIME type, file extension, magic bytes, file size)
+  // Profile Photo Validation (Client & Server side)
   const validateAndSelectFile = async (file: File) => {
     setFileError(null);
 
-    // 1. File extension validation
+    // 1. Extension check
     const ext = file.name.split('.').pop()?.toLowerCase();
     if (!ext || !['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
       setFileError('Invalid file extension. Only .jpg, .jpeg, .png, and .webp files are allowed.');
       return;
     }
 
-    // 2. MIME type validation
+    // 2. MIME type check
     if (!ALLOWED_MIME_TYPES.includes(file.type.toLowerCase())) {
       setFileError('Invalid image format. Supported formats: JPG, JPEG, PNG, WEBP.');
       return;
     }
 
-    // 3. File size validation
+    // 3. File size check
     if (file.size > MAX_FILE_SIZE) {
       const mbSize = (file.size / (1024 * 1024)).toFixed(2);
       setFileError(`File size (${mbSize} MB) exceeds maximum allowed size of 5 MB.`);
       return;
     }
 
-    // 4. Content magic byte inspection validation
+    // 4. Magic byte signature check
     try {
       const arrayBuffer = await file.slice(0, 4).arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
@@ -212,11 +242,11 @@ export default function SuperAdminSettingsPage() {
       if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) isValidMagic = true;
       // PNG: 89 50 4E 47
       if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) isValidMagic = true;
-      // WEBP: RIFF header starts with 52 49 46 46
+      // WEBP: RIFF header 52 49 46 46
       if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) isValidMagic = true;
 
       if (!isValidMagic) {
-        setFileError('Corrupted image binary or spoofed file format. File magic header signature verification failed.');
+        setFileError('Corrupted image binary or spoofed magic header signature verification failed.');
         return;
       }
     } catch {
@@ -272,9 +302,7 @@ export default function SuperAdminSettingsPage() {
     }
   };
 
-  const handleRemovePhoto = async () => {
-    if (!confirm('Are you sure you want to remove your Super Admin profile photo?')) return;
-
+  const handleConfirmRemovePhoto = async () => {
     try {
       const res = await fetch('/api/v1/settings/profile/photo', {
         method: 'DELETE',
@@ -287,29 +315,34 @@ export default function SuperAdminSettingsPage() {
         setProfilePhotoId(null);
         updateUserAvatar(fallbackAvatar);
 
-        setMessage({ type: 'success', text: 'Profile photo removed. Reverted to default avatar.' });
+        setMessage({ type: 'success', text: 'Profile photo removed from GridFS. Reverted to default avatar.' });
       } else {
         setMessage({ type: 'error', text: result.message || 'Failed to remove profile photo.' });
       }
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'Network error deleting photo.' });
+    } finally {
+      setIsRemovePhotoModalOpen(false);
     }
   };
 
   const handleCheckDbConnection = async () => {
     setIsCheckingDb(true);
-    setDbHealthStatus(null);
     try {
-      const res = await fetch('/api/v1/super-admin/stats');
+      const res = await fetch('/api/v1/super-admin/settings/health');
       if (res.ok) {
-        setDbHealthStatus('Healthy');
-        setMessage({ type: 'success', text: 'MongoDB Atlas & GridFS storage cluster status verified: Healthy & Responsive' });
+        const result = await res.json();
+        if (result.success && result.data) {
+          setDbHealth(result.data);
+          setMessage({
+            type: 'success',
+            text: `Database health verified: ${result.data.dbName} (${result.data.mongoStatus}). GridFS Vault: ${result.data.gridfsStatus}.`,
+          });
+        }
       } else {
-        setDbHealthStatus('Error');
         setMessage({ type: 'error', text: 'Database connectivity test returned an error status.' });
       }
     } catch {
-      setDbHealthStatus('Error');
       setMessage({ type: 'error', text: 'Failed to reach database connection.' });
     } finally {
       setIsCheckingDb(false);
@@ -320,16 +353,22 @@ export default function SuperAdminSettingsPage() {
     setIsTestingSmtp(true);
     setSmtpTestResult(null);
     try {
-      // Perform SMTP status check
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      const isConfigured = Boolean(settings?.smtpConfigured);
-      if (isConfigured) {
-        setSmtpTestResult('Connected');
-        setMessage({ type: 'success', text: `SMTP Server Test Passed: Gmail SMTP relay (${settings?.smtpHost}:${settings?.smtpPort}) is active.` });
+      const res = await fetch('/api/v1/super-admin/settings/test-smtp', {
+        method: 'POST',
+      });
+      const result = await res.json();
+      if (res.ok && result.success && result.data) {
+        setSmtpTestResult(result.data);
+        if (result.data.status === 'Connected') {
+          setMessage({ type: 'success', text: `SMTP Test Passed: ${result.data.message}` });
+        } else {
+          setMessage({ type: 'error', text: `SMTP Status: ${result.data.message}` });
+        }
       } else {
-        setSmtpTestResult('Not Configured');
-        setMessage({ type: 'error', text: 'SMTP environment variables are not set. Configure SMTP_HOST and GMAIL_USER in environment.' });
+        setMessage({ type: 'error', text: result.message || 'SMTP connection test failed.' });
       }
+    } catch {
+      setMessage({ type: 'error', text: 'Network communication error testing SMTP relay.' });
     } finally {
       setIsTestingSmtp(false);
     }
@@ -354,11 +393,11 @@ export default function SuperAdminSettingsPage() {
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-extrabold text-slate-900">System Core Configuration</h2>
             <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-700 border border-indigo-200">
-              GLOBAL ROOT
+              Super Admin
             </span>
           </div>
           <p className="text-xs text-slate-500">
-            System maintenance controls, Super Admin identity, GridFS storage parameters, and global organization rules
+            Global system controls, Super Admin identity, GridFS storage health, and outbound notification parameters
           </p>
         </div>
 
@@ -402,17 +441,17 @@ export default function SuperAdminSettingsPage() {
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <User className="h-5 w-5 text-indigo-600" />
-            <h3 className="text-sm font-extrabold text-slate-900">Super Admin Profile & Governance Identity</h3>
+            <h3 className="text-sm font-extrabold text-slate-900">Profile & Admin Identity</h3>
           </div>
           <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-700 border border-emerald-200 flex items-center gap-1">
             <ShieldCheck className="h-3 w-3 text-emerald-600" />
-            ROOT AUTHORIZED
+            Active Governance Session
           </span>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-            {/* Avatar Container with Edit Overlay */}
+            {/* Avatar Container */}
             <div className="relative group shrink-0">
               <div className="h-24 w-24 rounded-full overflow-hidden ring-4 ring-indigo-500/20 shadow-md bg-slate-100">
                 <img
@@ -447,11 +486,11 @@ export default function SuperAdminSettingsPage() {
                 <span>•</span>
                 <span className="flex items-center gap-1 text-emerald-700 font-bold">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Account Status: Active
+                  Status: Active
                 </span>
                 <span>•</span>
                 <span>
-                  GridFS Vault: <strong className="font-mono text-indigo-600">{profilePhotoId ? 'Photo Stored' : 'Default Avatar'}</strong>
+                  GridFS Storage: <strong className="font-mono text-indigo-600">{profilePhotoId ? 'Photo Stored' : 'Default Avatar'}</strong>
                 </span>
               </div>
             </div>
@@ -468,7 +507,7 @@ export default function SuperAdminSettingsPage() {
             </button>
 
             <button
-              onClick={handleRemovePhoto}
+              onClick={() => setIsRemovePhotoModalOpen(true)}
               className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700 px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors cursor-pointer"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -486,15 +525,15 @@ export default function SuperAdminSettingsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Section 2: Maintenance & Access Controls */}
+          {/* Section 2: Access & Maintenance Controls */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
             <div className="flex items-center gap-3 border-b pb-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 font-bold">
                 <ShieldAlert className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-sm font-extrabold text-slate-900">Access & Maintenance Controls</h3>
-                <p className="text-[11px] text-slate-500">Manage global site availability and onboarding mandates</p>
+                <h3 className="text-sm font-extrabold text-slate-900">Access & Maintenance</h3>
+                <p className="text-[11px] text-slate-500">Global site availability & public self-registration mandates</p>
               </div>
             </div>
 
@@ -502,7 +541,7 @@ export default function SuperAdminSettingsPage() {
               <div className="flex items-center justify-between p-3.5 rounded-xl border border-rose-100 bg-rose-50/50">
                 <div>
                   <p className="font-bold text-rose-900">Global Maintenance Mode</p>
-                  <p className="text-[10px] text-rose-600">Temporarily restrict access for non-Super Admin users</p>
+                  <p className="text-[10px] text-rose-600">Temporarily restrict access for non-Super Admin users.</p>
                 </div>
                 <input
                   type="checkbox"
@@ -515,7 +554,7 @@ export default function SuperAdminSettingsPage() {
               <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 bg-slate-50/60">
                 <div>
                   <p className="font-bold text-slate-800">Allow Self-Registration</p>
-                  <p className="text-[10px] text-slate-500">Permit new users to register on public sign-up (Defaults to EMPLOYEE role)</p>
+                  <p className="text-[10px] text-slate-500">Allow public users to create accounts (Defaults strictly to EMPLOYEE role).</p>
                 </div>
                 <input
                   type="checkbox"
@@ -527,7 +566,7 @@ export default function SuperAdminSettingsPage() {
             </div>
           </div>
 
-          {/* Section 3: General System Information */}
+          {/* Section 3: General Branding & Regional */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
             <div className="flex items-center gap-3 border-b pb-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 font-bold">
@@ -535,7 +574,7 @@ export default function SuperAdminSettingsPage() {
               </div>
               <div>
                 <h3 className="text-sm font-extrabold text-slate-900">General Branding & Regional</h3>
-                <p className="text-[11px] text-slate-500">Application title, default timezone, currency & support contact</p>
+                <p className="text-[11px] text-slate-500">Application title, timezone, support email, currency & date formats</p>
               </div>
             </div>
 
@@ -552,7 +591,7 @@ export default function SuperAdminSettingsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block mb-1 font-bold text-slate-700">Default Timezone</label>
+                  <label className="block mb-1 font-bold text-slate-700">Timezone</label>
                   <select
                     value={settings.defaultTimezone}
                     onChange={(e) => handleChange('defaultTimezone', e.target.value)}
@@ -607,7 +646,7 @@ export default function SuperAdminSettingsPage() {
             </div>
           </div>
 
-          {/* Section 4: Database & GridFS Storage */}
+          {/* Section 4: Database & GridFS Storage Health */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-3">
@@ -616,14 +655,14 @@ export default function SuperAdminSettingsPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-extrabold text-slate-900">Database & GridFS Storage</h3>
-                  <p className="text-[11px] text-slate-500">Document vault persistence and audit retention</p>
+                  <p className="text-[11px] text-slate-500">Real MongoDB Atlas & GridFS binary bucket health diagnostic</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={handleCheckDbConnection}
                 disabled={isCheckingDb}
-                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
               >
                 <RefreshCw className={`h-3.5 w-3.5 text-indigo-600 ${isCheckingDb ? 'animate-spin' : ''}`} />
                 <span>Check Connection</span>
@@ -634,36 +673,51 @@ export default function SuperAdminSettingsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-xl border border-slate-100 bg-slate-50/60 space-y-1">
                   <p className="font-bold text-slate-700">MongoDB Atlas</p>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 border border-emerald-200">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold border ${
+                    dbHealth?.mongoStatus === 'Connected' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
+                  }`}>
                     <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                    Connected
+                    {dbHealth?.mongoStatus || 'Connected'}
                   </span>
+                  <p className="text-[10px] text-slate-500 font-mono">
+                    Database: <strong className="text-slate-700">{dbHealth?.dbName || 'ems_database'}</strong>
+                  </p>
                 </div>
 
                 <div className="p-3 rounded-xl border border-slate-100 bg-slate-50/60 space-y-1">
-                  <p className="font-bold text-slate-700">GridFS Binary Vault</p>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 border border-emerald-200">
+                  <p className="font-bold text-slate-700">GridFS Storage Vault</p>
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold border ${
+                    dbHealth?.gridfsStatus === 'Healthy' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
+                  }`}>
                     <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                    Healthy (photos.files)
+                    {dbHealth?.gridfsStatus || 'Healthy'}
                   </span>
+                  <p className="text-[10px] text-slate-500">
+                    Photos: <strong className="text-slate-700">{dbHealth?.totalPhotos ?? 0} files</strong>
+                  </p>
                 </div>
               </div>
 
-              <div>
-                <label className="block mb-1 font-bold text-slate-700">Audit & Log Retention (Days)</label>
-                <input
-                  type="number"
-                  min={30}
-                  max={3650}
-                  value={settings.dataRetentionDays}
-                  onChange={(e) => handleChange('dataRetentionDays', parseInt(e.target.value, 10) || 365)}
-                  className="w-full rounded-xl border border-slate-200 p-2.5 font-semibold text-slate-800 focus:border-indigo-500 focus:outline-hidden"
-                />
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="flex items-center justify-between text-[11px] text-slate-600">
+                  <span>Photo Bucket (photos.files):</span>
+                  <span className="font-bold text-emerald-700">● {dbHealth?.photosBucketStatus || 'Healthy'}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-600">
+                  <span>Document Bucket (documents.files):</span>
+                  <span className="font-bold text-emerald-700">● {dbHealth?.documentsBucketStatus || 'Healthy'}</span>
+                </div>
               </div>
+
+              {dbHealth?.lastCheckedAt && (
+                <p className="text-[10px] text-slate-400 font-mono pt-1">
+                  Last Health Check: {new Date(dbHealth.lastCheckedAt).toLocaleString()}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Section 5: Email SMTP Integration */}
+          {/* Section 5: Email / SMTP Integration */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-3">
@@ -671,8 +725,8 @@ export default function SuperAdminSettingsPage() {
                   <Mail className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-slate-900">Email / SMTP Status</h3>
-                  <p className="text-[11px] text-slate-500">Gmail SMTP notification relay integration</p>
+                  <h3 className="text-sm font-extrabold text-slate-900">Email SMTP Integration</h3>
+                  <p className="text-[11px] text-slate-500">Outbound system notification dispatcher relay status</p>
                 </div>
               </div>
 
@@ -680,7 +734,7 @@ export default function SuperAdminSettingsPage() {
                 type="button"
                 onClick={handleTestSmtp}
                 disabled={isTestingSmtp}
-                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
               >
                 <RefreshCw className={`h-3.5 w-3.5 text-emerald-600 ${isTestingSmtp ? 'animate-spin' : ''}`} />
                 <span>Test SMTP Connection</span>
@@ -688,19 +742,123 @@ export default function SuperAdminSettingsPage() {
             </div>
 
             <div className="space-y-3 text-xs font-medium">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-700">SMTP Server Host</span>
-                <span className="font-mono text-xs text-slate-800">
-                  {settings.smtpHost}:{settings.smtpPort}
-                </span>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <span className="block text-[10px] text-slate-500 font-bold uppercase">Provider</span>
+                  <span className="font-bold text-slate-800">{smtpTestResult?.provider || 'Gmail SMTP'}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-slate-500 font-bold uppercase">Host</span>
+                  <span className="font-mono text-xs text-slate-800">{smtpTestResult?.host || settings.smtpHost}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-slate-500 font-bold uppercase">Port & TLS</span>
+                  <span className="font-mono text-xs text-slate-800">
+                    {smtpTestResult?.port || settings.smtpPort} ({smtpTestResult?.tls || (settings.smtpPort === 465 ? 'SSL/TLS' : 'STARTTLS')})
+                  </span>
+                </div>
               </div>
 
               <div className="flex items-center justify-between p-3 rounded-xl border border-emerald-100 bg-emerald-50/50">
                 <span className="font-bold text-emerald-900">Connection Status</span>
-                <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
+                <span className={`inline-flex items-center gap-1 font-bold ${
+                  (smtpTestResult?.status || (settings.smtpConfigured ? 'Connected' : 'Not Configured')) === 'Connected'
+                    ? 'text-emerald-700'
+                    : 'text-amber-700'
+                }`}>
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                  {settings.smtpConfigured ? 'Connected' : 'Not Configured'}
+                  {smtpTestResult?.status || (settings.smtpConfigured ? 'Connected' : 'Not Configured')}
                 </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 6: System Defaults */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+            <div className="flex items-center gap-3 border-b pb-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600 font-bold">
+                <Clock className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900">System Defaults</h3>
+                <p className="text-[11px] text-slate-500">Audit log retention parameters & default organization code</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs font-medium">
+              <div>
+                <label className="block mb-1 font-bold text-slate-700">Audit Log Retention</label>
+                <select
+                  value={settings.dataRetentionDays}
+                  onChange={(e) => handleChange('dataRetentionDays', parseInt(e.target.value, 10))}
+                  className="w-full rounded-xl border border-slate-200 p-2.5 font-semibold text-slate-800 focus:border-indigo-500 focus:outline-hidden"
+                >
+                  <option value={30}>30 days</option>
+                  <option value={90}>90 days</option>
+                  <option value={180}>180 days</option>
+                  <option value={365}>365 days (1 Year)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-slate-700">Default Organization Code</label>
+                <input
+                  type="text"
+                  value={settings.defaultOrganizationCode}
+                  onChange={(e) => handleChange('defaultOrganizationCode', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 p-2.5 font-semibold text-slate-800 focus:border-indigo-500 focus:outline-hidden"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 7: Danger Zone */}
+          <div className="rounded-2xl border border-rose-200/80 bg-white p-5 shadow-xs space-y-4">
+            <div className="flex items-center gap-3 border-b border-rose-100 pb-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 font-bold">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-rose-900">Danger Zone</h3>
+                <p className="text-[11px] text-rose-600">High-impact system-wide governance controls requiring explicit confirmation</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs font-medium">
+              <div className="flex items-center justify-between p-3.5 rounded-xl border border-rose-100 bg-rose-50/50">
+                <div>
+                  <p className="font-bold text-rose-900">Restrict Public Registration</p>
+                  <p className="text-[10px] text-rose-600">Disable new self-registration accounts across all tenants</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleChange('allowSelfSignup', !settings.allowSelfSignup)}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
+                    !settings.allowSelfSignup
+                      ? 'bg-rose-600 text-white'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {!settings.allowSelfSignup ? 'Public Signup Disabled' : 'Disable Public Signup'}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-3.5 rounded-xl border border-rose-100 bg-rose-50/50">
+                <div>
+                  <p className="font-bold text-rose-900">Global Maintenance Lockout</p>
+                  <p className="text-[10px] text-rose-600">Toggle site-wide maintenance mode for non-Super Admin users</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleChange('maintenanceMode', !settings.maintenanceMode)}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
+                    settings.maintenanceMode
+                      ? 'bg-rose-600 text-white'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {settings.maintenanceMode ? 'Maintenance Mode Active' : 'Enable Maintenance Mode'}
+                </button>
               </div>
             </div>
           </div>
@@ -798,6 +956,40 @@ export default function SuperAdminSettingsPage() {
         </div>
       )}
 
+      {/* CONFIRM REMOVE PHOTO MODAL */}
+      {isRemovePhotoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-600 border-b pb-3">
+              <Trash2 className="h-6 w-6 shrink-0" />
+              <h3 className="text-base font-extrabold text-slate-900">Remove Profile Photo?</h3>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed font-medium">
+              Are you sure you want to remove your Super Admin profile photo? This will permanently delete the file from MongoDB GridFS storage and revert your profile to the default system avatar.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t">
+              <button
+                type="button"
+                onClick={() => setIsRemovePhotoModalOpen(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmRemovePhoto}
+                className="rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2 text-xs font-bold text-white shadow-md transition-colors cursor-pointer"
+              >
+                Confirm Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CONFIRM MAINTENANCE MODE MODAL */}
       {isMaintenanceModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
@@ -808,7 +1000,7 @@ export default function SuperAdminSettingsPage() {
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed font-medium">
-              Enabling Maintenance Mode will temporarily restrict system access for non-Super Admin users (Admins, HR, Managers, and Employees). Super Admin privileges will remain fully active so you can perform server maintenance and updates safely.
+              Enabling Maintenance Mode will temporarily restrict system access for non-Super Admin users (Admins, HR, Managers, and Employees). Super Admin privileges will remain fully active so you can perform server maintenance safely.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t">
