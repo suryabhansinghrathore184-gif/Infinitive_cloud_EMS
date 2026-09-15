@@ -1,28 +1,37 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { SuperAdminLayout } from '@/components/layout/SuperAdminLayout';
 import {
-  Lock,
-  ShieldCheck,
   ShieldAlert,
-  Key,
+  ShieldCheck,
+  Shield,
+  KeyRound,
+  Users,
+  Lock,
   RefreshCw,
-  Save,
-  CheckCircle2,
-  AlertCircle,
   Activity,
-  Server,
-  UserCheck,
-  Globe,
-  SlidersHorizontal,
-  X,
-  RotateCcw,
-  Check,
+  CheckCircle2,
   AlertTriangle,
-  FileText,
-  Clock,
+  Radio,
+  Sliders,
+  RotateCcw,
   Zap,
+  Clock,
+  Globe,
+  Database,
+  Search,
+  Filter,
+  Eye,
+  X,
+  Send,
+  Trash2,
+  Server,
+  FileText,
+  ChevronRight,
+  UserX,
+  AlertCircle,
 } from 'lucide-react';
 
 interface SecurityConfig {
@@ -42,74 +51,109 @@ interface SecurityConfig {
   allowedIpRanges: string[];
   geoBlockingEnabled: boolean;
   updatedAt: string;
-  updatedBy?: string;
+  updatedBy: string;
 }
 
-interface SecurityStats {
-  totalUsersCount: number;
-  mfaUsersCount: number;
-  activeSessionsCount: number;
-  failedLoginsLast24h: number;
-  sslStatus: string;
-  dbEncryptionStatus: string;
+interface ActiveSession {
+  id: string;
+  userId: string;
+  email: string;
+  role: string;
+  organizationId: string;
+  userAgent: string;
+  ipAddress: string;
+  createdAt: string;
+  expiresAt: string;
 }
 
-interface SecurityAuditLog {
+interface SecurityLog {
   id: string;
   action: string;
   performedBy: string;
   performedByName: string;
   role: string;
+  organizationId: string;
   details: any;
+  ipAddress: string;
+  severity: 'INFO' | 'WARNING' | 'CRITICAL';
   timestamp: string;
 }
 
-interface DiagnosticCheck {
-  check: string;
-  status: 'PASSED' | 'WARNING' | 'INFO';
-  details: string;
+interface FailedLogin {
+  id: string;
+  email: string;
+  action: string;
+  ipAddress: string;
+  reason: string;
+  timestamp: string;
+}
+
+interface HealthSummary {
+  overallStatus: 'HEALTHY' | 'WARNING' | 'CRITICAL';
+  reasons: string[];
+  components: {
+    authentication: string;
+    sessionSecurity: string;
+    mfaPolicy: string;
+    emailOtp: string;
+    databaseSecurity: string;
+    auditLogging: string;
+  };
 }
 
 export default function SuperAdminSecurityPage() {
   const [config, setConfig] = useState<SecurityConfig | null>(null);
-  const [originalConfig, setOriginalConfig] = useState<SecurityConfig | null>(null);
-  const [stats, setStats] = useState<SecurityStats | null>(null);
-  const [recentLogs, setRecentLogs] = useState<SecurityAuditLog[]>([]);
+  const [initialConfig, setInitialConfig] = useState<SecurityConfig | null>(null);
+  const [stats, setStats] = useState<any>({});
+  const [healthSummary, setHealthSummary] = useState<HealthSummary | null>(null);
+  const [smtpHealth, setSmtpHealth] = useState<any>({});
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+  const [securityLogs, setSecurityLogs] = useState<SecurityLog[]>([]);
+  const [failedLogins, setFailedLogins] = useState<FailedLogin[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [saveError, setSaveError] = useState('');
+
+  // Event stream search & filter
+  const [eventSearch, setEventSearch] = useState('');
+  const [severityFilter, setSeverityFilter] = useState('All');
 
   // Modals
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [showRestoreModal, setShowRestoreModal] = useState(false);
-  const [showRevokeGlobalModal, setShowRevokeGlobalModal] = useState(false);
   const [showDiagnosticModal, setShowDiagnosticModal] = useState(false);
-
-  // Diagnostic State
   const [isDiagnosticRunning, setIsDiagnosticRunning] = useState(false);
-  const [diagnosticResult, setDiagnosticResult] = useState<{
-    score: number;
-    timestamp: string;
-    checks: DiagnosticCheck[];
-  } | null>(null);
+  const [diagnosticResults, setDiagnosticResults] = useState<any>(null);
 
-  // Fetch security state from backend
+  const [showRevokeModal, setShowRevokeModal] = useState(false);
+  const [isRevoking, setIsRevoking] = useState(false);
+
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+
+  const [isTestingSmtp, setIsTestingSmtp] = useState(false);
+  const [smtpResult, setSmtpResult] = useState<any>(null);
+
+  const hasUnsavedChanges = JSON.stringify(config) !== JSON.stringify(initialConfig);
+
   const fetchSecurityData = useCallback(async () => {
     setIsLoading(true);
-    setMessage(null);
     try {
       const res = await fetch('/api/v1/super-admin/security');
-      const result = await res.json();
-      if (res.ok && result.success && result.data) {
-        setConfig(result.data.config);
-        setOriginalConfig(result.data.config);
-        setStats(result.data.stats);
-        setRecentLogs(result.data.recentSecurityLogs || []);
+      if (res.ok) {
+        const result = await res.json();
+        if (result.success && result.data) {
+          setConfig(result.data.config);
+          setInitialConfig(result.data.config);
+          setStats(result.data.stats || {});
+          setHealthSummary(result.data.healthSummary || null);
+          setSmtpHealth(result.data.smtpHealth || {});
+          setActiveSessions(result.data.activeSessions || []);
+          setSecurityLogs(result.data.recentSecurityLogs || []);
+          setFailedLogins(result.data.failedLogins || []);
+        }
       }
-    } catch (err: any) {
-      console.error('Error fetching security data:', err);
-      setMessage({ type: 'error', text: 'Failed to connect to security governance service.' });
+    } catch (err) {
+      console.error('Error fetching security governance data:', err);
     } finally {
       setIsLoading(false);
     }
@@ -119,70 +163,51 @@ export default function SuperAdminSecurityPage() {
     fetchSecurityData();
   }, [fetchSecurityData]);
 
-  // Handle boolean toggle changes
-  const handleToggle = (key: keyof SecurityConfig) => {
-    if (!config) return;
-    setConfig({
-      ...config,
-      [key]: !config[key],
-    });
-  };
-
-  // Handle number input changes
-  const handleNumberChange = (key: keyof SecurityConfig, val: number) => {
-    if (!config) return;
-    setConfig({
-      ...config,
-      [key]: val,
-    });
-  };
-
-  // Calculate dirty state
-  const isDirty = useMemo(() => {
-    if (!config || !originalConfig) return false;
-    return JSON.stringify(config) !== JSON.stringify(originalConfig);
-  }, [config, originalConfig]);
-
-  // Confirm Save Policies
-  const handleConfirmSave = async (actionType = 'SAVE') => {
-    if (!config) return;
+  // Save Config
+  const handleSaveConfig = async (actionType?: string) => {
     setIsSaving(true);
-    setShowSaveModal(false);
-    setShowRestoreModal(false);
-    setMessage(null);
+    setSaveMessage('');
+    setSaveError('');
 
     try {
       const res = await fetch('/api/v1/super-admin/security', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config, actionType }),
+        body: JSON.stringify({
+          config,
+          actionType: actionType || 'SAVE_SECURITY_CONFIG',
+        }),
       });
 
       const result = await res.json();
       if (res.ok && result.success) {
-        setMessage({ type: 'success', text: result.message || 'Security policies saved successfully.' });
-        fetchSecurityData();
+        setSaveMessage(result.message || 'Security policies updated successfully.');
+        setInitialConfig(result.data);
+        setConfig(result.data);
+        setShowRestoreModal(false);
       } else {
-        setMessage({ type: 'error', text: result.message || 'Failed to save security configuration.' });
+        setSaveError(result.message || 'Failed to save security policy.');
       }
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Network communication error.' });
+      setSaveError(err.message || 'Network error occurred.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Run Security Health Diagnostic
+  // Run Health Diagnostic Audit
   const handleRunDiagnostic = async () => {
     setIsDiagnosticRunning(true);
     setShowDiagnosticModal(true);
+    setDiagnosticResults(null);
+
     try {
-      const res = await fetch('/api/v1/super-admin/security/diagnostic', {
-        method: 'POST',
-      });
-      const result = await res.json();
-      if (res.ok && result.success && result.data) {
-        setDiagnosticResult(result.data);
+      const res = await fetch('/api/v1/super-admin/security/diagnostic', { method: 'POST' });
+      if (res.ok) {
+        const result = await res.json();
+        if (result.success) {
+          setDiagnosticResults(result.data);
+        }
       }
     } catch (err) {
       console.error('Diagnostic error:', err);
@@ -191,460 +216,355 @@ export default function SuperAdminSecurityPage() {
     }
   };
 
-  // Emergency Global Session Revocation
-  const handleConfirmRevokeGlobalSessions = async () => {
-    setIsSaving(true);
-    setShowRevokeGlobalModal(false);
-    setMessage(null);
-
+  // Revoke All Global Sessions
+  const handleRevokeGlobalSessions = async () => {
+    setIsRevoking(true);
     try {
-      const res = await fetch('/api/v1/super-admin/security/revoke-global-sessions', {
-        method: 'POST',
-      });
+      const res = await fetch('/api/v1/super-admin/security/revoke-global-sessions', { method: 'POST' });
       const result = await res.json();
       if (res.ok && result.success) {
-        setMessage({ type: 'success', text: result.message });
+        setShowRevokeModal(false);
         fetchSecurityData();
-      } else {
-        setMessage({ type: 'error', text: result.message || 'Failed to revoke global sessions.' });
       }
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Error executing session revocation.' });
+    } catch (err) {
+      console.error('Failed to revoke sessions:', err);
     } finally {
-      setIsSaving(false);
+      setIsRevoking(false);
     }
   };
 
+  // Test SMTP Connection Diagnostic
+  const handleTestSmtp = async () => {
+    setIsTestingSmtp(true);
+    setSmtpResult(null);
+    try {
+      const res = await fetch('/api/v1/super-admin/settings/test-smtp', { method: 'POST' });
+      const result = await res.json();
+      setSmtpResult(result);
+    } catch (err: any) {
+      setSmtpResult({ success: false, message: err.message || 'SMTP diagnostic request failed.' });
+    } finally {
+      setIsTestingSmtp(false);
+    }
+  };
+
+  // Filtered security log events
+  const filteredLogs = securityLogs.filter((log) => {
+    const matchesSearch =
+      (log.action || '').toLowerCase().includes(eventSearch.toLowerCase()) ||
+      (log.performedBy || '').toLowerCase().includes(eventSearch.toLowerCase()) ||
+      (log.ipAddress || '').toLowerCase().includes(eventSearch.toLowerCase());
+
+    const matchesSeverity = severityFilter === 'All' || log.severity === severityFilter;
+
+    return matchesSearch && matchesSeverity;
+  });
+
   return (
     <SuperAdminLayout
-      pageTitle="System Security & Access Governance Center"
+      pageTitle="Security & Access Governance Control Center"
       breadcrumbs={[
         { label: 'Executive Dashboard', href: '/super-admin/dashboard' },
-        { label: 'Security Center', href: '/super-admin/security' },
+        { label: 'Security Operations', href: '/super-admin/security' },
       ]}
     >
-      {/* 1. Header Toolbar */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      {/* Page Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Security Governance Controls</h2>
-            <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-              ENTERPRISE SHIELD
+            <h2 className="text-xl font-extrabold text-slate-900">Security & Access Governance Center</h2>
+            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800 border border-emerald-300">
+              ENTERPRISE GOVERNANCE ACTIVE
             </span>
-            {isDirty && (
-              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-800 border border-amber-300 animate-pulse">
-                UNSAVED CHANGES
-              </span>
-            )}
           </div>
-          <p className="text-xs font-medium text-slate-500 mt-0.5">
-            Multi-factor authentication enforcement, password strength requirements, session security, and network whitelisting.
+          <p className="text-xs text-slate-500">
+            Monitor authentication security, sessions, access controls, MFA policies, and system security events
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={handleRunDiagnostic}
-            className="flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 shadow-2xs hover:bg-indigo-100"
+            onClick={fetchSecurityData}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition-colors"
           >
-            <Zap className="h-3.5 w-3.5 text-indigo-600" />
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+
+          <button
+            onClick={handleRunDiagnostic}
+            className="flex items-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 px-3.5 py-2 text-xs font-bold text-white shadow-md transition-colors"
+          >
+            <Zap className="h-3.5 w-3.5" />
             <span>Run Diagnostic</span>
           </button>
 
           <button
-            onClick={() => setShowRevokeGlobalModal(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 shadow-2xs hover:bg-rose-100"
+            onClick={() => handleSaveConfig()}
+            disabled={isSaving || !config}
+            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-xs font-bold text-white shadow-md transition-colors disabled:opacity-50"
           >
-            <Lock className="h-3.5 w-3.5 text-rose-600" />
-            <span>Revoke All Sessions</span>
-          </button>
-
-          <button
-            onClick={() => setShowRestoreModal(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50"
-          >
-            <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
-            <span>Restore Defaults</span>
-          </button>
-
-          <button
-            onClick={fetchSecurityData}
-            disabled={isLoading || isSaving}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 text-indigo-600 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Refresh Audit</span>
-          </button>
-
-          <button
-            onClick={() => setShowSaveModal(true)}
-            disabled={!isDirty || isSaving}
-            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-          >
-            {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {isSaving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
             <span>Save Security Policies</span>
           </button>
         </div>
       </div>
 
-      {/* Notification Banner */}
-      {message && (
-        <div
-          className={`flex items-center gap-2 rounded-xl p-3.5 text-xs font-semibold border ${
-            message.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-              : 'bg-rose-50 text-rose-800 border-rose-200'
-          }`}
-        >
-          {message.type === 'success' ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <AlertCircle className="h-4 w-4 text-rose-600" />}
-          <span>{message.text}</span>
+      {/* Unsaved Changes Banner */}
+      {hasUnsavedChanges && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 flex items-center justify-between text-xs font-semibold text-amber-800 shadow-xs animate-pulse">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <span>UNSAVED SECURITY CHANGES: You have unsaved policy modifications.</span>
+          </div>
+          <button
+            onClick={() => handleSaveConfig()}
+            className="rounded-lg bg-amber-600 hover:bg-amber-700 px-3 py-1 font-bold text-white"
+          >
+            Save Changes Now
+          </button>
         </div>
       )}
 
-      {/* 2. Executive Security Metrics Row */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        {/* Active Sessions */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Live Tokens</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-              <Activity className="h-4 w-4" />
+      {/* Save Alert Messages */}
+      {saveMessage && (
+        <div className="rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 border border-emerald-200">
+          {saveMessage}
+        </div>
+      )}
+      {saveError && (
+        <div className="rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 border border-rose-200">
+          {saveError}
+        </div>
+      )}
+
+      {/* Security Health Summary Banner */}
+      {healthSummary && (
+        <div className={`rounded-2xl border p-4 shadow-xs ${
+          healthSummary.overallStatus === 'HEALTHY' ? 'border-emerald-200 bg-emerald-50/40' : 'border-amber-200 bg-amber-50/40'
+        }`}>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-3">
+              {healthSummary.overallStatus === 'HEALTHY' ? (
+                <ShieldCheck className="h-7 w-7 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertTriangle className="h-7 w-7 text-amber-600 shrink-0 animate-bounce" />
+              )}
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900">
+                  Overall System Security Status: <span className={healthSummary.overallStatus === 'HEALTHY' ? 'text-emerald-700' : 'text-amber-700'}>{healthSummary.overallStatus}</span>
+                </h3>
+                <p className="text-xs text-slate-600">
+                  Real-time security telemetry evaluated across authentication parameters, sessions, MFA policies, and database encryption.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6 text-[10px] font-bold">
+              {Object.entries(healthSummary.components).map(([key, value]) => (
+                <div key={key} className="rounded-xl bg-white p-2 border border-slate-200 text-center shadow-2xs">
+                  <p className="text-slate-400 uppercase tracking-wider text-[9px]">{key.replace(/([A-Z])/g, ' $1')}</p>
+                  <p className={`mt-0.5 font-extrabold ${value === 'Healthy' ? 'text-emerald-600' : 'text-amber-600'}`}>{value}</p>
+                </div>
+              ))}
             </div>
           </div>
-          <p className="mt-2 text-2xl font-extrabold text-slate-900">{stats?.activeSessionsCount ?? 0}</p>
-          <span className="mt-1 inline-block text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-            Active Tokens
-          </span>
+        </div>
+      )}
+
+      {/* Real KPI Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Live Sessions</p>
+          <div className="mt-1 flex items-baseline justify-between">
+            <span className="text-2xl font-black text-indigo-600">{stats.activeSessionsCount ?? 0}</span>
+            <Activity className="h-4 w-4 text-indigo-500" />
+          </div>
         </div>
 
-        {/* Failed Logins 24h */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Failed Logins</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
-              <ShieldAlert className="h-4 w-4" />
-            </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Failed Logins 24h</p>
+          <div className="mt-1 flex items-baseline justify-between">
+            <span className="text-2xl font-black text-rose-600">{stats.failedLoginsLast24h ?? 0}</span>
+            <ShieldAlert className="h-4 w-4 text-rose-500" />
           </div>
-          <p className="mt-2 text-2xl font-extrabold text-rose-600">{stats?.failedLoginsLast24h ?? 0}</p>
-          <span className="mt-1 inline-block text-[10px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
-            Last 24h Events
-          </span>
         </div>
 
-        {/* MFA Coverage */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">MFA Users</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-              <Key className="h-4 w-4" />
-            </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">MFA Users</p>
+          <div className="mt-1 flex items-baseline justify-between">
+            <span className="text-2xl font-black text-emerald-600">{stats.mfaUsersCount ?? 0}</span>
+            <Lock className="h-4 w-4 text-emerald-500" />
           </div>
-          <p className="mt-2 text-2xl font-extrabold text-purple-600">{stats?.mfaUsersCount ?? 0}</p>
-          <span className="mt-1 inline-block text-[10px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
-            2FA Active
-          </span>
         </div>
 
-        {/* Total Users */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">User Roster</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <UserCheck className="h-4 w-4" />
-            </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">User Roster</p>
+          <div className="mt-1 flex items-baseline justify-between">
+            <span className="text-2xl font-black text-slate-900">{stats.totalUsersCount ?? 0}</span>
+            <Users className="h-4 w-4 text-slate-400" />
           </div>
-          <p className="mt-2 text-2xl font-extrabold text-slate-900">{stats?.totalUsersCount ?? 0}</p>
-          <span className="mt-1 inline-block text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-            Protected Accounts
-          </span>
         </div>
 
-        {/* Transport Security */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Transport</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <Lock className="h-4 w-4" />
-            </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Transport</p>
+          <div className="mt-1 flex items-baseline justify-between">
+            <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-1 rounded">HTTPS</span>
+            <Globe className="h-4 w-4 text-emerald-500" />
           </div>
-          <p className="mt-2 text-sm font-extrabold text-emerald-600">TLS 1.3 / SSL</p>
-          <span className="mt-1 inline-block text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-            Active & Valid
-          </span>
         </div>
 
-        {/* Database Vault */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Database Vault</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-teal-50 text-teal-600">
-              <Server className="h-4 w-4" />
-            </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Database Security</p>
+          <div className="mt-1 flex items-baseline justify-between">
+            <span className="text-xs font-extrabold text-purple-700 bg-purple-50 px-2 py-1 rounded">AES-256</span>
+            <Database className="h-4 w-4 text-purple-500" />
           </div>
-          <p className="mt-2 text-sm font-extrabold text-teal-600">AES-256 Atlas</p>
-          <span className="mt-1 inline-block text-[10px] font-semibold text-teal-600 bg-teal-50 px-2 py-0.5 rounded">
-            Encrypted at Rest
-          </span>
         </div>
       </div>
 
-      {/* 3. Main Policy Governance Cards */}
-      {isLoading || !config ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-16 text-slate-400">
-          <RefreshCw className="h-8 w-8 animate-spin text-indigo-600" />
-          <p className="mt-3 text-xs font-medium text-slate-600">Loading security governance policies...</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Card 1: Multi-Factor Authentication */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4">
-            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 font-bold">
-                <Key className="h-5 w-5" />
-              </div>
+      {/* Security Policy Governance Cards */}
+      {config && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* Card 1: Password & Authentication Policy */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+            <div className="flex items-center gap-2 border-b pb-3">
+              <KeyRound className="h-5 w-5 text-indigo-600" />
               <div>
-                <h3 className="text-sm font-extrabold text-slate-900">Multi-Factor Authentication (MFA / 2FA)</h3>
-                <p className="text-[11px] text-slate-500">Configure global 2FA and OTP login mandates</p>
+                <h3 className="text-sm font-extrabold text-slate-900">Authentication & Password Complexity Policy</h3>
+                <p className="text-[11px] text-slate-500">Configure global password length, character mandates, and expiration horizons</p>
               </div>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/60">
-                <div>
-                  <p className="font-bold text-slate-800">Enforce MFA for All Users</p>
-                  <p className="text-[10px] text-slate-500">Require TOTP authenticator app on every user login</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={config.mfaEnforced}
-                  onChange={() => handleToggle('mfaEnforced')}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/60">
-                <div>
-                  <p className="font-bold text-slate-800">Enforce MFA for Super Admin & Admin Only</p>
-                  <p className="text-[10px] text-slate-500">Require 2FA specifically for privileged administrative accounts</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={config.mfaForSuperAdminsOnly}
-                  onChange={() => handleToggle('mfaForSuperAdminsOnly')}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                />
-              </div>
-
+            <div className="space-y-3 text-xs font-medium">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-slate-700">OTP Code Expiration (Minutes)</p>
-                  <p className="text-[10px] text-slate-500">Duration before verification OTP expires</p>
+                <label className="text-slate-700 font-bold">Minimum Password Length</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="6"
+                    max="32"
+                    value={config.passwordPolicyMinLength}
+                    onChange={(e) => setConfig({ ...config, passwordPolicyMinLength: parseInt(e.target.value, 10) })}
+                    className="w-28 accent-indigo-600"
+                  />
+                  <span className="font-mono font-bold text-slate-900 w-8 text-right">{config.passwordPolicyMinLength} chars</span>
                 </div>
-                <input
-                  type="number"
-                  min={5}
-                  max={30}
-                  value={config.otpExpiryMinutes}
-                  onChange={(e) => handleNumberChange('otpExpiryMinutes', parseInt(e.target.value, 10) || 10)}
-                  className="w-20 rounded-lg border border-slate-200 p-1.5 text-center font-bold text-slate-800"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Password Complexity & Expiry */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4">
-            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600 font-bold">
-                <Lock className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-900">Password Policy Requirements</h3>
-                <p className="text-[11px] text-slate-500">Enforce strong password rules for all account credentials</p>
-              </div>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-slate-700">Minimum Password Length</p>
-                  <p className="text-[10px] text-slate-500">Recommended minimum character length</p>
-                </div>
-                <input
-                  type="number"
-                  min={6}
-                  max={32}
-                  value={config.passwordPolicyMinLength}
-                  onChange={(e) => handleNumberChange('passwordPolicyMinLength', parseInt(e.target.value, 10) || 8)}
-                  className="w-20 rounded-lg border border-slate-200 p-1.5 text-center font-bold text-slate-800"
-                />
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/60">
-                <div>
-                  <p className="font-bold text-slate-800">Require Special Characters (!@#$%^&*)</p>
-                  <p className="text-[10px] text-slate-500">Passwords must include at least one symbol</p>
-                </div>
+              <div className="flex items-center justify-between border-t pt-2.5">
+                <label className="text-slate-700 font-bold">Require Special Characters (!@#$%^&*)</label>
                 <input
                   type="checkbox"
                   checked={config.requireSpecialChars}
-                  onChange={() => handleToggle('requireSpecialChars')}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  onChange={(e) => setConfig({ ...config, requireSpecialChars: e.target.checked })}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/60">
-                <div>
-                  <p className="font-bold text-slate-800">Require Numbers (0-9)</p>
-                  <p className="text-[10px] text-slate-500">Passwords must contain numeric digits</p>
-                </div>
+              <div className="flex items-center justify-between border-t pt-2.5">
+                <label className="text-slate-700 font-bold">Require Numerical Digits (0-9)</label>
                 <input
                   type="checkbox"
                   checked={config.requireNumbers}
-                  onChange={() => handleToggle('requireNumbers')}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  onChange={(e) => setConfig({ ...config, requireNumbers: e.target.checked })}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-slate-700">Password Expiry Period (Days)</p>
-                  <p className="text-[10px] text-slate-500">Days before mandatory rotation (0 = Disabled)</p>
-                </div>
+              <div className="flex items-center justify-between border-t pt-2.5">
+                <label className="text-slate-700 font-bold">Require Uppercase Letters (A-Z)</label>
                 <input
-                  type="number"
-                  min={0}
-                  max={365}
-                  value={config.passwordExpiryDays}
-                  onChange={(e) => handleNumberChange('passwordExpiryDays', parseInt(e.target.value, 10) || 0)}
-                  className="w-20 rounded-lg border border-slate-200 p-1.5 text-center font-bold text-slate-800"
+                  type="checkbox"
+                  checked={config.requireUppercase}
+                  onChange={(e) => setConfig({ ...config, requireUppercase: e.target.checked })}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
+              </div>
+
+              <div className="flex items-center justify-between border-t pt-2.5">
+                <label className="text-slate-700 font-bold">Password Expiration Horizon</label>
+                <select
+                  value={config.passwordExpiryDays}
+                  onChange={(e) => setConfig({ ...config, passwordExpiryDays: parseInt(e.target.value, 10) })}
+                  className="rounded-xl border border-slate-200 px-3 py-1.5 font-semibold text-slate-800"
+                >
+                  <option value={30}>30 Days</option>
+                  <option value={60}>60 Days</option>
+                  <option value={90}>90 Days</option>
+                  <option value={180}>180 Days</option>
+                  <option value={0}>Never Expire</option>
+                </select>
               </div>
             </div>
           </div>
 
-          {/* Card 3: Session Security & Lockout */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4">
-            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 font-bold">
-                <ShieldAlert className="h-5 w-5" />
-              </div>
+          {/* Card 2: Session & Lockout Governance */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+            <div className="flex items-center gap-2 border-b pb-3">
+              <Clock className="h-5 w-5 text-indigo-600" />
               <div>
-                <h3 className="text-sm font-extrabold text-slate-900">Session Security & Lockout</h3>
-                <p className="text-[11px] text-slate-500">Inactivity timeouts and brute-force protection</p>
+                <h3 className="text-sm font-extrabold text-slate-900">Session Security & Brute-Force Lockout</h3>
+                <p className="text-[11px] text-slate-500">Manage active token expiration, concurrent access, and login attempt thresholds</p>
               </div>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs font-medium">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-slate-700">Max Failed Login Attempts</p>
-                  <p className="text-[10px] text-slate-500">Temporarily locks account after N failed retries</p>
-                </div>
-                <input
-                  type="number"
-                  min={3}
-                  max={10}
-                  value={config.maxLoginAttempts}
-                  onChange={(e) => handleNumberChange('maxLoginAttempts', parseInt(e.target.value, 10) || 5)}
-                  className="w-20 rounded-lg border border-slate-200 p-1.5 text-center font-bold text-slate-800"
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-slate-700">Inactivity Session Timeout (Minutes)</p>
-                  <p className="text-[10px] text-slate-500">Auto-logs user out after idle duration</p>
-                </div>
-                <input
-                  type="number"
-                  min={15}
-                  max={480}
+                <label className="text-slate-700 font-bold">Session Expiration Timeout</label>
+                <select
                   value={config.sessionTimeoutMinutes}
-                  onChange={(e) => handleNumberChange('sessionTimeoutMinutes', parseInt(e.target.value, 10) || 60)}
-                  className="w-20 rounded-lg border border-slate-200 p-1.5 text-center font-bold text-slate-800"
-                />
+                  onChange={(e) => setConfig({ ...config, sessionTimeoutMinutes: parseInt(e.target.value, 10) })}
+                  className="rounded-xl border border-slate-200 px-3 py-1.5 font-semibold text-slate-800"
+                >
+                  <option value={15}>15 Minutes</option>
+                  <option value={30}>30 Minutes</option>
+                  <option value={60}>1 Hour</option>
+                  <option value={240}>4 Hours</option>
+                  <option value={1440}>24 Hours</option>
+                </select>
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/60">
-                <div>
-                  <p className="font-bold text-slate-800">Allow Concurrent Device Logins</p>
-                  <p className="text-[10px] text-slate-500">Permit multiple active sessions per user account</p>
-                </div>
+              <div className="flex items-center justify-between border-t pt-2.5">
+                <label className="text-slate-700 font-bold">Max Failed Login Attempts Before Lockout</label>
+                <select
+                  value={config.maxLoginAttempts}
+                  onChange={(e) => setConfig({ ...config, maxLoginAttempts: parseInt(e.target.value, 10) })}
+                  className="rounded-xl border border-slate-200 px-3 py-1.5 font-semibold text-slate-800"
+                >
+                  <option value={3}>3 Attempts</option>
+                  <option value={5}>5 Attempts</option>
+                  <option value={10}>10 Attempts</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between border-t pt-2.5">
+                <label className="text-slate-700 font-bold">Allow Concurrent User Sessions</label>
                 <input
                   type="checkbox"
                   checked={config.concurrentSessionsAllowed}
-                  onChange={() => handleToggle('concurrentSessionsAllowed')}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  onChange={(e) => setConfig({ ...config, concurrentSessionsAllowed: e.target.checked })}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/60">
-                <div>
-                  <p className="font-bold text-slate-800">Revoke Sessions on Password Change</p>
-                  <p className="text-[10px] text-slate-500">Automatically logout all devices when password updates</p>
-                </div>
+              <div className="flex items-center justify-between border-t pt-2.5">
+                <label className="text-slate-700 font-bold">Revoke Sessions on Password Reset</label>
                 <input
                   type="checkbox"
                   checked={config.revokeOnPasswordChange}
-                  onChange={() => handleToggle('revokeOnPasswordChange')}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  onChange={(e) => setConfig({ ...config, revokeOnPasswordChange: e.target.checked })}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
               </div>
-            </div>
-          </div>
 
-          {/* Card 4: Network Security & IP Whitelisting */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4">
-            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 font-bold">
-                <Globe className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-900">Network & IP Whitelisting</h3>
-                <p className="text-[11px] text-slate-500">Restrict admin login access to specific CIDR ranges</p>
-              </div>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/60">
-                <div>
-                  <p className="font-bold text-slate-800">Enable IP Range Restriction</p>
-                  <p className="text-[10px] text-slate-500">Block admin access outside approved corporate IPs</p>
-                </div>
+              <div className="flex items-center justify-between border-t pt-2.5">
+                <label className="text-slate-700 font-bold">Global MFA Enforcement</label>
                 <input
                   type="checkbox"
-                  checked={config.ipWhitelistEnabled}
-                  onChange={() => handleToggle('ipWhitelistEnabled')}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-bold text-slate-700">Approved IP Subnets (CIDR)</label>
-                <input
-                  type="text"
-                  value={config.allowedIpRanges ? config.allowedIpRanges.join(', ') : '0.0.0.0/0'}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      allowedIpRanges: e.target.value.split(',').map((s) => s.trim()),
-                    })
-                  }
-                  className="w-full rounded-xl border border-slate-200 p-2.5 font-mono text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-hidden"
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/60">
-                <div>
-                  <p className="font-bold text-slate-800">Enable Geo-Blocking Threat Alerts</p>
-                  <p className="text-[10px] text-slate-500">Alert Super Admin on logins from unapproved regions</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={config.geoBlockingEnabled}
-                  onChange={() => handleToggle('geoBlockingEnabled')}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  checked={config.mfaEnforced}
+                  onChange={(e) => setConfig({ ...config, mfaEnforced: e.target.checked })}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
               </div>
             </div>
@@ -652,206 +572,231 @@ export default function SuperAdminSecurityPage() {
         </div>
       )}
 
-      {/* 4. Real-time Security Audit & Threat Feed */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      {/* Live Session Monitor */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/60 px-5 py-4">
           <div className="flex items-center gap-2">
             <Activity className="h-5 w-5 text-indigo-600" />
-            <h3 className="text-sm font-extrabold text-slate-900">Recent Security Audit & Threat Events</h3>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900">Active Live User Sessions</h3>
+              <p className="text-[11px] text-slate-500">Real-time session token monitoring across all tenant organizations</p>
+            </div>
           </div>
-          <span className="text-[11px] font-semibold text-slate-500">Live Audit Vault Stream</span>
+          <button
+            onClick={() => setShowRevokeModal(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-700 transition-colors"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span>Revoke All Sessions</span>
+          </button>
         </div>
 
-        <div className="space-y-2 text-xs">
-          {recentLogs.length === 0 ? (
-            <p className="py-6 text-center text-slate-500">No security audit logs recorded yet.</p>
-          ) : (
-            recentLogs.map((log) => (
-              <div key={log.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-100 bg-slate-50 p-3 gap-2">
-                <div className="flex items-center gap-2.5">
-                  <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-[10px] font-extrabold text-indigo-800 border border-indigo-200">
-                    {log.action}
-                  </span>
-                  <span className="font-bold text-slate-900">{log.performedByName}</span>
-                  <span className="text-[10px] font-mono text-slate-500">({log.performedBy})</span>
-                </div>
+        {activeSessions.length === 0 ? (
+          <div className="py-12 text-center text-xs text-slate-500">
+            <Activity className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-2 font-bold text-slate-700">No active user sessions recorded</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <tr>
+                  <th className="py-3 px-4">User Account</th>
+                  <th className="py-3 px-4">Role & Org</th>
+                  <th className="py-3 px-4">Device & IP</th>
+                  <th className="py-3 px-4">Created</th>
+                  <th className="py-3 px-4">Expires</th>
+                  <th className="py-3 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                {activeSessions.map((s) => (
+                  <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3 px-4">
+                      <p className="font-bold text-slate-900">{s.email}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">User ID: {s.userId}</p>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200">
+                        {s.role}
+                      </span>
+                      <p className="text-[10px] font-mono text-slate-400 mt-0.5">{s.organizationId}</p>
+                    </td>
+                    <td className="py-3 px-4 text-[11px]">
+                      <p className="font-medium text-slate-800">{s.userAgent.slice(0, 30)}...</p>
+                      <p className="font-mono text-[10px] text-slate-400">{s.ipAddress}</p>
+                    </td>
+                    <td className="py-3 px-4 text-[11px] font-mono text-slate-500">
+                      {new Date(s.createdAt).toLocaleTimeString()}
+                    </td>
+                    <td className="py-3 px-4 text-[11px] font-mono text-slate-500">
+                      {new Date(s.expiresAt).toLocaleTimeString()}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <button
+                        onClick={handleRevokeGlobalSessions}
+                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-50 hover:border-rose-300"
+                      >
+                        Revoke
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-                <span className="text-[10px] text-slate-400 font-mono">
+      {/* Security Event Stream */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden space-y-3 p-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b pb-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5 text-indigo-600" />
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900">Recent Security Event Stream</h3>
+              <p className="text-[11px] text-slate-500">Real-time audit log stream tracking administrative overrides and login activity</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Link
+              href="/super-admin/audit-logs"
+              className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800"
+            >
+              <span>View Full Audit Logs</span>
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Filter bar */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Filter events by action, email, or IP address..."
+              value={eventSearch}
+              onChange={(e) => setEventSearch(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-9 pr-3 py-1.5 text-xs font-medium text-slate-800 focus:outline-hidden"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <span>Severity:</span>
+            <select
+              value={severityFilter}
+              onChange={(e) => setSeverityFilter(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700"
+            >
+              <option value="All">All Severities</option>
+              <option value="INFO">INFO</option>
+              <option value="WARNING">WARNING</option>
+              <option value="CRITICAL">CRITICAL</option>
+            </select>
+          </div>
+        </div>
+
+        {filteredLogs.length === 0 ? (
+          <div className="py-8 text-center text-xs text-slate-400">
+            No matching security events found
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {filteredLogs.map((log) => (
+              <div key={log.id} className="py-2.5 flex items-center justify-between text-xs hover:bg-slate-50/50 px-2 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <span className={`rounded-md px-2 py-0.5 text-[9px] font-black border ${
+                    log.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-800 border-rose-300' :
+                    log.severity === 'WARNING' ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                    'bg-slate-100 text-slate-700 border-slate-200'
+                  }`}>
+                    {log.severity}
+                  </span>
+                  <div>
+                    <p className="font-bold text-slate-900">{log.action}</p>
+                    <p className="text-[11px] text-slate-500">{log.performedBy} ({log.role}) &bull; IP: {log.ipAddress}</p>
+                  </div>
+                </div>
+                <span className="font-mono text-[10px] text-slate-400">
                   {new Date(log.timestamp).toLocaleString()}
                 </span>
               </div>
-            ))
-          )}
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Danger Zone */}
+      <div className="rounded-2xl border border-rose-200 bg-rose-50/30 p-5 shadow-xs space-y-3">
+        <div className="flex items-center gap-2 border-b border-rose-200 pb-3">
+          <AlertCircle className="h-5 w-5 text-rose-600" />
+          <div>
+            <h3 className="text-sm font-extrabold text-rose-900">DANGER ZONE & EMERGENCY CONTROLS</h3>
+            <p className="text-[11px] text-rose-700">High-privilege emergency security interventions</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setShowRevokeModal(true)}
+            className="rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2 text-xs font-bold text-white shadow-md transition-colors"
+          >
+            Emergency Revoke All Global Sessions
+          </button>
+
+          <button
+            onClick={() => setShowRestoreModal(true)}
+            className="rounded-xl border border-rose-300 bg-white hover:bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition-colors"
+          >
+            Restore Factory Security Defaults
+          </button>
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* MODALS SECTION */}
-      {/* ========================================================================= */}
-
-      {/* 1. Save Policy Confirmation Modal */}
-      {showSaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-indigo-600" />
-                <h3 className="text-sm font-extrabold text-slate-900">Save Security Policy Governance?</h3>
-              </div>
-              <button onClick={() => setShowSaveModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-600">
-              You are updating system-wide security policies including multi-factor authentication, password rules, session timeouts, and IP whitelisting.
-            </p>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setShowSaveModal(false)}
-                className="rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleConfirmSave('SAVE')}
-                disabled={isSaving}
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {isSaving ? 'Saving...' : 'Confirm & Save Policies'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 2. Emergency Global Session Revocation Modal */}
-      {showRevokeGlobalModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <ShieldAlert className="h-5 w-5 text-rose-600" />
-                <h3 className="text-sm font-extrabold text-slate-900">Emergency Global Session Revocation</h3>
-              </div>
-              <button onClick={() => setShowRevokeGlobalModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="rounded-xl bg-rose-50 p-3.5 border border-rose-200 flex items-start gap-2.5 text-xs text-rose-800">
-              <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
-              <div>
-                <strong className="block font-bold">High-Impact Emergency Action</strong>
-                This will invalidate all active session tokens across all user accounts in the application, requiring all active users to re-authenticate.
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setShowRevokeGlobalModal(false)}
-                className="rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmRevokeGlobalSessions}
-                disabled={isSaving}
-                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50"
-              >
-                {isSaving ? 'Revoking...' : 'Confirm Global Revocation'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Restore Defaults Modal */}
-      {showRestoreModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <RotateCcw className="h-5 w-5 text-amber-600" />
-                <h3 className="text-sm font-extrabold text-slate-900">Restore Factory Security Policies?</h3>
-              </div>
-              <button onClick={() => setShowRestoreModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-600">
-              This will restore factory default parameters for MFA mandates, password rules, lockout thresholds, and IP ranges.
-            </p>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setShowRestoreModal(false)}
-                className="rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleConfirmSave('RESTORE_DEFAULTS')}
-                disabled={isSaving}
-                className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-700 disabled:opacity-50"
-              >
-                {isSaving ? 'Restoring...' : 'Confirm Restore Defaults'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4. Security Diagnostic Results Modal */}
+      {/* Diagnostic Modal */}
       {showDiagnosticModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-indigo-600" />
-                <h3 className="text-sm font-extrabold text-slate-900">Security Health Diagnostic Audit</h3>
+                <Zap className="h-5 w-5 text-purple-600" />
+                <h3 className="text-base font-extrabold text-slate-900">Automated Security Health Diagnostic</h3>
               </div>
-              <button onClick={() => setShowDiagnosticModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-4 w-4" />
+              <button onClick={() => setShowDiagnosticModal(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
+                <X className="h-5 w-5" />
               </button>
             </div>
 
             {isDiagnosticRunning ? (
-              <div className="py-12 flex flex-col items-center justify-center text-slate-500 text-xs">
-                <RefreshCw className="h-8 w-8 animate-spin text-indigo-600" />
-                <p className="mt-3 font-semibold text-slate-700">Executing security diagnostic checks...</p>
+              <div className="py-12 flex flex-col items-center justify-center text-slate-400 space-y-3">
+                <RefreshCw className="h-8 w-8 animate-spin text-purple-600" />
+                <p className="text-xs font-bold text-slate-700">Running diagnostic security audit checks...</p>
               </div>
-            ) : diagnosticResult ? (
+            ) : diagnosticResults ? (
               <div className="space-y-4 text-xs">
-                <div className="flex items-center justify-between rounded-xl bg-indigo-50 p-4 border border-indigo-200">
+                <div className="flex items-center justify-between rounded-xl bg-purple-50 p-4 border border-purple-200">
                   <div>
-                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">Security Health Index</span>
-                    <span className="text-2xl font-extrabold text-indigo-900">{diagnosticResult.score} / 100</span>
+                    <p className="text-purple-700 font-bold">Overall Health Score Index</p>
+                    <p className="text-3xl font-black text-purple-900">{diagnosticResults.healthScore} / 100</p>
                   </div>
-                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-extrabold text-emerald-800 border border-emerald-300">
-                    EXCELLENT RATING
+                  <span className="rounded-full bg-purple-200 px-3 py-1 font-black text-purple-800 text-xs">
+                    {diagnosticResults.summaryStatus}
                   </span>
                 </div>
 
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {diagnosticResult.checks.map((item, idx) => (
-                    <div key={idx} className="flex items-start justify-between rounded-xl border border-slate-200 bg-slate-50 p-3 gap-2">
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {diagnosticResults.audits?.map((audit: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between rounded-lg border border-slate-200 p-2.5 bg-slate-50">
                       <div>
-                        <p className="font-bold text-slate-900">{item.check}</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">{item.details}</p>
+                        <p className="font-bold text-slate-900">{audit.name}</p>
+                        <p className="text-[10px] text-slate-500">{audit.detail}</p>
                       </div>
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold border shrink-0 ${
-                          item.status === 'PASSED'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : item.status === 'WARNING'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-blue-50 text-blue-700 border-blue-200'
-                        }`}
-                      >
-                        {item.status}
+                      <span className={`rounded-md px-2 py-0.5 font-bold text-[10px] ${
+                        audit.status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {audit.status}
                       </span>
                     </div>
                   ))}
@@ -859,12 +804,70 @@ export default function SuperAdminSecurityPage() {
               </div>
             ) : null}
 
-            <div className="flex justify-end pt-2 border-t border-slate-100">
+            <div className="flex justify-end border-t pt-3">
               <button
                 onClick={() => setShowDiagnosticModal(false)}
-                className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800"
+                className="rounded-xl bg-slate-900 hover:bg-slate-800 px-5 py-2 text-xs font-bold text-white transition-colors"
               >
                 Close Diagnostic
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revoke Sessions Modal */}
+      {showRevokeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 border-b pb-3">
+              <AlertTriangle className="h-5 w-5 text-rose-600" />
+              <h3 className="text-base font-extrabold text-slate-900">Revoke All Active Sessions?</h3>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              This will immediately invalidate all active login session tokens across all tenant organizations. Users will be required to re-authenticate.
+            </p>
+
+            <div className="flex justify-end gap-2 border-t pt-3">
+              <button onClick={() => setShowRevokeModal(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">
+                Cancel
+              </button>
+              <button
+                onClick={handleRevokeGlobalSessions}
+                disabled={isRevoking}
+                className="rounded-xl bg-rose-600 hover:bg-rose-700 px-5 py-2 text-xs font-bold text-white shadow-md disabled:opacity-50"
+              >
+                {isRevoking ? 'Revoking...' : 'Confirm Emergency Revocation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restore Defaults Modal */}
+      {showRestoreModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 border-b pb-3">
+              <RotateCcw className="h-5 w-5 text-amber-600" />
+              <h3 className="text-base font-extrabold text-slate-900">Restore Factory Security Defaults?</h3>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              This will reset all security governance parameters to factory defaults (8-character password min, 60m session timeout, 5 login attempts).
+            </p>
+
+            <div className="flex justify-end gap-2 border-t pt-3">
+              <button onClick={() => setShowRestoreModal(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">
+                Cancel
+              </button>
+              <button
+                onClick={() => handleSaveConfig('RESTORE_DEFAULTS')}
+                disabled={isSaving}
+                className="rounded-xl bg-amber-600 hover:bg-amber-700 px-5 py-2 text-xs font-bold text-white shadow-md disabled:opacity-50"
+              >
+                {isSaving ? 'Restoring...' : 'Restore Defaults Now'}
               </button>
             </div>
           </div>
