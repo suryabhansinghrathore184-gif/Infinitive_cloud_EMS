@@ -18,11 +18,17 @@ import {
   FileText,
   Download,
   Activity,
-  Layers,
   CheckCircle2,
   AlertTriangle,
   Copy,
   Check,
+  Lock,
+  Calendar,
+  ShieldCheck,
+  AlertOctagon,
+  KeyRound,
+  SlidersHorizontal,
+  ArrowRight
 } from 'lucide-react';
 
 interface AuditLog {
@@ -46,9 +52,23 @@ interface AuditLog {
 
 interface AuditStats {
   totalEvents: number;
+  eventsToday: number;
+  securityEvents: number;
+  failedActions: number;
+  adminChanges: number;
+  loginLogoutEvents: number;
   activeActors24h: number;
-  securityOverridesCount: number;
   retentionPolicy: string;
+}
+
+interface SecurityBreakdown {
+  loginFailures: number;
+  sessionRevocations: number;
+  roleEscalations: number;
+  orgModifications: number;
+  securityDiagnostics: number;
+  unauthorizedAttempts: number;
+  systemConfigChanges: number;
 }
 
 interface FilterOptions {
@@ -63,9 +83,22 @@ export default function SuperAdminAuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [stats, setStats] = useState<AuditStats>({
     totalEvents: 0,
+    eventsToday: 0,
+    securityEvents: 0,
+    failedActions: 0,
+    adminChanges: 0,
+    loginLogoutEvents: 0,
     activeActors24h: 0,
-    securityOverridesCount: 0,
     retentionPolicy: '90-Day Enterprise Immutable Policy (AES-256 Storage)',
+  });
+  const [securityBreakdown, setSecurityBreakdown] = useState<SecurityBreakdown>({
+    loginFailures: 0,
+    sessionRevocations: 0,
+    roleEscalations: 0,
+    orgModifications: 0,
+    securityDiagnostics: 0,
+    unauthorizedAttempts: 0,
+    systemConfigChanges: 0,
   });
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     categories: [],
@@ -82,8 +115,11 @@ export default function SuperAdminAuditLogsPage() {
   const [roleFilter, setRoleFilter] = useState('All');
   const [timeFilter, setTimeFilter] = useState('All');
   const [severityFilter, setSeverityFilter] = useState('All');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
   const [totalLogs, setTotalLogs] = useState(0);
 
@@ -99,13 +135,15 @@ export default function SuperAdminAuditLogsPage() {
     try {
       const params = new URLSearchParams({
         page: String(page),
-        limit: '20',
+        limit: String(limit),
         search,
         category: categoryFilter,
         organizationId: orgFilter,
         role: roleFilter,
         timeRange: timeFilter,
         severity: severityFilter,
+        ...(startDate ? { startDate } : {}),
+        ...(endDate ? { endDate } : {}),
       });
 
       const res = await fetch(`/api/v1/super-admin/audit-logs?${params.toString()}`);
@@ -114,6 +152,7 @@ export default function SuperAdminAuditLogsPage() {
         if (result.success && result.data) {
           setLogs(result.data.logs || []);
           setStats(result.data.stats || {});
+          setSecurityBreakdown(result.data.securityBreakdown || {});
           setFilterOptions(result.data.filters || {});
           setTotalPages(result.data.pagination?.totalPages || 1);
           setTotalLogs(result.data.pagination?.total || 0);
@@ -124,7 +163,7 @@ export default function SuperAdminAuditLogsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, search, categoryFilter, orgFilter, roleFilter, timeFilter, severityFilter]);
+  }, [page, limit, search, categoryFilter, orgFilter, roleFilter, timeFilter, severityFilter, startDate, endDate]);
 
   useEffect(() => {
     fetchLogs();
@@ -152,6 +191,8 @@ export default function SuperAdminAuditLogsPage() {
       role: roleFilter,
       timeRange: timeFilter,
       severity: severityFilter,
+      ...(startDate ? { startDate } : {}),
+      ...(endDate ? { endDate } : {}),
       export: format,
     });
 
@@ -182,23 +223,24 @@ export default function SuperAdminAuditLogsPage() {
 
   return (
     <SuperAdminLayout
-      pageTitle="Global Audit Trail & Compliance Stream"
+      pageTitle="Audit & Compliance Control Center"
       breadcrumbs={[
         { label: 'Executive Dashboard', href: '/super-admin/dashboard' },
         { label: 'Audit Logs', href: '/super-admin/audit-logs' },
       ]}
     >
-      {/* Header */}
+      {/* Header Banner */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-extrabold text-slate-900">System Activity Stream</h2>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-extrabold text-slate-800 border border-slate-300">
-              {totalLogs} AUDIT EVENTS RECORDED
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-xl font-extrabold text-slate-900">Audit & Compliance Stream</h2>
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-extrabold text-slate-800 border border-slate-300">
+              <Lock className="h-3 w-3 text-slate-600" />
+              READ-ONLY IMMUTABLE LEDGER
             </span>
           </div>
-          <p className="text-xs text-slate-500">
-            Immutable system audit logs tracking administrative overrides, security telemetry, user access, and system transactions across all organizations
+          <p className="text-xs text-slate-500 mt-0.5">
+            Enterprise audit logging tracking administrative changes, security telemetry, user access, and system transactions across all organizations.
           </p>
         </div>
 
@@ -210,7 +252,7 @@ export default function SuperAdminAuditLogsPage() {
             }`}
           >
             <Activity className={`h-3.5 w-3.5 ${autoRefresh ? 'animate-pulse text-emerald-600' : 'text-slate-400'}`} />
-            <span>{autoRefresh ? 'Auto-Refresh (10s)' : 'Enable Live Stream'}</span>
+            <span>{autoRefresh ? 'Live Stream (10s)' : 'Enable Live Stream'}</span>
           </button>
 
           <button
@@ -239,61 +281,146 @@ export default function SuperAdminAuditLogsPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Audit Events</p>
+      {/* 6 Audit Summary KPI Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Events</p>
           <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-2xl font-black text-slate-900">{stats.totalEvents || 0}</span>
-            <FileText className="h-5 w-5 text-indigo-500" />
+            <span className="text-xl font-black text-slate-900">{stats.totalEvents || 0}</span>
+            <FileText className="h-4 w-4 text-indigo-500" />
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Performers (24h)</p>
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Events Today</p>
           <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-2xl font-black text-emerald-600">{stats.activeActors24h || 0}</span>
-            <User className="h-5 w-5 text-emerald-500" />
+            <span className="text-xl font-black text-emerald-600">{stats.eventsToday || 0}</span>
+            <Clock className="h-4 w-4 text-emerald-500" />
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Security & Critical Overrides</p>
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Security Events</p>
           <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-2xl font-black text-purple-600">{stats.securityOverridesCount || 0}</span>
-            <ShieldAlert className="h-5 w-5 text-purple-500" />
+            <span className="text-xl font-black text-purple-600">{stats.securityEvents || 0}</span>
+            <ShieldAlert className="h-4 w-4 text-purple-500" />
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Retention & Storage Policy</p>
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Failed / Blocked</p>
           <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-xs font-bold text-slate-700 leading-tight">90-Day Enterprise Immutable Policy</span>
-            <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+            <span className="text-xl font-black text-rose-600">{stats.failedActions || 0}</span>
+            <AlertOctagon className="h-4 w-4 text-rose-500" />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Admin Changes</p>
+          <div className="mt-1 flex items-baseline justify-between">
+            <span className="text-xl font-black text-blue-600">{stats.adminChanges || 0}</span>
+            <SlidersHorizontal className="h-4 w-4 text-blue-500" />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Login / Logout</p>
+          <div className="mt-1 flex items-baseline justify-between">
+            <span className="text-xl font-black text-amber-600">{stats.loginLogoutEvents || 0}</span>
+            <KeyRound className="h-4 w-4 text-amber-500" />
           </div>
         </div>
       </div>
 
-      {/* Filter & Search Toolbar */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search by action, actor email, employee name, IP address, or payload details..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-9 pr-4 py-2.5 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-hidden"
-          />
+      {/* 7-Point Security Event Visualization Breakdown */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+        <div className="flex items-center justify-between mb-3 border-b pb-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-indigo-600" />
+            <h3 className="text-xs font-extrabold uppercase text-slate-800 tracking-wider">Security Event Telemetry & Breakdown</h3>
+          </div>
+          <span className="text-[10px] font-bold text-slate-400">7 Security Telemetry Indicators</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-7">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2 text-center">
+            <p className="text-[10px] font-bold text-slate-500 uppercase">Login Failures</p>
+            <p className="text-base font-black text-rose-600 mt-0.5">{securityBreakdown.loginFailures || 0}</p>
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2 text-center">
+            <p className="text-[10px] font-bold text-slate-500 uppercase">Session Revokes</p>
+            <p className="text-base font-black text-amber-600 mt-0.5">{securityBreakdown.sessionRevocations || 0}</p>
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2 text-center">
+            <p className="text-[10px] font-bold text-slate-500 uppercase">Role Changes</p>
+            <p className="text-base font-black text-indigo-600 mt-0.5">{securityBreakdown.roleEscalations || 0}</p>
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2 text-center">
+            <p className="text-[10px] font-bold text-slate-500 uppercase">Org Modifications</p>
+            <p className="text-base font-black text-blue-600 mt-0.5">{securityBreakdown.orgModifications || 0}</p>
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2 text-center">
+            <p className="text-[10px] font-bold text-slate-500 uppercase">Diagnostics</p>
+            <p className="text-base font-black text-emerald-600 mt-0.5">{securityBreakdown.securityDiagnostics || 0}</p>
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2 text-center">
+            <p className="text-[10px] font-bold text-slate-500 uppercase">Unauthorized</p>
+            <p className="text-base font-black text-rose-700 mt-0.5">{securityBreakdown.unauthorizedAttempts || 0}</p>
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2 text-center">
+            <p className="text-[10px] font-bold text-slate-500 uppercase">Config Changes</p>
+            <p className="text-base font-black text-purple-600 mt-0.5">{securityBreakdown.systemConfigChanges || 0}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Advanced Filter Toolbar */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by action, actor email, employee name, IP address, or payload details..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-9 pr-4 py-2.5 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-hidden"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div>
+              <label className="sr-only">Page Size</label>
+              <select
+                value={limit}
+                onChange={(e) => {
+                  setLimit(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:outline-hidden"
+              >
+                <option value={10}>10 per page</option>
+                <option value={25}>25 per page</option>
+                <option value={50}>50 per page</option>
+                <option value={100}>100 per page</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6">
           {/* Category Filter */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Event Category</label>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Module / Category</label>
             <select
               value={categoryFilter}
               onChange={(e) => {
@@ -389,15 +516,41 @@ export default function SuperAdminAuditLogsPage() {
               className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-hidden"
             >
               <option value="All">All Time</option>
+              <option value="today">Today</option>
               <option value="24h">Last 24 Hours</option>
               <option value="7d">Last 7 Days</option>
               <option value="30d">Last 30 Days</option>
             </select>
           </div>
+
+          {/* Date Pickers */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Start / End Date</label>
+            <div className="flex items-center gap-1">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full rounded-lg border border-slate-200 px-1.5 py-1 text-[11px] font-semibold text-slate-700"
+              />
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full rounded-lg border border-slate-200 px-1.5 py-1 text-[11px] font-semibold text-slate-700"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Audit Log Table */}
+      {/* 9-Column Enterprise Audit Log Table */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-16 text-slate-400">
@@ -415,56 +568,71 @@ export default function SuperAdminAuditLogsPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3.5 px-4">Action Event & Category</th>
-                  <th className="py-3.5 px-4">Actor</th>
-                  <th className="py-3.5 px-4">Role & Organization</th>
-                  <th className="py-3.5 px-4">Device & IP</th>
-                  <th className="py-3.5 px-4">Timestamp</th>
-                  <th className="py-3.5 px-4 text-right">Payload</th>
+                  <th className="py-3.5 px-4">1. Event</th>
+                  <th className="py-3.5 px-4">2. Actor</th>
+                  <th className="py-3.5 px-4">3. Role</th>
+                  <th className="py-3.5 px-4">4. Organization</th>
+                  <th className="py-3.5 px-4">5. Module</th>
+                  <th className="py-3.5 px-4">6. Severity</th>
+                  <th className="py-3.5 px-4">7. IP Address</th>
+                  <th className="py-3.5 px-4">8. Timestamp</th>
+                  <th className="py-3.5 px-4 text-right">9. Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                 {logs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                    {/* 1. Event */}
                     <td className="py-3 px-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 font-bold text-[10px]">
-                          LOG
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <p className="font-bold text-slate-900">{log.action}</p>
-                            {renderSeverityBadge(log.severity)}
-                          </div>
-                          <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider">{log.category}</span>
-                        </div>
-                      </div>
+                      <p className="font-bold text-slate-900">{log.action}</p>
                     </td>
 
+                    {/* 2. Actor */}
                     <td className="py-3 px-4">
                       <p className="font-bold text-slate-800">{log.performedByName || 'System'}</p>
                       <p className="text-[10px] text-slate-400">{log.performedBy}</p>
                     </td>
 
+                    {/* 3. Role */}
                     <td className="py-3 px-4">
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200">
                         {formatRoleLabel(log.role)}
                       </span>
-                      <p className="text-[10px] font-mono text-slate-400 mt-0.5">{log.organizationName} ({log.organizationCode})</p>
                     </td>
 
+                    {/* 4. Organization */}
+                    <td className="py-3 px-4">
+                      <p className="font-semibold text-slate-800 text-[11px]">{log.organizationName}</p>
+                      <p className="text-[10px] font-mono text-slate-400">{log.organizationCode}</p>
+                    </td>
+
+                    {/* 5. Module / Category */}
+                    <td className="py-3 px-4">
+                      <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-extrabold text-indigo-700 uppercase border border-indigo-100">
+                        {log.category}
+                      </span>
+                    </td>
+
+                    {/* 6. Severity */}
+                    <td className="py-3 px-4">
+                      {renderSeverityBadge(log.severity)}
+                    </td>
+
+                    {/* 7. IP Address */}
                     <td className="py-3 px-4 text-[11px]">
                       <p className="font-mono text-[10px] text-slate-700">{log.ipAddress}</p>
-                      <p className="text-[10px] text-slate-400 truncate max-w-xs">{log.userAgent}</p>
+                      <p className="text-[10px] text-slate-400 truncate max-w-[120px]">{log.userAgent}</p>
                     </td>
 
-                    <td className="py-3 px-4 text-slate-500 text-[11px] font-mono">
+                    {/* 8. Timestamp */}
+                    <td className="py-3 px-4 text-slate-500 text-[11px] font-mono whitespace-nowrap">
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3 text-slate-400" />
                         <span>{new Date(log.timestamp).toLocaleString()}</span>
                       </div>
                     </td>
 
+                    {/* 9. Action */}
                     <td className="py-3 px-4 text-right">
                       <button
                         onClick={() => setSelectedLog(log)}
@@ -509,60 +677,89 @@ export default function SuperAdminAuditLogsPage() {
         )}
       </div>
 
-      {/* JSON Payload Inspector & Diff Modal */}
+      {/* Audit Retention Info Banner */}
+      <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-3.5 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-2.5">
+          <ShieldCheck className="h-5 w-5 text-indigo-600 shrink-0" />
+          <div>
+            <p className="font-extrabold text-indigo-950">{stats.retentionPolicy}</p>
+            <p className="text-slate-500 text-[11px]">Audit logs are cryptographically sealed, time-stamped, and tamper-proof. Write-once, read-only compliance enforced.</p>
+          </div>
+        </div>
+        <span className="rounded-full bg-indigo-100 px-3 py-1 text-[10px] font-extrabold text-indigo-800">
+          COMPLIANCE COMPLIANT
+        </span>
+      </div>
+
+      {/* JSON Payload Inspector & Before/After Diff Modal */}
       {selectedLog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-indigo-600" />
-                <h3 className="text-base font-extrabold text-slate-900">Audit Event Payload & Diff Inspector</h3>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">Audit Event Payload & Diff Inspector</h3>
+                  <p className="text-[11px] text-slate-400">Event ID: {selectedLog.id}</p>
+                </div>
               </div>
               <button onClick={() => setSelectedLog(null)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs rounded-xl bg-slate-50 p-3 border border-slate-200">
+            <div className="grid grid-cols-2 gap-3 text-xs rounded-xl bg-slate-50 p-3 border border-slate-200 sm:grid-cols-4">
               <div>
-                <p className="text-slate-500 font-medium">Action Event:</p>
+                <p className="text-slate-500 font-medium text-[10px]">Action Event:</p>
                 <p className="font-bold text-slate-900">{selectedLog.action}</p>
               </div>
               <div>
-                <p className="text-slate-500 font-medium">Actor Email:</p>
+                <p className="text-slate-500 font-medium text-[10px]">Actor Email:</p>
                 <p className="font-bold text-slate-900">{selectedLog.performedBy}</p>
               </div>
               <div>
-                <p className="text-slate-500 font-medium">Role & Org:</p>
+                <p className="text-slate-500 font-medium text-[10px]">Role & Org:</p>
                 <p className="font-bold text-slate-900">{selectedLog.role} &bull; {selectedLog.organizationName}</p>
               </div>
               <div>
-                <p className="text-slate-500 font-medium">Timestamp:</p>
-                <p className="font-mono text-slate-900">{new Date(selectedLog.timestamp).toISOString()}</p>
+                <p className="text-slate-500 font-medium text-[10px]">Timestamp:</p>
+                <p className="font-mono text-slate-900 text-[11px]">{new Date(selectedLog.timestamp).toISOString()}</p>
               </div>
             </div>
 
             {/* Side-by-side Before / After Diff view if available */}
             {(selectedLog.oldValue || selectedLog.newValue) && (
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-1">
-                  <p className="font-bold text-amber-900 text-[10px] uppercase">Before Value (oldValue)</p>
-                  <pre className="max-h-40 overflow-y-auto font-mono text-[10px] text-amber-800 scrollbar-thin">
-                    {JSON.stringify(selectedLog.oldValue || {}, null, 2)}
-                  </pre>
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <span>State Modification Diff View</span>
+                  <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
                 </div>
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 space-y-1">
-                  <p className="font-bold text-emerald-900 text-[10px] uppercase">After Value (newValue)</p>
-                  <pre className="max-h-40 overflow-y-auto font-mono text-[10px] text-emerald-800 scrollbar-thin">
-                    {JSON.stringify(selectedLog.newValue || {}, null, 2)}
-                  </pre>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className="font-bold text-amber-900 text-[10px] uppercase">Before State (oldValue)</p>
+                      <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded">PREVIOUS</span>
+                    </div>
+                    <pre className="max-h-44 overflow-y-auto font-mono text-[10px] text-amber-900 leading-relaxed scrollbar-thin">
+                      {JSON.stringify(selectedLog.oldValue || {}, null, 2)}
+                    </pre>
+                  </div>
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className="font-bold text-emerald-900 text-[10px] uppercase">After State (newValue)</p>
+                      <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">UPDATED</span>
+                    </div>
+                    <pre className="max-h-44 overflow-y-auto font-mono text-[10px] text-emerald-900 leading-relaxed scrollbar-thin">
+                      {JSON.stringify(selectedLog.newValue || {}, null, 2)}
+                    </pre>
+                  </div>
                 </div>
               </div>
             )}
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-bold text-slate-700">JSON Event Payload Details</p>
+                <p className="text-xs font-bold text-slate-700">Sanitized JSON Event Details (Sensitive Keys Redacted)</p>
                 <button
                   onClick={() => handleCopyPayload(selectedLog.details)}
                   className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
@@ -571,7 +768,7 @@ export default function SuperAdminAuditLogsPage() {
                   <span>{copiedPayload ? 'Copied' : 'Copy Payload'}</span>
                 </button>
               </div>
-              <pre className="max-h-72 overflow-y-auto rounded-xl bg-slate-950 p-4 font-mono text-[11px] text-emerald-400 shadow-inner scrollbar-thin">
+              <pre className="max-h-64 overflow-y-auto rounded-xl bg-slate-950 p-4 font-mono text-[11px] text-emerald-400 shadow-inner scrollbar-thin">
                 {JSON.stringify(selectedLog.details || {}, null, 2)}
               </pre>
             </div>

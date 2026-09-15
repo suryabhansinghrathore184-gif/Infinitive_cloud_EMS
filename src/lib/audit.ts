@@ -20,7 +20,7 @@ export interface AuditLogEntry {
 /**
  * Sanitizes object by removing sensitive fields (passwords, secrets, tokens).
  */
-function sanitizePayload(obj: any): any {
+export function sanitizePayload(obj: any): any {
   if (!obj || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(sanitizePayload);
 

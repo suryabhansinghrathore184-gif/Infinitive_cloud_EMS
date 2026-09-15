@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { getAuthContext, checkPermissions } from '@/lib/auth';
-import { logAuditEvent } from '@/lib/audit';
+import { logAuditEvent, sanitizePayload } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,24 +53,84 @@ export async function GET(req: NextRequest) {
     const orgFilter = searchParams.get('organizationId')?.trim() || 'All';
     const timeFilter = searchParams.get('timeRange')?.trim() || 'All';
     const severityFilter = searchParams.get('severity')?.trim() || 'All';
+    const startDateParam = searchParams.get('startDate')?.trim() || '';
+    const endDateParam = searchParams.get('endDate')?.trim() || '';
     const exportFormat = searchParams.get('export')?.trim() || '';
 
-    // 1. Fetch Executive Stats
+    // Calculate dates for KPI & Security Breakdown
     const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const last30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const [totalEvents, logs24h, securityOverridesCount, orgDocs] = await Promise.all([
+    // Fetch system retention policy setting if configured
+    const secSettings = await db.collection('system_settings').findOne({ _id: 'security_config' as any });
+    const retentionDays = secSettings?.auditRetentionDays || 90;
+    const retentionPolicy = `${retentionDays}-Day Enterprise Immutable Retention Policy (AES-256 Storage)`;
+
+    // 1. Compute 6 Real Audit KPIs
+    const [
+      totalEvents,
+      eventsToday,
+      securityEvents,
+      failedActions,
+      adminChanges,
+      loginLogoutEvents,
+      logs24h,
+      orgDocs
+    ] = await Promise.all([
       db.collection('audit_logs').countDocuments(),
-      db.collection('audit_logs').find({ timestamp: { $gte: last24h } }).toArray(),
+      db.collection('audit_logs').countDocuments({ timestamp: { $gte: startOfToday } }),
       db.collection('audit_logs').countDocuments({
-        action: { $regex: /REVOKE|SECURITY|ROLE|LOCKED|UNAUTHORIZED/i },
+        action: { $regex: /REVOKE|SECURITY|DIAGNOSTIC|UNAUTHORIZED|ROLE|PERMISSION|LOCKED|FAILED|OTP/i },
       }),
+      db.collection('audit_logs').countDocuments({
+        $or: [
+          { action: { $regex: /FAILED|DENIED|UNAUTHORIZED|INVALID|BLOCKED/i } },
+          { severity: 'CRITICAL' }
+        ]
+      }),
+      db.collection('audit_logs').countDocuments({
+        action: { $regex: /ORG_|USER_|ROLE_|SETTINGS_|DELET|UPDATE|MODIFY|CREATE/i },
+      }),
+      db.collection('audit_logs').countDocuments({
+        action: { $regex: /LOGIN|LOGOUT|OTP|SESSION/i },
+      }),
+      db.collection('audit_logs').find({ timestamp: { $gte: last24h } }).toArray(),
       db.collection('organization_settings').find({}).toArray(),
     ]);
 
     const activeActors24h = new Set(logs24h.map(l => l.performedBy || l.email).filter(Boolean)).size;
+
+    // 2. Compute 7-Point Security Event Visualization Breakdown
+    const [
+      loginFailures,
+      sessionRevocations,
+      roleEscalations,
+      orgModifications,
+      securityDiagnostics,
+      unauthorizedAttempts,
+      systemConfigChanges
+    ] = await Promise.all([
+      db.collection('audit_logs').countDocuments({ action: { $regex: /LOGIN_FAIL|LOGIN_FAILED|OTP_FAILED/i } }),
+      db.collection('audit_logs').countDocuments({ action: { $regex: /REVOKE|SESSION/i } }),
+      db.collection('audit_logs').countDocuments({ action: { $regex: /ROLE|PERMISSION/i } }),
+      db.collection('audit_logs').countDocuments({ action: { $regex: /ORGANIZATION|ORG_/i } }),
+      db.collection('audit_logs').countDocuments({ action: { $regex: /DIAGNOSTIC|SECURITY/i } }),
+      db.collection('audit_logs').countDocuments({ action: { $regex: /UNAUTHORIZED|DENIED|BLOCKED/i } }),
+      db.collection('audit_logs').countDocuments({ action: { $regex: /SETTING|CONFIG/i } }),
+    ]);
+
+    const securityBreakdown = {
+      loginFailures,
+      sessionRevocations,
+      roleEscalations,
+      orgModifications,
+      securityDiagnostics,
+      unauthorizedAttempts,
+      systemConfigChanges,
+    };
 
     // Build Organization map
     const orgMap = new Map<string, { id: string; name: string; code: string }>();
@@ -96,7 +156,7 @@ export async function GET(req: NextRequest) {
 
     const organizationsList = Array.from(orgMap.values());
 
-    // 2. Build Query Filters
+    // 3. Build Query Filters
     let query: any = {};
 
     if (orgFilter !== 'All') {
@@ -107,8 +167,23 @@ export async function GET(req: NextRequest) {
       query.role = roleFilter;
     }
 
-    if (timeFilter !== 'All') {
-      if (timeFilter === '24h') query.timestamp = { $gte: last24h };
+    // Time horizon or custom date filtering
+    if (startDateParam || endDateParam) {
+      query.timestamp = {};
+      if (startDateParam) {
+        query.timestamp.$gte = new Date(startDateParam);
+      }
+      if (endDateParam) {
+        const endDate = new Date(endDateParam);
+        // If YYYY-MM-DD string, set to end of day
+        if (endDateParam.length === 10) {
+          endDate.setHours(23, 59, 59, 999);
+        }
+        query.timestamp.$lte = endDate;
+      }
+    } else if (timeFilter !== 'All') {
+      if (timeFilter === 'today') query.timestamp = { $gte: startOfToday };
+      else if (timeFilter === '24h') query.timestamp = { $gte: last24h };
       else if (timeFilter === '7d') query.timestamp = { $gte: last7d };
       else if (timeFilter === '30d') query.timestamp = { $gte: last30d };
     }
@@ -128,7 +203,7 @@ export async function GET(req: NextRequest) {
 
     const allLogs = await db.collection('audit_logs').find(query).sort({ timestamp: -1, _id: -1 }).toArray();
 
-    // Enrich logs with categories & severity
+    // Enrich logs with categories, severity & sanitize sensitive fields
     let enrichedLogs = allLogs.map((log) => {
       const category = getCategoryForAction(log.action);
       const severity = getSeverityForAction(log.action);
@@ -151,9 +226,9 @@ export async function GET(req: NextRequest) {
         action: log.action || 'GENERAL_AUDIT',
         category,
         severity,
-        details: log.details || {},
-        oldValue: log.oldValue || null,
-        newValue: log.newValue || null,
+        details: sanitizePayload(log.details || {}),
+        oldValue: sanitizePayload(log.oldValue || null),
+        newValue: sanitizePayload(log.newValue || null),
         ipAddress: log.ipAddress || '127.0.0.1',
         userAgent: log.userAgent || 'Web Client',
         timestamp: log.timestamp ? new Date(log.timestamp).toISOString() : new Date().toISOString(),
@@ -171,7 +246,7 @@ export async function GET(req: NextRequest) {
 
     const totalFilteredCount = enrichedLogs.length;
 
-    // 3. Export Handling (CSV / JSON)
+    // 4. Export Handling (CSV / JSON)
     if (exportFormat === 'csv') {
       await logAuditEvent(req, 'AUDIT_LOG_EXPORTED', {
         details: { totalExported: totalFilteredCount, format: 'csv', categoryFilter, roleFilter },
@@ -224,10 +299,15 @@ export async function GET(req: NextRequest) {
       data: {
         stats: {
           totalEvents,
+          eventsToday,
+          securityEvents,
+          failedActions,
+          adminChanges,
+          loginLogoutEvents,
           activeActors24h,
-          securityOverridesCount,
-          retentionPolicy: '90-Day Enterprise Immutable Policy (AES-256 Storage)',
+          retentionPolicy,
         },
+        securityBreakdown,
         filters: {
           categories: [
             'All',
@@ -248,7 +328,7 @@ export async function GET(req: NextRequest) {
           organizations: organizationsList,
           roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'],
           severities: ['All', 'INFO', 'WARNING', 'CRITICAL'],
-          timeRanges: ['All', '24h', '7d', '30d'],
+          timeRanges: ['All', 'today', '24h', '7d', '30d'],
         },
         logs: paginatedLogs,
         pagination: {
