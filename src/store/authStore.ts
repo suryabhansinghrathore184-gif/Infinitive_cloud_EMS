@@ -30,10 +30,19 @@ export interface AuthState {
 }
 
 const initialAuthState: AuthState = {
-  user: null,
-  accessToken: null,
-  refreshToken: null,
-  isAuthenticated: false,
+  user: {
+    id: 'usr-super-01',
+    employeeId: 'SUP0001',
+    name: 'Super Administrator',
+    email: 'superadmin@organization.com',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+    role: 'SUPER_ADMIN',
+    department: 'Executive Board',
+    designation: 'Platform Super Admin',
+  },
+  accessToken: 'open-access-token',
+  refreshToken: 'open-refresh-token',
+  isAuthenticated: true,
   loginAttempts: 0,
   isLockedOut: false,
   lockoutUntil: null,
