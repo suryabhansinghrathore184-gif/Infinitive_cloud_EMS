@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { generateSecureToken, hashToken } from '@/lib/cryptoAuth';
+import { sendOtpEmail } from '@/lib/email';
 import { createNotification } from '@/lib/notifications/notificationService';
 import { logAuditEvent } from '@/lib/audit';
 
@@ -50,6 +51,14 @@ export async function POST(req: NextRequest) {
       const resetUrl = `${origin}/reset-password?token=${resetToken}`;
 
       try {
+        await sendOtpEmail({
+          to: cleanEmail,
+          otp: resetToken,
+          purpose: 'PASSWORD_RESET',
+          userName: user.name,
+          organizationName: user.organizationId,
+        });
+
         await createNotification({
           organizationId: user.organizationId || 'org-default',
           recipientType: 'EMPLOYEE',
@@ -63,7 +72,7 @@ export async function POST(req: NextRequest) {
           recipientEmail: cleanEmail,
         });
       } catch (notifErr) {
-        console.warn('Could not dispatch password reset notification:', notifErr);
+        console.warn('Could not dispatch password reset email/notification:', notifErr);
       }
 
       await logAuditEvent(req, 'PASSWORD_RESET_REQUESTED', { details: { email: cleanEmail } });
