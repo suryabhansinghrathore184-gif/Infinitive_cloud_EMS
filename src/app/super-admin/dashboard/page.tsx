@@ -151,7 +151,18 @@ export default function SuperAdminDashboardPage() {
       }
       const result = await res.json();
       if (result.success && result.data) {
-        setStats(result.data);
+        setStats({
+          kpis: { ...DEFAULT_STATS.kpis, ...(result.data.kpis || {}) },
+          organizationGrowth: Array.isArray(result.data.organizationGrowth) ? result.data.organizationGrowth : [],
+          workforceGrowth: Array.isArray(result.data.workforceGrowth) ? result.data.workforceGrowth : [],
+          roleDistribution: Array.isArray(result.data.roleDistribution) ? result.data.roleDistribution : [],
+          systemHealth: Array.isArray(result.data.systemHealth) && result.data.systemHealth.length > 0 ? result.data.systemHealth : DEFAULT_STATS.systemHealth,
+          securityOverview: {
+            ...DEFAULT_STATS.securityOverview,
+            ...(result.data.securityOverview || {}),
+          },
+          recentAuditLogs: Array.isArray(result.data.recentAuditLogs) ? result.data.recentAuditLogs : [],
+        });
       } else {
         throw new Error(result.message || 'Failed to retrieve stats data');
       }
@@ -413,14 +424,14 @@ export default function SuperAdminDashboardPage() {
               <div className="flex h-full items-center justify-center bg-slate-50 rounded-xl">
                 <RefreshCw className="h-6 w-6 animate-spin text-indigo-600" />
               </div>
-            ) : stats.organizationGrowth.length === 0 ? (
+            ) : (stats.organizationGrowth || []).length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-xs text-slate-400">
                 <Building2 className="h-8 w-8 text-slate-300 mb-1" />
                 <span>No organization growth data recorded</span>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stats.organizationGrowth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={stats.organizationGrowth || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="orgGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.3} />
@@ -458,14 +469,14 @@ export default function SuperAdminDashboardPage() {
               <div className="flex h-full items-center justify-center bg-slate-50 rounded-xl">
                 <RefreshCw className="h-6 w-6 animate-spin text-indigo-600" />
               </div>
-            ) : stats.workforceGrowth.length === 0 ? (
+            ) : (stats.workforceGrowth || []).length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-xs text-slate-400">
                 <Users className="h-8 w-8 text-slate-300 mb-1" />
                 <span>No workforce growth data recorded</span>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stats.workforceGrowth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={stats.workforceGrowth || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="workforceGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -641,7 +652,7 @@ export default function SuperAdminDashboardPage() {
                 <ShieldCheck className="h-4 w-4 text-emerald-600" />
                 <span>Successful Logins</span>
               </div>
-              <p className="mt-2 text-xl font-black text-slate-900">{stats.securityOverview.successfulLogins}</p>
+              <p className="mt-2 text-xl font-black text-slate-900">{stats.securityOverview?.successfulLogins ?? 0}</p>
               <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">Verified Sessions</p>
             </div>
 
@@ -650,7 +661,7 @@ export default function SuperAdminDashboardPage() {
                 <ShieldAlert className="h-4 w-4 text-rose-600" />
                 <span>Failed Attempts</span>
               </div>
-              <p className="mt-2 text-xl font-black text-slate-900">{stats.securityOverview.failedLogins}</p>
+              <p className="mt-2 text-xl font-black text-slate-900">{stats.securityOverview?.failedLogins ?? 0}</p>
               <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Blocked/Invalid</p>
             </div>
 
@@ -659,7 +670,7 @@ export default function SuperAdminDashboardPage() {
                 <Lock className="h-4 w-4 text-indigo-600" />
                 <span>Active Sessions</span>
               </div>
-              <p className="mt-2 text-xl font-black text-slate-900">{stats.securityOverview.activeSessions}</p>
+              <p className="mt-2 text-xl font-black text-slate-900">{stats.securityOverview?.activeSessions ?? 0}</p>
               <p className="text-[10px] text-indigo-600 font-semibold mt-0.5">Online Users</p>
             </div>
 
@@ -668,7 +679,7 @@ export default function SuperAdminDashboardPage() {
                 <Activity className="h-4 w-4 text-purple-600" />
                 <span>Security Events</span>
               </div>
-              <p className="mt-2 text-xl font-black text-slate-900">{stats.securityOverview.recentSecurityEvents}</p>
+              <p className="mt-2 text-xl font-black text-slate-900">{stats.securityOverview?.recentSecurityEvents ?? 0}</p>
               <p className="text-[10px] text-purple-600 font-semibold mt-0.5">Logged in 7 Days</p>
             </div>
           </div>
