@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { hashToken, hashPassword } from '@/lib/cryptoAuth';
+import { getSecurityConfig, validatePasswordPolicy } from '@/lib/securityPolicy';
 import { logAuditEvent } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
@@ -19,14 +20,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (password.length < 6) {
+    const { db } = await connectToDatabase();
+    const secConfig = await getSecurityConfig(db);
+
+    const policyResult = validatePasswordPolicy(password, secConfig);
+    if (!policyResult.valid) {
       return NextResponse.json(
-        { success: false, message: 'Password must be at least 6 characters long.' },
+        { success: false, message: policyResult.errors.join(' ') },
         { status: 400 }
       );
     }
 
-    const { db } = await connectToDatabase();
     const now = new Date();
 
     // Find active invitation token (purpose: ACCOUNT_INVITATION ONLY)

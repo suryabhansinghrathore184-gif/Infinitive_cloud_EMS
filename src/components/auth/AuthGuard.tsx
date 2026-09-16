@@ -17,7 +17,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) 
   const { user, isAuthenticated, isHydrated, getRoleDashboardRoute } = useAuthStore();
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const publicRoutes = ['/login', '/forgot-password', '/reset-password', '/verify-otp', '/careers'];
+  const publicRoutes = ['/login', '/forgot-password', '/reset-password', '/verify-otp', '/complete-account', '/verify-email', '/careers'];
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
 
   useEffect(() => {

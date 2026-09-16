@@ -36,6 +36,15 @@ export async function GET(request: NextRequest) {
       expiresAt: { $gt: new Date() },
     });
 
+    const isExplicitHeaderAuth = Boolean(request.headers.get('x-user-id') && request.headers.get('x-user-role'));
+
+    if (!sessionDoc && !isExplicitHeaderAuth) {
+      return NextResponse.json(
+        { success: false, message: 'Session has expired or has been revoked. Please log in again.' },
+        { status: 401 }
+      );
+    }
+
     let userDoc: any = null;
 
     if (sessionDoc) {
@@ -44,7 +53,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (!userDoc && authCtx.email) {
+    if (!userDoc && isExplicitHeaderAuth && authCtx.email) {
       userDoc = await db.collection('users').findOne({ email: authCtx.email });
     }
 

@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
 
       if (purpose) {
         queryFilter.purpose = purpose;
+      } else {
+        queryFilter.purpose = { $ne: 'ACCOUNT_INVITATION' };
       }
 
       const otpDoc = await db.collection('auth_otp_tokens').findOne(queryFilter);
