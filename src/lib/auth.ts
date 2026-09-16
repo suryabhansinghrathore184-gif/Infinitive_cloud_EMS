@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { hashPassword } from '@/lib/cryptoAuth';
+import { normalizeRole } from '@/lib/roleUtils';
 
 export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'HR' | 'MANAGER' | 'EMPLOYEE';
 
@@ -158,42 +159,25 @@ export function getAuthContext(req: NextRequest): AuthContext {
   const headerEmpId = req.headers.get('x-employee-id');
 
   if (headerUserId && headerRoleRaw) {
-    const roleUpper = headerRoleRaw.toUpperCase().replace(/[\s_\-\/]+/g, '');
-    const normRole: UserRole =
-      roleUpper === 'SUPERADMIN'
-        ? 'SUPER_ADMIN'
-        : roleUpper === 'ADMIN' || roleUpper === 'HR' || roleUpper === 'HRADMIN'
-        ? 'ADMIN'
-        : roleUpper === 'MANAGER'
-        ? 'MANAGER'
-        : 'EMPLOYEE';
-
+    const normRole = normalizeRole(headerRoleRaw) as UserRole;
     return {
       userId: headerUserId,
-      email: headerEmail || 'user@organization.com',
-      name: req.headers.get('x-user-name') || 'Authenticated User',
+      email: headerEmail || (normRole === 'SUPER_ADMIN' ? 'superadmin@organization.com' : 'user@organization.com'),
+      name: req.headers.get('x-user-name') || (normRole === 'SUPER_ADMIN' ? 'Super Administrator' : 'Authenticated User'),
       role: normRole,
       organizationId: headerOrgId || 'org-default',
-      employeeId: headerEmpId || undefined,
+      employeeId: headerEmpId || (normRole === 'SUPER_ADMIN' ? 'SUP0001' : undefined),
       isAuthenticated: true,
     };
   }
 
   if (sessionToken) {
-    const sessionRegex = /^jwt-(?:session|access)-(.+?)-(org-[^\-]+)-([A-Z_]+)-([^\-]+)-(\d+)$/i;
+    const sessionRegex = /^jwt-(?:session|access)-(.+?)-(org-[a-zA-Z0-9_\-]+)-(SUPER_ADMIN|SUPERADMIN|ADMIN|HR|MANAGER|EMPLOYEE)-([a-zA-Z0-9_\-]+)-(\d+)$/i;
     const match = sessionToken.match(sessionRegex);
 
     if (match) {
       const [, uId, orgId, rawRole, empId] = match;
-      const roleUpper = rawRole.toUpperCase().replace(/[\s_\-\/]+/g, '');
-      const normRole: UserRole =
-        roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN'
-          ? 'SUPER_ADMIN'
-          : roleUpper === 'ADMIN' || roleUpper === 'HR' || roleUpper === 'HRADMIN'
-          ? 'ADMIN'
-          : roleUpper === 'MANAGER'
-          ? 'MANAGER'
-          : 'EMPLOYEE';
+      const normRole = normalizeRole(rawRole) as UserRole;
 
       const isSuper = normRole === 'SUPER_ADMIN' || uId === 'usr-super-01';
       const isAdmin = normRole === 'ADMIN' || uId === 'usr-admin-01';
@@ -216,18 +200,28 @@ export function getAuthContext(req: NextRequest): AuthContext {
     }
 
     const tokenUpper = sessionToken.toUpperCase();
-    const detectedRole: UserRole = tokenUpper.includes('SUPER_ADMIN') || tokenUpper.includes('SUPERADMIN')
+    const isSuper =
+      tokenUpper.includes('SUPER_ADMIN') ||
+      tokenUpper.includes('SUPERADMIN') ||
+      tokenUpper.includes('USR-SUPER') ||
+      tokenUpper.includes('SUP0001') ||
+      sessionToken.toLowerCase().includes('superadmin');
+
+    const isManager = tokenUpper.includes('MANAGER') || tokenUpper.includes('MGR1001');
+    const isEmployee = tokenUpper.includes('EMPLOYEE') || tokenUpper.includes('EMP1001');
+
+    const detectedRole: UserRole = isSuper
       ? 'SUPER_ADMIN'
-      : tokenUpper.includes('MANAGER')
+      : isManager
       ? 'MANAGER'
-      : tokenUpper.includes('EMPLOYEE')
+      : isEmployee
       ? 'EMPLOYEE'
       : 'ADMIN';
 
-    const empIdFallback = detectedRole === 'SUPER_ADMIN' ? 'SUP0001' : detectedRole === 'ADMIN' ? 'EMP9201' : detectedRole === 'MANAGER' ? 'MGR1001' : 'EMP1001';
-    const emailFallback = detectedRole === 'SUPER_ADMIN' ? 'superadmin@organization.com' : detectedRole === 'ADMIN' ? 'admin@organization.com' : detectedRole === 'MANAGER' ? 'manager@organization.com' : 'employee@organization.com';
-    const userIdFallback = detectedRole === 'SUPER_ADMIN' ? 'usr-super-01' : detectedRole === 'ADMIN' ? 'usr-admin-01' : detectedRole === 'MANAGER' ? 'usr-mgr-01' : 'usr-emp-01';
-    const nameFallback = detectedRole === 'SUPER_ADMIN' ? 'Super Administrator' : detectedRole === 'ADMIN' ? 'Suryabhan Singh Rathore' : 'Authenticated User';
+    const empIdFallback = isSuper ? 'SUP0001' : detectedRole === 'ADMIN' ? 'EMP9201' : detectedRole === 'MANAGER' ? 'MGR1001' : 'EMP1001';
+    const emailFallback = isSuper ? 'superadmin@organization.com' : detectedRole === 'ADMIN' ? 'admin@organization.com' : detectedRole === 'MANAGER' ? 'manager@organization.com' : 'employee@organization.com';
+    const userIdFallback = isSuper ? 'usr-super-01' : detectedRole === 'ADMIN' ? 'usr-admin-01' : detectedRole === 'MANAGER' ? 'usr-mgr-01' : 'usr-emp-01';
+    const nameFallback = isSuper ? 'Super Administrator' : detectedRole === 'ADMIN' ? 'Suryabhan Singh Rathore' : 'Authenticated User';
 
     return {
       userId: userIdFallback,
@@ -261,16 +255,15 @@ export function checkPermissions(
     return { isAllowed: false, statusCode: 401, message: 'Authentication required. Please log in.' };
   }
 
-  if (auth.role === 'SUPER_ADMIN') {
+  const normalizedAuthRole = normalizeRole(auth.role) as UserRole;
+
+  if (normalizedAuthRole === 'SUPER_ADMIN') {
     return { isAllowed: true, statusCode: 200, message: 'Authorized' };
   }
 
   if (requiredRole) {
     const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-    const normalizedAuthRole = auth.role === ('Super Admin' as any) ? 'SUPER_ADMIN' : auth.role;
-    const normalizedRequiredRoles = roles.map((r) =>
-      r === ('Super Admin' as any) ? 'SUPER_ADMIN' : r === ('HR' as any) ? 'ADMIN' : r
-    );
+    const normalizedRequiredRoles = roles.map((r) => normalizeRole(r) as UserRole);
 
     if (!normalizedRequiredRoles.includes(normalizedAuthRole)) {
       return {

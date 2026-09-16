@@ -145,7 +145,9 @@ export default function SuperAdminDashboardPage() {
     setIsRefreshing(true);
     setError(null);
     try {
-      const res = await fetch(`/api/v1/super-admin/stats?range=${dateRange}`);
+      const res = await fetch(`/api/v1/super-admin/stats?range=${dateRange}`, {
+        credentials: 'include',
+      });
       if (!res.ok) {
         throw new Error(`Server returned HTTP ${res.status}`);
       }
