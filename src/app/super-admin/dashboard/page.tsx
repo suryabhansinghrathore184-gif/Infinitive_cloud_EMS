@@ -364,7 +364,7 @@ export default function SuperAdminDashboardPage() {
                 <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
                   {stats.kpis.totalWorkforce > 0
                     ? `${Math.round((stats.kpis.activeEmployees / stats.kpis.totalWorkforce) * 100)}% Active`
-                    : '100% Active'}
+                    : '0% Active'}
                 </span>
               </div>
             </div>
