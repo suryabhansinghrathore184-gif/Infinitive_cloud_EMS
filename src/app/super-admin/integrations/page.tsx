@@ -463,7 +463,7 @@ export default function SuperAdminIntegrationsPage() {
         ) : (
           /* Integrations Grid */
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {integrations.map((item) => (
+            {(integrations || []).map((item) => (
               <div
                 key={item.id}
                 className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-xs transition-all hover:shadow-md"
@@ -650,7 +650,7 @@ export default function SuperAdminIntegrationsPage() {
             </div>
 
             <div className="mt-4 space-y-3">
-              {integrations.map((i) => (
+              {(integrations || []).map((i) => (
                 <div key={i.id} className="flex items-center justify-between rounded-xl bg-slate-50 p-3 border border-slate-100">
                   <div className="flex items-center gap-2.5">
                     <span
@@ -688,10 +688,10 @@ export default function SuperAdminIntegrationsPage() {
             </div>
 
             <div className="mt-4 space-y-3 max-h-[280px] overflow-y-auto pr-1">
-              {activityStream.length === 0 ? (
+              {(activityStream || []).length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400">No integration audit events recorded yet.</div>
               ) : (
-                activityStream.map((act) => (
+                (activityStream || []).map((act) => (
                   <div key={act.id} className="flex items-start justify-between rounded-xl bg-slate-50 p-3 border border-slate-100 text-xs">
                     <div className="flex items-start gap-2.5">
                       <div className="mt-0.5 rounded-lg bg-indigo-100 p-1.5 text-indigo-700">

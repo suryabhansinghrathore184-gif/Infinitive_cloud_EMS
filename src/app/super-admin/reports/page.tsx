@@ -398,7 +398,7 @@ export default function SuperAdminReportsPage() {
                 className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-indigo-500 max-w-[200px] truncate"
               >
                 <option value="ALL">Organization: All Tenants</option>
-                {data?.orgBreakdown.map((org) => (
+                {(data?.orgBreakdown || []).map((org) => (
                   <option key={org.id} value={org.id}>
                     {org.name}
                   </option>
@@ -533,7 +533,7 @@ export default function SuperAdminReportsPage() {
                   <h3 className="text-xs font-extrabold text-indigo-900 uppercase">Executive Intelligence Insights</h3>
                 </div>
                 <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 text-xs font-semibold text-slate-700">
-                  {data.executiveInsights.map((insight, idx) => (
+                  {(data?.executiveInsights || []).map((insight, idx) => (
                     <div key={idx} className="flex items-start gap-2 bg-white/80 p-2.5 rounded-xl border border-indigo-100/50">
                       <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 mt-1.5 shrink-0" />
                       <span>{insight}</span>
@@ -787,7 +787,7 @@ export default function SuperAdminReportsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {sortedOrgBreakdown.map((org) => (
+                      {(sortedOrgBreakdown || []).map((org) => (
                         <tr
                           key={org.id}
                           onClick={() => setSelectedOrgModal(org)}

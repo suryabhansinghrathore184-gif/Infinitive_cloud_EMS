@@ -361,7 +361,7 @@ export default function SuperAdminSecurityPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6 text-[10px] font-bold">
-              {Object.entries(healthSummary.components).map(([key, value]) => (
+              {Object.entries(healthSummary?.components || {}).map(([key, value]) => (
                 <div key={key} className="rounded-xl bg-white p-2 border border-slate-200 text-center shadow-2xs">
                   <p className="text-slate-400 uppercase tracking-wider text-[9px]">{key.replace(/([A-Z])/g, ' $1')}</p>
                   <p className={`mt-0.5 font-extrabold ${value === 'Healthy' ? 'text-emerald-600' : 'text-amber-600'}`}>{value}</p>
@@ -610,7 +610,7 @@ export default function SuperAdminSecurityPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {activeSessions.map((s) => (
+                {(activeSessions || []).map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-4">
                       <p className="font-bold text-slate-900">{s.email}</p>
@@ -698,13 +698,13 @@ export default function SuperAdminSecurityPage() {
           </div>
         </div>
 
-        {filteredLogs.length === 0 ? (
+        {(filteredLogs || []).length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-400">
             No matching security events found
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {filteredLogs.map((log) => (
+            {(filteredLogs || []).map((log) => (
               <div key={log.id} className="py-2.5 flex items-center justify-between text-xs hover:bg-slate-50/50 px-2 rounded-lg">
                 <div className="flex items-center gap-3">
                   <span className={`rounded-md px-2 py-0.5 text-[9px] font-black border ${

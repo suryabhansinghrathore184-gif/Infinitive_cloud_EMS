@@ -628,7 +628,7 @@ export default function SuperAdminOrganizationsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                  {organizations.map((org) => (
+                  {(organizations || []).map((org) => (
                     <tr key={org.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">

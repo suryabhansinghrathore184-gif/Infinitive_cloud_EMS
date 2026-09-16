@@ -515,7 +515,7 @@ export default function SuperAdminUsersPage() {
               className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs focus:border-indigo-500 focus:outline-hidden"
             >
               <option value="All">All Organizations</option>
-              {organizations.map((org) => (
+              {(organizations || []).map((org) => (
                 <option key={org.id} value={org.id}>
                   {org.name} ({org.code})
                 </option>
@@ -568,7 +568,7 @@ export default function SuperAdminUsersPage() {
               Retry
             </button>
           </div>
-        ) : users.length === 0 ? (
+        ) : (users || []).length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center text-slate-500">
             <Users className="h-10 w-10 text-slate-300" />
             <p className="mt-2 font-bold text-slate-800">No user accounts found</p>
@@ -593,7 +593,7 @@ export default function SuperAdminUsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {users.map((user) => (
+                {(users || []).map((user) => (
                   <tr key={user.id} className="hover:bg-slate-50/80 transition-colors">
                     {/* User Details */}
                     <td className="py-3 px-4">
@@ -1067,11 +1067,11 @@ export default function SuperAdminUsersPage() {
 
             {isSessionsLoading ? (
               <div className="py-8 text-center text-xs text-slate-500 animate-pulse">Loading active sessions...</div>
-            ) : sessionsList.length === 0 ? (
+            ) : (sessionsList || []).length === 0 ? (
               <div className="py-6 text-center text-xs text-slate-500">No active token sessions found for this user.</div>
             ) : (
               <div className="space-y-2 max-h-60 overflow-y-auto">
-                {sessionsList.map((s) => (
+                {(sessionsList || []).map((s) => (
                   <div key={s.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
                     <div>
                       <p className="font-bold text-slate-900">{s.userAgent}</p>

@@ -330,10 +330,11 @@ export default function SuperAdminNotificationsPage() {
 
   // Select All Checkbox Handler
   const toggleSelectAll = () => {
-    if (selectedIds.length === notifications.length) {
+    const list = notifications || [];
+    if (selectedIds.length === list.length && list.length > 0) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(notifications.map((n) => n.id));
+      setSelectedIds(list.map((n) => n.id));
     }
   };
 
@@ -627,7 +628,7 @@ export default function SuperAdminNotificationsPage() {
                 className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-indigo-500 max-w-[180px] truncate"
               >
                 <option value="ALL">Organization: All</option>
-                {organizations.map((org) => (
+                {(organizations || []).map((org) => (
                   <option key={org.id} value={org.id}>
                     {org.name}
                   </option>
@@ -759,12 +760,12 @@ export default function SuperAdminNotificationsPage() {
                 onClick={toggleSelectAll}
                 className="flex items-center gap-2 hover:text-slate-900 transition-colors"
               >
-                {selectedIds.length === notifications.length ? (
+                {selectedIds.length === (notifications || []).length && (notifications || []).length > 0 ? (
                   <CheckSquare className="h-4 w-4 text-indigo-600" />
                 ) : (
                   <Square className="h-4 w-4 text-slate-400" />
                 )}
-                <span>Select All on Page ({notifications.length})</span>
+                <span>Select All on Page ({(notifications || []).length})</span>
               </button>
 
               <span>
@@ -772,7 +773,7 @@ export default function SuperAdminNotificationsPage() {
               </span>
             </div>
 
-            {notifications.map((item) => {
+            {(notifications || []).map((item) => {
               const isSelected = selectedIds.includes(item.id);
               return (
                 <div

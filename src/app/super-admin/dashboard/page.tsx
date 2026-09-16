@@ -513,7 +513,7 @@ export default function SuperAdminDashboardPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={stats.roleDistribution}
+                      data={stats.roleDistribution || []}
                       cx="50%"
                       cy="50%"
                       innerRadius={42}
@@ -521,7 +521,7 @@ export default function SuperAdminDashboardPage() {
                       paddingAngle={4}
                       dataKey="count"
                     >
-                      {stats.roleDistribution.map((entry, index) => (
+                      {(stats.roleDistribution || []).map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={CHART_PIE_COLORS[index % CHART_PIE_COLORS.length]} />
                       ))}
                     </Pie>
@@ -535,7 +535,7 @@ export default function SuperAdminDashboardPage() {
 
             {/* List Distribution Progress Bars */}
             <div className="space-y-2.5 text-xs font-semibold">
-              {stats.roleDistribution.map((r, i) => (
+              {(stats.roleDistribution || []).map((r, i) => (
                 <div key={r.role} className="space-y-1">
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-slate-700 font-bold flex items-center gap-1.5">
@@ -572,7 +572,7 @@ export default function SuperAdminDashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            {stats.systemHealth.map((sh) => {
+            {(stats.systemHealth || []).map((sh) => {
               const isOk = sh.status === 'Healthy' || sh.status === 'Connected';
               const isNotConfig = sh.status === 'Not Configured';
               const isWarning = sh.status === 'Warning';
@@ -705,13 +705,13 @@ export default function SuperAdminDashboardPage() {
               <RefreshCw className="h-6 w-6 animate-spin text-indigo-600" />
               <p className="mt-2 text-xs font-medium text-slate-600">Streaming audit logs...</p>
             </div>
-          ) : stats.recentAuditLogs.length === 0 ? (
+          ) : (stats.recentAuditLogs || []).length === 0 ? (
             <div className="py-8 text-center text-xs text-slate-500">
               No recent audit activity recorded.
             </div>
           ) : (
             <div className="divide-y divide-slate-100 text-xs">
-              {stats.recentAuditLogs.slice(0, 5).map((log) => (
+              {(stats.recentAuditLogs || []).slice(0, 5).map((log) => (
                 <div key={log.id} className="flex items-center justify-between py-2.5 hover:bg-slate-50/80 px-2 rounded-xl transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 font-bold text-[10px] border border-indigo-100">
