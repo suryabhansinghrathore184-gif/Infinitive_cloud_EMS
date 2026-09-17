@@ -21,7 +21,10 @@ import {
   FileText,
   Building2,
   ShieldCheck,
-  LogOut,
+  CheckCheck,
+  ChevronRight,
+  Inbox,
+  Sparkles,
 } from 'lucide-react';
 
 interface AttendanceRecord {
@@ -174,8 +177,9 @@ export default function EmployeeDashboardPage() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  // Derived KPI metrics
+  // Derived metrics
   const activeUser = profileData || user;
+  const firstName = activeUser?.name?.split(' ')[0] || 'Employee';
   const todayStr = new Date().toISOString().split('T')[0];
   const todayAttendance = attendanceLogs.find(
     (log) => log.date === todayStr || log.date?.startsWith(todayStr)
@@ -189,11 +193,11 @@ export default function EmployeeDashboardPage() {
   const pendingLeaveCount = leaveRequests.filter((r) => r.status === 'Pending').length;
   const latestPayroll = payrollRecords[0];
   const unreadNotifCount = notifications.filter((n) => n.status !== 'READ').length;
+  const isClockedIn = todayAttendance?.checkIn && !todayAttendance?.checkOut;
 
-  // Handle Check-in / Check-out quick action
+  // Clock in/out toggle
   const handleAttendanceClockToggle = async () => {
     setIsClockingIn(true);
-    const isClockedIn = todayAttendance?.checkIn && !todayAttendance?.checkOut;
     const action = isClockedIn ? 'CLOCK_OUT' : 'CLOCK_IN';
 
     try {
@@ -214,6 +218,8 @@ export default function EmployeeDashboardPage() {
       } else {
         showToast(data.message || 'Failed to update attendance.', 'error');
       }
+    } catch (err: any) {
+      showToast(err.message || 'Attendance action failed.', 'error');
     } finally {
       setIsClockingIn(false);
     }
@@ -223,7 +229,7 @@ export default function EmployeeDashboardPage() {
     <AuthGuard allowedRoles={['EMPLOYEE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'MANAGER']}>
       <AdminLayout
         allowedRoles={['EMPLOYEE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'MANAGER']}
-        pageTitle="Employee Self-Service Dashboard"
+        pageTitle="Employee Workspace"
         breadcrumbs={[{ label: 'Dashboard', href: '/employee/dashboard' }]}
       >
         {/* Toast Notification */}
@@ -242,354 +248,394 @@ export default function EmployeeDashboardPage() {
           </div>
         )}
 
-        {/* Header & Refresh */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* Page Header */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Employee Dashboard</h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Welcome back, <strong className="text-slate-800">{activeUser?.name || 'Employee'}</strong>. Here is your real-time work summary.
+            <h1 className="text-xl font-bold tracking-tight text-slate-950">Employee Dashboard</h1>
+            <p className="text-xs font-medium text-slate-500 mt-0.5">
+              Welcome back, <strong className="text-slate-800">{firstName}</strong>. Here&apos;s your work summary.
             </p>
           </div>
           <button
             onClick={fetchDashboardData}
             disabled={isLoading}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 disabled:opacity-50 transition-all cursor-pointer"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Refresh Data</span>
+            <span>Refresh</span>
           </button>
         </div>
 
-        {/* Welcome Profile Card */}
-        <div className="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-xl">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-2xl font-extrabold text-white shadow-lg shadow-indigo-600/40 border-2 border-indigo-400/30 overflow-hidden">
-                {activeUser?.photoUrl ? (
-                  <img src={activeUser.photoUrl} alt="Profile" className="h-full w-full object-cover" />
-                ) : (
-                  (activeUser?.name || 'E').charAt(0).toUpperCase()
-                )}
+        {/* Pulse Skeleton Loading State */}
+        {isLoading ? (
+          <div className="space-y-6 animate-pulse">
+            <div className="h-32 w-full rounded-2xl bg-slate-200/80"></div>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="h-24 rounded-xl bg-slate-200/80"></div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+              <div className="lg:col-span-8 h-64 rounded-2xl bg-slate-200/80"></div>
+              <div className="lg:col-span-4 h-64 rounded-2xl bg-slate-200/80"></div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Top Grid: Clean Profile Card & Attendance Action */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Profile Card (8 Cols) */}
+              <div className="lg:col-span-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-5">
+                <div className="flex items-center gap-4">
+                  <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-2xl font-extrabold text-white shadow-md shadow-indigo-600/20 overflow-hidden border border-indigo-100">
+                    {activeUser?.photoUrl ? (
+                      <img src={activeUser.photoUrl} alt={activeUser.name} className="h-full w-full object-cover" />
+                    ) : (
+                      (activeUser?.name || 'E').charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-bold text-slate-900">{activeUser?.name || 'Employee'}</h2>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                        <ShieldCheck className="h-3 w-3" /> {activeUser?.status || 'Active Employee'}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold text-indigo-600">
+                      {activeUser?.designation || 'Staff Member'} <span className="text-slate-400">•</span> <span className="text-slate-600">{activeUser?.department || 'General'}</span>
+                    </p>
+                    <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono pt-0.5">
+                      <span>ID: <strong className="text-slate-800">{activeUser?.employeeId || 'EMP1001'}</strong></span>
+                      <span>Manager: <strong className="text-slate-800">{activeUser?.managerName || activeUser?.reportingToName || 'HR Admin'}</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                <Link
+                  href="/employee/profile"
+                  className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors shrink-0"
+                >
+                  <span>View Profile</span>
+                  <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                </Link>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-bold text-white">{activeUser?.name || 'Employee'}</h2>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
-                    <ShieldCheck className="h-3 w-3" /> Active Employee
+
+              {/* Compact Attendance Card (4 Cols) */}
+              <div className="lg:col-span-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Today&apos;s Attendance</span>
+                  <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${
+                    isClockedIn ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                  }`}>
+                    {todayAttendance?.status || (todayAttendance?.checkIn ? (isClockedIn ? 'Clocked In' : 'Completed') : 'Not Marked')}
                   </span>
                 </div>
-                <p className="text-xs font-medium text-indigo-200 mt-0.5">
-                  {activeUser?.designation || 'Staff Member'} • <span className="text-slate-300">{activeUser?.department || 'General'}</span>
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-400 font-mono">
-                  <span>ID: <strong className="text-slate-200">{activeUser?.employeeId || 'EMP-1001'}</strong></span>
-                  <span>Manager: <strong className="text-slate-200">{activeUser?.managerName || activeUser?.reportingToName || 'HR Administrator'}</strong></span>
+
+                <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono py-1">
+                  <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                    <span className="text-[10px] text-slate-400 font-sans block">Check In</span>
+                    <span className="font-bold text-slate-800">{todayAttendance?.checkIn || todayAttendance?.clockIn || '--:--'}</span>
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                    <span className="text-[10px] text-slate-400 font-sans block">Check Out</span>
+                    <span className="font-bold text-slate-800">{todayAttendance?.checkOut || todayAttendance?.clockOut || '--:--'}</span>
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                    <span className="text-[10px] text-slate-400 font-sans block">Hours</span>
+                    <span className="font-bold text-indigo-600">{todayAttendance?.workingHours ? `${todayAttendance.workingHours}h` : '--'}</span>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Attendance Quick Clock Action */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 backdrop-blur-md flex flex-col sm:flex-row items-center gap-4 text-xs">
-              <div className="text-center sm:text-left">
-                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Today&apos;s Attendance Status</span>
-                <span className={`text-sm font-extrabold ${todayAttendance?.checkIn ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {todayAttendance?.checkIn ? (todayAttendance.checkOut ? 'Clocked Out' : 'Clocked In') : 'Not Checked In'}
-                </span>
-                {todayAttendance?.checkIn && (
-                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                    In: {todayAttendance.checkIn || todayAttendance.clockIn} {todayAttendance.checkOut ? `• Out: ${todayAttendance.checkOut}` : ''}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={handleAttendanceClockToggle}
-                disabled={isClockingIn}
-                className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-bold shadow-md transition-all cursor-pointer ${
-                  todayAttendance?.checkIn && !todayAttendance?.checkOut
-                    ? 'bg-rose-600 hover:bg-rose-500 text-white'
-                    : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                }`}
-              >
-                <Clock className="h-4 w-4" />
-                <span>
-                  {isClockingIn
-                    ? 'Updating...'
-                    : todayAttendance?.checkIn && !todayAttendance?.checkOut
-                    ? 'Clock Out'
-                    : 'Clock In Now'}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* 6 Real KPI Cards */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
-          {/* KPI 1: Today Attendance */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Attendance</span>
-              <Clock className="h-4 w-4 text-indigo-600" />
-            </div>
-            <p className="mt-2 text-lg font-black text-slate-900 truncate">
-              {todayAttendance?.status || (todayAttendance?.checkIn ? 'Present' : 'Not Marked')}
-            </p>
-            <p className="mt-0.5 text-[10px] text-slate-400">
-              {todayAttendance?.workingHours ? `${todayAttendance.workingHours} hrs today` : 'Today status'}
-            </p>
-          </div>
-
-          {/* KPI 2: Leave Balance */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Leave Balance</span>
-              <CalendarDays className="h-4 w-4 text-emerald-600" />
-            </div>
-            <p className="mt-2 text-xl font-black text-emerald-600">
-              {totalRemainingLeave} <span className="text-xs font-semibold text-slate-400">Days</span>
-            </p>
-            <p className="mt-0.5 text-[10px] text-slate-400">Available quota</p>
-          </div>
-
-          {/* KPI 3: Pending Leave */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pending Leave</span>
-              <CalendarDays className="h-4 w-4 text-amber-600" />
-            </div>
-            <p className="mt-2 text-xl font-black text-amber-600">{pendingLeaveCount}</p>
-            <p className="mt-0.5 text-[10px] text-slate-400">Awaiting approval</p>
-          </div>
-
-          {/* KPI 4: Monthly Payroll */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Latest Net Salary</span>
-              <CreditCard className="h-4 w-4 text-indigo-600" />
-            </div>
-            <p className="mt-2 text-lg font-black text-slate-900 font-mono truncate">
-              {latestPayroll?.netSalary !== undefined ? `$${latestPayroll.netSalary.toLocaleString()}` : '--'}
-            </p>
-            <p className="mt-0.5 text-[10px] text-slate-400">{latestPayroll?.payrollPeriod || 'Latest period'}</p>
-          </div>
-
-          {/* KPI 5: Notifications */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Unread Alerts</span>
-              <Bell className="h-4 w-4 text-rose-500" />
-            </div>
-            <p className="mt-2 text-xl font-black text-rose-600">{unreadNotifCount}</p>
-            <p className="mt-0.5 text-[10px] text-slate-400">System notices</p>
-          </div>
-
-          {/* KPI 6: Helpdesk */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Open Tickets</span>
-              <HelpCircle className="h-4 w-4 text-indigo-600" />
-            </div>
-            <p className="mt-2 text-xl font-black text-indigo-600">{helpdeskCounts.open}</p>
-            <p className="mt-0.5 text-[10px] text-slate-400">{helpdeskCounts.total} total created</p>
-          </div>
-        </div>
-
-        {/* Dashboard Main Grid Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column (8 cols): Attendance & Leave Activity */}
-          <div className="lg:col-span-8 space-y-6">
-            {/* Attendance & Leave Quick Panel */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4 text-indigo-600" />
-                  <span>My Leave Balances Overview</span>
-                </h3>
-                <Link
-                  href="/employee/leave"
-                  className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                <button
+                  onClick={handleAttendanceClockToggle}
+                  disabled={isClockingIn}
+                  className={`w-full inline-flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold shadow-xs transition-all cursor-pointer ${
+                    isClockedIn
+                      ? 'bg-rose-600 hover:bg-rose-500 text-white'
+                      : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                  }`}
                 >
-                  <span>Apply Leave</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
+                  <Clock className="h-4 w-4" />
+                  <span>{isClockingIn ? 'Updating...' : isClockedIn ? 'Check Out' : 'Check In'}</span>
+                </button>
               </div>
-
-              {Object.keys(leaveBalances).length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400">
-                  No leave balance quotas assigned yet.
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {Object.entries(leaveBalances).map(([key, cat]: [string, any]) => (
-                    <div key={key} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-xs">
-                      <span className="font-bold text-slate-800 truncate block">{cat.name || key}</span>
-                      <p className="mt-1 text-lg font-black text-indigo-600">
-                        {cat.remaining} <span className="text-[10px] font-normal text-slate-400">rem.</span>
-                      </p>
-                      <div className="mt-1 flex justify-between text-[10px] text-slate-500 border-t border-slate-200/60 pt-1">
-                        <span>Quota: {cat.total}</span>
-                        <span>Used: {cat.used}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
-            {/* Recent Leave Requests */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-indigo-600" />
-                  <span>Recent Leave Requests</span>
-                </h3>
-                <Link href="/employee/leave" className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
-                  View All
-                </Link>
+            {/* 6 Responsive KPI Cards */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
+              {/* Card 1: Today Attendance */}
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Attendance</span>
+                  <Clock className="h-4 w-4 text-indigo-600" />
+                </div>
+                <p className="mt-2 text-base font-extrabold text-slate-900 truncate">
+                  {todayAttendance?.status || (todayAttendance?.checkIn ? 'Present' : 'Not Marked')}
+                </p>
+                <p className="mt-0.5 text-[10px] text-slate-400">Today status</p>
               </div>
 
-              {leaveRequests.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400">
-                  No leave requests submitted yet.
+              {/* Card 2: Leave Balance */}
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Leave Balance</span>
+                  <CalendarDays className="h-4 w-4 text-emerald-600" />
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[10px]">
-                        <th className="pb-2">Type</th>
-                        <th className="pb-2">Dates</th>
-                        <th className="pb-2">Duration</th>
-                        <th className="pb-2">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium">
-                      {leaveRequests.slice(0, 5).map((req) => (
-                        <tr key={req._id || req.id} className="hover:bg-slate-50/60">
-                          <td className="py-2.5 font-bold text-slate-900">{req.leaveType}</td>
-                          <td className="py-2.5 text-slate-600">
-                            {req.startDate} to {req.endDate}
-                          </td>
-                          <td className="py-2.5 text-indigo-600 font-bold">{req.durationDays} Days</td>
-                          <td className="py-2.5">
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
-                                req.status === 'Approved'
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : req.status === 'Rejected'
-                                  ? 'bg-rose-50 text-rose-700'
-                                  : 'bg-amber-50 text-amber-700'
-                              }`}
-                            >
-                              {req.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+                <p className="mt-2 text-lg font-black text-emerald-600">
+                  {totalRemainingLeave} <span className="text-xs font-semibold text-slate-400">Days</span>
+                </p>
+                <p className="mt-0.5 text-[10px] text-slate-400">Available quota</p>
+              </div>
 
-            {/* Latest Payroll Preview */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+              {/* Card 3: Pending Leave */}
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pending Leave</span>
+                  <CalendarDays className="h-4 w-4 text-amber-600" />
+                </div>
+                <p className="mt-2 text-lg font-black text-amber-600">{pendingLeaveCount}</p>
+                <p className="mt-0.5 text-[10px] text-slate-400">Awaiting approval</p>
+              </div>
+
+              {/* Card 4: Latest Payroll */}
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Latest Net Salary</span>
                   <CreditCard className="h-4 w-4 text-indigo-600" />
-                  <span>Latest Payslip Summary</span>
-                </h3>
-                <Link href="/employee/payroll" className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
-                  My Payslips
-                </Link>
+                </div>
+                <p className="mt-2 text-base font-extrabold text-slate-900 font-mono truncate">
+                  {latestPayroll?.netSalary !== undefined ? `$${latestPayroll.netSalary.toLocaleString()}` : 'No payroll'}
+                </p>
+                <p className="mt-0.5 text-[10px] text-slate-400">{latestPayroll?.payrollPeriod || 'Latest period'}</p>
               </div>
 
-              {latestPayroll ? (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4 text-xs">
-                  <div>
-                    <span className="font-bold text-slate-900 text-sm">Period: {latestPayroll.payrollPeriod || latestPayroll.month || 'Current'}</span>
-                    <p className="text-slate-500 mt-0.5">Status: <strong className="text-emerald-600">{latestPayroll.status || 'PAID'}</strong></p>
-                  </div>
-                  <div className="text-right font-mono">
-                    <span className="text-slate-400 block text-[10px]">Net Salary Amount</span>
-                    <span className="text-xl font-extrabold text-emerald-600">${(latestPayroll.netSalary || 0).toLocaleString()}</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="py-6 text-center text-xs text-slate-400">
-                  No processed payslips available yet.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column (4 cols): Notifications & Support Activity */}
-          <div className="lg:col-span-4 space-y-6">
-            {/* System Notifications */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+              {/* Card 5: Notifications */}
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Unread Alerts</span>
                   <Bell className="h-4 w-4 text-rose-500" />
-                  <span>Recent Notifications</span>
-                </h3>
-                <Link href="/employee/notifications" className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
-                  View All
-                </Link>
+                </div>
+                <p className="mt-2 text-lg font-black text-rose-600">{unreadNotifCount}</p>
+                <p className="mt-0.5 text-[10px] text-slate-400">System notices</p>
               </div>
 
-              {notifications.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400">
-                  No notifications found.
+              {/* Card 6: Helpdesk */}
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Open Tickets</span>
+                  <HelpCircle className="h-4 w-4 text-indigo-600" />
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {notifications.slice(0, 4).map((item) => (
-                    <div key={item._id || item.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-xs">
-                      <h4 className="font-bold text-slate-900">{item.title}</h4>
-                      <p className="text-slate-600 mt-0.5 line-clamp-2">{item.message}</p>
-                      <span className="text-[10px] text-slate-400 font-mono mt-1 block">
-                        {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Recent'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
+                <p className="mt-2 text-lg font-black text-indigo-600">{helpdeskCounts.open}</p>
+                <p className="mt-0.5 text-[10px] text-slate-400">{helpdeskCounts.total} total created</p>
+              </div>
             </div>
 
-            {/* Helpdesk Support Activity */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                  <HelpCircle className="h-4 w-4 text-indigo-600" />
-                  <span>Support Tickets</span>
-                </h3>
-                <Link href="/employee/helpdesk" className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
-                  Open Helpdesk
-                </Link>
+            {/* 2-Column Content Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column (8 cols): Leave & Payroll Breakdown */}
+              <div className="lg:col-span-8 space-y-6">
+                {/* Leave Quotas */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4 text-indigo-600" />
+                      <span>My Leave Balances</span>
+                    </h3>
+                    <Link
+                      href="/employee/leave"
+                      className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                    >
+                      <span>Apply Leave</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+
+                  {Object.keys(leaveBalances).length === 0 ? (
+                    <div className="py-6 text-center text-xs text-slate-400">
+                      No leave balance quotas assigned yet.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {Object.entries(leaveBalances).map(([key, cat]: [string, any]) => (
+                        <div key={key} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-xs space-y-1">
+                          <span className="font-bold text-slate-800 truncate block">{cat.name || key}</span>
+                          <p className="text-base font-black text-indigo-600">
+                            {cat.remaining} <span className="text-[10px] font-normal text-slate-400">Days available</span>
+                          </p>
+                          <div className="flex justify-between text-[10px] text-slate-500 border-t border-slate-200/60 pt-1">
+                            <span>Quota: {cat.total}</span>
+                            <span>Used: {cat.used}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Recent Leave Requests */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-indigo-600" />
+                      <span>Recent Leave Applications</span>
+                    </h3>
+                    <Link href="/employee/leave" className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
+                      View All
+                    </Link>
+                  </div>
+
+                  {leaveRequests.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-400 space-y-1">
+                      <Inbox className="h-8 w-8 text-slate-300 mx-auto" />
+                      <p className="font-semibold text-slate-600">No time-off requests yet</p>
+                      <p className="text-[11px] text-slate-400">Your submitted leave applications will appear here.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[10px]">
+                            <th className="pb-2">Leave Type</th>
+                            <th className="pb-2">Dates</th>
+                            <th className="pb-2">Duration</th>
+                            <th className="pb-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium">
+                          {leaveRequests.slice(0, 5).map((req) => (
+                            <tr key={req._id || req.id} className="hover:bg-slate-50/60">
+                              <td className="py-2.5 font-bold text-slate-900">{req.leaveType}</td>
+                              <td className="py-2.5 text-slate-600">
+                                {req.startDate} to {req.endDate}
+                              </td>
+                              <td className="py-2.5 text-indigo-600 font-bold">{req.durationDays} Days</td>
+                              <td className="py-2.5">
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                                    req.status === 'Approved'
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                      : req.status === 'Rejected'
+                                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                      : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  }`}
+                                >
+                                  {req.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Latest Payroll Preview */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-indigo-600" />
+                      <span>Latest Payslip Breakdown</span>
+                    </h3>
+                    <Link href="/employee/payroll" className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
+                      My Payslips
+                    </Link>
+                  </div>
+
+                  {latestPayroll ? (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4 text-xs">
+                      <div>
+                        <span className="font-bold text-slate-900 text-sm">Period: {latestPayroll.payrollPeriod || latestPayroll.month || 'Current'}</span>
+                        <p className="text-slate-500 mt-0.5">Status: <strong className="text-emerald-600">{latestPayroll.status || 'PAID'}</strong></p>
+                      </div>
+                      <div className="text-right font-mono">
+                        <span className="text-slate-400 block text-[10px]">Net Payout Amount</span>
+                        <span className="text-xl font-extrabold text-emerald-600">${(latestPayroll.netSalary || 0).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center text-xs text-slate-400 space-y-1">
+                      <CreditCard className="h-8 w-8 text-slate-300 mx-auto" />
+                      <p className="font-semibold text-slate-600">No processed payslips available yet</p>
+                      <p className="text-[11px] text-slate-400">When HR approves your salary, your monthly payslips will be ready here.</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {helpdeskTickets.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400">
-                  No support tickets created yet.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {helpdeskTickets.slice(0, 3).map((t) => (
-                    <div key={t.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-xs flex items-center justify-between">
-                      <div>
-                        <span className="font-mono text-[10px] font-bold text-indigo-600">{t.ticketNumber}</span>
-                        <h4 className="font-bold text-slate-900 truncate max-w-[180px]">{t.subject}</h4>
-                      </div>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-600">
-                        {t.status}
-                      </span>
+              {/* Right Column (4 cols): Notifications & Support */}
+              <div className="lg:col-span-4 space-y-6">
+                {/* Notifications Feed */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                      <Bell className="h-4 w-4 text-rose-500" />
+                      <span>Recent Notifications</span>
+                    </h3>
+                    <Link href="/employee/notifications" className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
+                      View All
+                    </Link>
+                  </div>
+
+                  {notifications.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-400 space-y-1">
+                      <CheckCheck className="h-8 w-8 text-emerald-500 mx-auto" />
+                      <p className="font-semibold text-slate-700">No new notifications</p>
+                      <p className="text-[11px] text-slate-400">You&apos;re all caught up!</p>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="space-y-3">
+                      {notifications.slice(0, 4).map((item) => (
+                        <div key={item._id || item.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-xs space-y-1">
+                          <h4 className="font-bold text-slate-900">{item.title}</h4>
+                          <p className="text-slate-600 line-clamp-2">{item.message}</p>
+                          <span className="text-[10px] text-slate-400 font-mono block pt-0.5">
+                            {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Recent'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* Open Helpdesk Support Tickets */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                      <HelpCircle className="h-4 w-4 text-indigo-600" />
+                      <span>Open Support Requests</span>
+                    </h3>
+                    <Link href="/employee/helpdesk" className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
+                      Open Helpdesk
+                    </Link>
+                  </div>
+
+                  {helpdeskTickets.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-400 space-y-1">
+                      <HelpCircle className="h-8 w-8 text-slate-300 mx-auto" />
+                      <p className="font-semibold text-slate-600">No support tickets created</p>
+                      <p className="text-[11px] text-slate-400">Submit HR queries or attendance corrections via Helpdesk.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {helpdeskTickets.slice(0, 3).map((t) => (
+                        <div key={t.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-xs flex items-center justify-between">
+                          <div>
+                            <span className="font-mono text-[10px] font-bold text-indigo-600">{t.ticketNumber}</span>
+                            <h4 className="font-bold text-slate-900 truncate max-w-[170px]">{t.subject}</h4>
+                          </div>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[9px] font-bold text-slate-600 border border-slate-200">
+                            {t.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </AdminLayout>
     </AuthGuard>
   );

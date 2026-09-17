@@ -158,6 +158,17 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     }
   };
 
+  const roleStr = (user?.role || '').toUpperCase();
+  const isEmployeeRole = roleStr === 'EMPLOYEE';
+  const isManagerRole = roleStr === 'MANAGER';
+
+  const headerTitle = isEmployeeRole ? 'Employee Workspace' : isManagerRole ? 'Manager Portal' : 'Enterprise Control Center';
+  const helpdeskHref = isEmployeeRole ? '/employee/helpdesk' : isManagerRole ? '/manager/helpdesk' : '/admin/helpdesk';
+  const notificationsHref = isEmployeeRole ? '/employee/notifications' : isManagerRole ? '/manager/notifications' : '/admin/notifications';
+  const profileHref = isEmployeeRole ? '/employee/profile' : '/admin/settings';
+  const settingsHref = isEmployeeRole ? '/employee/settings' : '/admin/settings';
+  const searchPlaceholder = isEmployeeRole ? 'Search documents, leaves, support tickets...' : 'Search employees, ID, departments, leaves...';
+
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur-md sm:px-6 shadow-xs">
       {/* Left: Mobile Menu Toggle & App Title */}
@@ -171,10 +182,10 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         </button>
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 font-bold text-indigo-600 text-xs border border-indigo-200">
-            HR
+            {isEmployeeRole ? 'EW' : 'HR'}
           </span>
           <h1 className="text-base font-bold tracking-tight text-slate-900 hidden sm:block">
-            Enterprise Control Center
+            {headerTitle}
           </h1>
         </div>
       </div>
@@ -191,7 +202,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               setIsSearchOpen(true);
             }}
             onFocus={() => setIsSearchOpen(true)}
-            placeholder="Search employees, ID, departments, leaves..."
+            placeholder={searchPlaceholder}
             className="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-12 text-xs text-slate-800 placeholder-slate-400 transition-colors focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium"
           />
           {searchQuery ? (
@@ -254,7 +265,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
       <div className="flex items-center gap-2.5">
         {/* Help Center Icon */}
         <Link
-          href="/admin/helpdesk"
+          href={helpdeskHref}
           className="relative rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
           title="HR Helpdesk & Support Tickets"
         >
@@ -358,7 +369,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
               <div className="border-t border-slate-100 p-2 text-center">
                 <Link
-                  href="/admin/notifications"
+                  href={notificationsHref}
                   onClick={() => setIsNotificationsOpen(false)}
                   className="block rounded-xl py-1.5 font-bold text-indigo-600 hover:bg-indigo-50 transition"
                 >
@@ -404,20 +415,20 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               </div>
               <div className="py-1 text-slate-700">
                 <Link
-                  href="/admin/settings"
+                  href={profileHref}
                   onClick={() => setIsProfileOpen(false)}
                   className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 hover:bg-slate-100 font-medium"
                 >
                   <User className="h-4 w-4 text-slate-500" />
-                  <span>My Profile & Photo</span>
+                  <span>My Profile</span>
                 </Link>
                 <Link
-                  href="/admin/settings"
+                  href={settingsHref}
                   onClick={() => setIsProfileOpen(false)}
                   className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 hover:bg-slate-100 font-medium"
                 >
                   <Settings className="h-4 w-4 text-slate-500" />
-                  <span>System Settings</span>
+                  <span>Account Settings</span>
                 </Link>
               </div>
               <div className="border-t border-slate-100 pt-1 text-rose-600">

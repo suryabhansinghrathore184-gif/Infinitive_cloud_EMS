@@ -6,6 +6,7 @@ import { Header } from './Header';
 import { ChevronRight, Home } from 'lucide-react';
 import Link from 'next/link';
 import { AuthGuard } from '@/components/auth/AuthGuard';
+import { useAuthStore } from '@/store/authStore';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -22,6 +23,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const rolesToGuard = allowedRoles || ['HR/Admin', 'Super Admin', 'ADMIN', 'HR', 'SUPER_ADMIN'];
 
+  const { user } = useAuthStore();
+  const roleStr = (user?.role || '').toUpperCase();
+  const isEmployeeRole = roleStr === 'EMPLOYEE';
+  const isManagerRole = roleStr === 'MANAGER';
+
+  const homeHref = isEmployeeRole ? '/employee/dashboard' : isManagerRole ? '/manager/dashboard' : '/admin/dashboard';
+  const homeLabel = isEmployeeRole ? 'Employee' : isManagerRole ? 'Manager' : 'Admin';
+
   return (
     <AuthGuard allowedRoles={rolesToGuard}>
       <div className="flex h-screen w-full overflow-hidden bg-slate-50 font-sans text-slate-800 antialiased">
@@ -36,9 +45,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           {/* Breadcrumb Bar */}
           {breadcrumbs.length > 0 && (
             <div className="flex items-center gap-2 border-b border-slate-200/80 bg-white px-4 sm:px-6 py-2 text-xs text-slate-500 shadow-2xs">
-              <Link href="/admin/dashboard" className="flex items-center gap-1 hover:text-indigo-600 font-medium transition-colors">
+              <Link href={homeHref} className="flex items-center gap-1 hover:text-indigo-600 font-medium transition-colors">
                 <Home className="h-3.5 w-3.5 text-slate-400" />
-                <span>Admin</span>
+                <span>{homeLabel}</span>
               </Link>
               {breadcrumbs.map((bc, idx) => (
                 <React.Fragment key={idx}>

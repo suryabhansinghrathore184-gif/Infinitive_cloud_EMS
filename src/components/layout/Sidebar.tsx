@@ -277,7 +277,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   <span className="text-base font-extrabold tracking-tight text-white">EMS</span>
                   <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">/ HRMS</span>
                 </div>
-                <p className="text-[10px] text-slate-400 font-medium">Enterprise HR SaaS</p>
+                <p className="text-[10px] text-indigo-300 font-semibold truncate">
+                  {isEmployee ? 'Employee Workspace' : isManager ? 'Manager Workspace' : 'Enterprise HR SaaS'}
+                </p>
               </div>
             )}
           </Link>
@@ -377,7 +379,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span>{isManager ? 'Manager Panel' : isEmployee ? 'Employee Portal' : 'HR Master Panel'}</span>
               </div>
-              <p className="mt-0.5 text-[10px] text-slate-400">Enterprise Edition v2.0</p>
+              <p className="mt-0.5 text-[10px] text-slate-400 font-medium">Enterprise Edition</p>
             </div>
           ) : (
             <div className="flex justify-center" title="Enterprise HR Active">
