@@ -81,32 +81,54 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { employeeId, employeeName, date, checkIn, checkOut, status, method, location } = body;
+    const { action, employeeId, employeeName, date, checkIn, checkOut, status, method, location } = body;
 
-    const targetEmpId = employeeId || auth.employeeId || 'EMP-UNKNOWN';
+    // Strict security: EMPLOYEE role MUST use their own authenticated session employeeId
+    const targetEmpId = (auth.role === 'EMPLOYEE' && auth.employeeId)
+      ? auth.employeeId
+      : (employeeId || auth.employeeId || 'EMP-UNKNOWN');
+
     const targetDate = date || new Date().toISOString().split('T')[0];
 
     const { db } = await connectToDatabase();
     const orgId = auth.organizationId;
     const now = new Date();
 
+    // Format current time into "hh:mm AM/PM"
+    const nowTimeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
     // Check if an employee record exists to fetch latest name if missing
-    let empName = employeeName;
+    let empName = employeeName || auth.name;
     if (!empName) {
-      const emp = await db.collection('employees').findOne({ organizationId: orgId, employeeId: targetEmpId });
-      if (emp) empName = `${emp.firstName} ${emp.lastName}`;
+      const emp = await db.collection('employees').findOne({
+        $or: [{ organizationId: orgId }, { organizationId: 'org-default' }],
+        employeeId: targetEmpId,
+      });
+      if (emp) empName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.name;
     }
 
-    // Fetch organization attendance rules to calculate Late / Present status if status not explicitly provided
-    const orgSettings = await db.collection('organization_settings').findOne({ organizationId: orgId });
-    const attRules = orgSettings?.attendance || { workStartTime: '09:00 AM', gracePeriodMinutes: 15, lateMarkingEnabled: true };
+    // Handle Clock-In Action
+    if (action === 'CLOCK_IN') {
+      const existingToday = await db.collection('attendance').findOne({
+        $or: [{ organizationId: orgId }, { organizationId: 'org-default' }, { organizationId: { $exists: false } }],
+        employeeId: targetEmpId,
+        date: targetDate,
+      });
 
-    let calculatedStatus = status;
-    if (!calculatedStatus) {
-      const checkInTimeStr = checkIn || '09:00 AM';
-      // Parse checkIn and workStartTime
+      if (existingToday && existingToday.checkIn && !existingToday.checkOut) {
+        return NextResponse.json(
+          { success: false, message: 'You are already checked in for today.' },
+          { status: 400 }
+        );
+      }
+
+      // Calculate Late / Present
+      const orgSettings = await db.collection('organization_settings').findOne({ organizationId: orgId });
+      const attRules = orgSettings?.attendance || { workStartTime: '09:00 AM', gracePeriodMinutes: 15, lateMarkingEnabled: true };
+
+      let calculatedStatus = status || 'Present';
       try {
-        const [timePart, modifier] = checkInTimeStr.split(' ');
+        const [timePart, modifier] = nowTimeStr.split(' ');
         let [hours, minutes] = timePart.split(':').map(Number);
         if (modifier === 'PM' && hours < 12) hours += 12;
         if (modifier === 'AM' && hours === 12) hours = 0;
@@ -122,14 +144,103 @@ export async function POST(req: NextRequest) {
 
         if (attRules.lateMarkingEnabled && checkInMins > shiftMins + graceMins) {
           calculatedStatus = 'Late';
-        } else {
-          calculatedStatus = 'Present';
         }
       } catch {
         calculatedStatus = 'Present';
       }
+
+      const clockInDoc = {
+        organizationId: orgId,
+        employeeId: targetEmpId,
+        employeeName: empName || 'Employee',
+        date: targetDate,
+        checkIn: nowTimeStr,
+        checkOut: '',
+        status: calculatedStatus,
+        method: method || 'Web',
+        location: location || 'Office HQ',
+        workingHours: 0,
+        updatedAt: now,
+      };
+
+      await db.collection('attendance').updateOne(
+        { employeeId: targetEmpId, date: targetDate },
+        { $set: clockInDoc, $setOnInsert: { createdAt: now } },
+        { upsert: true }
+      );
+
+      await logAuditEvent(req, 'CLOCK_IN', { employeeId: targetEmpId, details: clockInDoc });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Attendance checked in successfully.',
+        data: clockInDoc,
+      });
     }
 
+    // Handle Clock-Out Action
+    if (action === 'CLOCK_OUT') {
+      const existingToday = await db.collection('attendance').findOne({
+        $or: [{ organizationId: orgId }, { organizationId: 'org-default' }, { organizationId: { $exists: false } }],
+        employeeId: targetEmpId,
+        date: targetDate,
+      });
+
+      if (!existingToday || !existingToday.checkIn) {
+        return NextResponse.json(
+          { success: false, message: 'Cannot check out without checking in first.' },
+          { status: 400 }
+        );
+      }
+
+      if (existingToday.checkOut) {
+        return NextResponse.json(
+          { success: false, message: 'You have already checked out for today.' },
+          { status: 400 }
+        );
+      }
+
+      // Calculate working hours
+      let hoursWorked = 8;
+      try {
+        const inStr = existingToday.checkIn;
+        const [inTime, inMod] = inStr.split(' ');
+        let [inH, inM] = inTime.split(':').map(Number);
+        if (inMod === 'PM' && inH < 12) inH += 12;
+        if (inMod === 'AM' && inH === 12) inH = 0;
+
+        const [outTime, outMod] = nowTimeStr.split(' ');
+        let [outH, outM] = outTime.split(':').map(Number);
+        if (outMod === 'PM' && outH < 12) outH += 12;
+        if (outMod === 'AM' && outH === 12) outH = 0;
+
+        const diffMins = (outH * 60 + outM) - (inH * 60 + inM);
+        hoursWorked = Math.max(0.1, Math.round((diffMins / 60) * 10) / 10);
+      } catch {
+        hoursWorked = 8;
+      }
+
+      const updateData = {
+        checkOut: nowTimeStr,
+        workingHours: hoursWorked,
+        updatedAt: now,
+      };
+
+      await db.collection('attendance').updateOne(
+        { employeeId: targetEmpId, date: targetDate },
+        { $set: updateData }
+      );
+
+      await logAuditEvent(req, 'CLOCK_OUT', { employeeId: targetEmpId, details: updateData });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Attendance checked out successfully.',
+        data: { ...existingToday, ...updateData },
+      });
+    }
+
+    // Direct manual attendance upsert (Admin / HR)
     const attendanceDoc = {
       organizationId: orgId,
       employeeId: targetEmpId,
@@ -138,15 +249,15 @@ export async function POST(req: NextRequest) {
       checkIn: checkIn || '09:00 AM',
       checkOut: checkOut || '06:00 PM',
       breakDuration: body.breakDuration || '1 hr',
-      workingHours: body.workingHours || '8 hrs',
-      status: calculatedStatus,
+      workingHours: body.workingHours || 8,
+      status: status || 'Present',
       method: method || 'Web',
       location: location || 'Office HQ',
       updatedAt: now,
     };
 
     await db.collection('attendance').updateOne(
-      { organizationId: orgId, employeeId: targetEmpId, date: targetDate, checkIn: attendanceDoc.checkIn },
+      { employeeId: targetEmpId, date: targetDate },
       { $set: attendanceDoc, $setOnInsert: { createdAt: now } },
       { upsert: true }
     );
@@ -159,6 +270,7 @@ export async function POST(req: NextRequest) {
       data: attendanceDoc,
     });
   } catch (error: any) {
+    console.error('Error in POST /api/v1/attendance:', error);
     return NextResponse.json({ success: false, message: error.message || 'Failed to save attendance' }, { status: 500 });
   }
 }
