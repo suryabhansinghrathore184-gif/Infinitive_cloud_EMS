@@ -29,7 +29,7 @@ function LoginFormContent() {
   const { login, requestOtp, isAuthenticated, isHydrated, getRoleDashboardRoute } = useAuthStore();
 
   const [authMode, setAuthMode] = useState<'PASSWORD' | 'OTP'>('PASSWORD');
-  const [selectedRole, setSelectedRole] = useState<'SUPER_ADMIN' | 'ADMIN'>('SUPER_ADMIN');
+  const [selectedRole, setSelectedRole] = useState<'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'EMPLOYEE'>('SUPER_ADMIN');
   const [identifier, setIdentifier] = useState('superadmin@organization.com');
   const [password, setPassword] = useState('super123');
   const [showPassword, setShowPassword] = useState(false);
@@ -45,7 +45,7 @@ function LoginFormContent() {
     }
   }, [isHydrated, isAuthenticated, router, getRoleDashboardRoute]);
 
-  const handleSelectDemoAccount = (roleKey: 'SUPER_ADMIN' | 'ADMIN') => {
+  const handleSelectDemoAccount = (roleKey: 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'EMPLOYEE') => {
     setSelectedRole(roleKey);
     const account = DEMO_ACCOUNTS.find((a) => a.roleKey === roleKey);
     if (account) {

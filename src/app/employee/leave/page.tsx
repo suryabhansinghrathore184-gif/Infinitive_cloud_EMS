@@ -256,10 +256,14 @@ export default function EmployeeLeavePage() {
   const balanceEntries = Object.entries(balances);
 
   return (
-    <AuthGuard allowedRoles={['Employee', 'Super Admin']}>
+    <AuthGuard allowedRoles={['EMPLOYEE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'MANAGER']}>
       <AdminLayout
+        allowedRoles={['EMPLOYEE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'MANAGER']}
         pageTitle="My Time-Off & Leave Portal"
-        breadcrumbs={[{ label: 'Leave Portal', href: '/employee/leave' }]}
+        breadcrumbs={[
+          { label: 'My Workspace', href: '/employee/dashboard' },
+          { label: 'Leave Portal', href: '/employee/leave' },
+        ]}
       >
         {/* Toast */}
         {toastMessage && (

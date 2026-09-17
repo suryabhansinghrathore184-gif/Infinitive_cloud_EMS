@@ -1,9 +1,9 @@
 export interface DemoAccount {
-  roleKey: 'SUPER_ADMIN' | 'ADMIN';
+  roleKey: 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'EMPLOYEE';
   label: string;
   email: string;
   password: string;
-  role: 'SUPER_ADMIN' | 'ADMIN';
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'EMPLOYEE';
   id: string;
   employeeId: string;
   name: string;
@@ -37,5 +37,29 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [
     name: 'Suryabhan Singh Rathore',
     targetDashboard: '/admin/dashboard',
     description: 'HR management, employee directory, payroll, and department admin',
+  },
+  {
+    roleKey: 'MANAGER',
+    label: 'Manager',
+    email: 'manager@organization.com',
+    password: 'manager123',
+    role: 'MANAGER',
+    id: 'usr-mgr-01',
+    employeeId: 'MGR1001',
+    name: 'Vikramaditya Sharma',
+    targetDashboard: '/manager/dashboard',
+    description: 'Team directory, attendance, leave approvals, and performance reviews',
+  },
+  {
+    roleKey: 'EMPLOYEE',
+    label: 'Employee',
+    email: 'employee@organization.com',
+    password: 'emp123',
+    role: 'EMPLOYEE',
+    id: 'usr-emp-01',
+    employeeId: 'EMP1001',
+    name: 'Aarav Sharma',
+    targetDashboard: '/employee/dashboard',
+    description: 'Employee self-service, personal attendance, leave, payslips, and helpdesk',
   },
 ];

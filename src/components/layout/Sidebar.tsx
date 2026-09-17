@@ -148,17 +148,17 @@ const employeeNavSections: NavSection[] = [
     category: 'MAIN',
     items: [
       { name: 'Dashboard', href: '/employee/dashboard', icon: LayoutDashboard },
-      { name: 'My Profile', href: '/employee/profile', icon: User },
     ],
   },
   {
     category: 'MY WORK',
     items: [
-      { name: 'My Attendance', href: '/employee/attendance', icon: Clock },
-      { name: 'My Leave', href: '/employee/leave', icon: CalendarDays },
-      { name: 'My Payroll', href: '/employee/payroll', icon: CreditCard },
-      { name: 'My Documents', href: '/employee/documents', icon: FileText },
-      { name: 'My Performance', href: '/employee/performance', icon: TrendingUp },
+      { name: 'My Profile', href: '/employee/profile', icon: User },
+      { name: 'Attendance', href: '/employee/attendance', icon: Clock },
+      { name: 'Leave', href: '/employee/leave', icon: CalendarDays },
+      { name: 'Payroll', href: '/employee/payroll', icon: CreditCard },
+      { name: 'Documents', href: '/employee/documents', icon: FileText },
+      { name: 'Performance', href: '/employee/performance', icon: TrendingUp },
     ],
   },
   {
@@ -166,7 +166,17 @@ const employeeNavSections: NavSection[] = [
     items: [
       { name: 'Messages', href: '/employee/messages', icon: MessageSquare },
       { name: 'Notifications', href: '/employee/notifications', icon: Bell },
+    ],
+  },
+  {
+    category: 'SUPPORT',
+    items: [
       { name: 'Helpdesk', href: '/employee/helpdesk', icon: HelpCircle },
+    ],
+  },
+  {
+    category: 'SYSTEM',
+    items: [
       { name: 'Settings', href: '/employee/settings', icon: Settings },
     ],
   },

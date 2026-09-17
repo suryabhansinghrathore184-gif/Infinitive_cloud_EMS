@@ -135,8 +135,9 @@ export default function EmployeeMessagesPage() {
   };
 
   return (
-    <AuthGuard allowedRoles={['Employee', 'Super Admin']}>
+    <AuthGuard allowedRoles={['EMPLOYEE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'MANAGER']}>
       <AdminLayout
+        allowedRoles={['EMPLOYEE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'MANAGER']}
         pageTitle="HR Messages & Communication"
         breadcrumbs={[
           { label: 'My Workspace', href: '/employee/dashboard' },

@@ -129,8 +129,9 @@ export default function EmployeeHelpdeskPage() {
   };
 
   return (
-    <AuthGuard allowedRoles={['Employee', 'Super Admin', 'Admin', 'HR Manager', 'Payroll Manager']}>
+    <AuthGuard allowedRoles={['EMPLOYEE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'MANAGER']}>
       <AdminLayout
+        allowedRoles={['EMPLOYEE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'MANAGER']}
         pageTitle="Employee Helpdesk"
         breadcrumbs={[
           { label: 'My Workspace', href: '/employee/dashboard' },
