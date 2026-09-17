@@ -6,25 +6,21 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useAuthStore } from '@/store/authStore';
 import Link from 'next/link';
 import {
-  LayoutDashboard,
   Clock,
   CalendarDays,
   CreditCard,
   Bell,
   HelpCircle,
-  User,
   CheckCircle2,
   AlertCircle,
   RefreshCw,
   ArrowRight,
-  TrendingUp,
   FileText,
-  Building2,
   ShieldCheck,
   CheckCheck,
   ChevronRight,
   Inbox,
-  Sparkles,
+  UserCheck,
 } from 'lucide-react';
 
 interface AttendanceRecord {
@@ -76,14 +72,17 @@ interface HelpdeskTicket {
   ticketNumber?: string;
   subject?: string;
   requestType?: string;
+  priority?: string;
   status?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export default function EmployeeDashboardPage() {
   const { user } = useAuthStore();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
   const [isClockingIn, setIsClockingIn] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
@@ -106,6 +105,7 @@ export default function EmployeeDashboardPage() {
 
   const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
+    setIsError(false);
     try {
       const [
         meRes,
@@ -167,7 +167,7 @@ export default function EmployeeDashboardPage() {
       }
     } catch (err) {
       console.error('Error loading employee dashboard data:', err);
-      showToast('Failed to load some dashboard metrics.', 'error');
+      setIsError(true);
     } finally {
       setIsLoading(false);
     }
@@ -177,9 +177,9 @@ export default function EmployeeDashboardPage() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  // Derived metrics
+  // Derived metrics from real context
   const activeUser = profileData || user;
-  const firstName = activeUser?.name?.split(' ')[0] || 'Employee';
+  const fullName = activeUser?.name || 'Employee';
   const todayStr = new Date().toISOString().split('T')[0];
   const todayAttendance = attendanceLogs.find(
     (log) => log.date === todayStr || log.date?.startsWith(todayStr)
@@ -193,10 +193,17 @@ export default function EmployeeDashboardPage() {
   const pendingLeaveCount = leaveRequests.filter((r) => r.status === 'Pending').length;
   const latestPayroll = payrollRecords[0];
   const unreadNotifCount = notifications.filter((n) => n.status !== 'READ').length;
-  const isClockedIn = todayAttendance?.checkIn && !todayAttendance?.checkOut;
 
-  // Clock in/out toggle
+  // Attendance states
+  const hasCheckedIn = Boolean(todayAttendance?.checkIn || todayAttendance?.clockIn);
+  const hasCheckedOut = Boolean(todayAttendance?.checkOut || todayAttendance?.clockOut);
+  const isClockedIn = hasCheckedIn && !hasCheckedOut;
+  const isAttendanceComplete = hasCheckedIn && hasCheckedOut;
+
+  // Clock in/out action
   const handleAttendanceClockToggle = async () => {
+    if (isAttendanceComplete) return;
+
     setIsClockingIn(true);
     const action = isClockedIn ? 'CLOCK_OUT' : 'CLOCK_IN';
 
@@ -211,8 +218,8 @@ export default function EmployeeDashboardPage() {
       if (data.success) {
         showToast(
           action === 'CLOCK_IN'
-            ? 'Checked in successfully! Have a productive day.'
-            : 'Checked out successfully! Have a great evening.'
+            ? 'Clock In recorded successfully! Have a productive day.'
+            : 'Clock Out recorded successfully! Have a great evening.'
         );
         fetchDashboardData();
       } else {
@@ -249,11 +256,11 @@ export default function EmployeeDashboardPage() {
         )}
 
         {/* Page Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-950">Employee Dashboard</h1>
+            <h1 className="text-xl font-extrabold tracking-tight text-slate-950">Employee Dashboard</h1>
             <p className="text-xs font-medium text-slate-500 mt-0.5">
-              Welcome back, <strong className="text-slate-800">{firstName}</strong>. Here&apos;s your work summary.
+              Welcome back, <strong className="text-slate-800">{fullName}</strong>. Here&apos;s your work summary.
             </p>
           </div>
           <button
@@ -262,14 +269,33 @@ export default function EmployeeDashboardPage() {
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 disabled:opacity-50 transition-all cursor-pointer"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
+            <span>Refresh Data</span>
           </button>
         </div>
+
+        {/* Global Error State */}
+        {isError && (
+          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-xs text-rose-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+              <span>Unable to load this information. Please check your connection.</span>
+            </div>
+            <button
+              onClick={fetchDashboardData}
+              className="rounded-xl bg-rose-600 px-3 py-1.5 font-bold text-white shadow-xs hover:bg-rose-700 transition-all cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Pulse Skeleton Loading State */}
         {isLoading ? (
           <div className="space-y-6 animate-pulse">
-            <div className="h-32 w-full rounded-2xl bg-slate-200/80"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-8 h-28 rounded-2xl bg-slate-200/80"></div>
+              <div className="lg:col-span-4 h-28 rounded-2xl bg-slate-200/80"></div>
+            </div>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="h-24 rounded-xl bg-slate-200/80"></div>
@@ -282,22 +308,22 @@ export default function EmployeeDashboardPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Top Grid: Clean Profile Card & Attendance Action */}
+            {/* Top Grid: Profile Card (8 Cols) + Attendance Card (4 Cols) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Profile Card (8 Cols) */}
+              {/* Profile Card */}
               <div className="lg:col-span-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-5">
                 <div className="flex items-center gap-4">
                   <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-2xl font-extrabold text-white shadow-md shadow-indigo-600/20 overflow-hidden border border-indigo-100">
                     {activeUser?.photoUrl ? (
-                      <img src={activeUser.photoUrl} alt={activeUser.name} className="h-full w-full object-cover" />
+                      <img src={activeUser.photoUrl} alt={fullName} className="h-full w-full object-cover" />
                     ) : (
-                      (activeUser?.name || 'E').charAt(0).toUpperCase()
+                      (fullName || 'E').charAt(0).toUpperCase()
                     )}
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <h2 className="text-base font-bold text-slate-900">{activeUser?.name || 'Employee'}</h2>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                      <h2 className="text-base font-bold text-slate-900">{fullName}</h2>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
                         <ShieldCheck className="h-3 w-3" /> {activeUser?.status || 'Active Employee'}
                       </span>
                     </div>
@@ -305,8 +331,8 @@ export default function EmployeeDashboardPage() {
                       {activeUser?.designation || 'Staff Member'} <span className="text-slate-400">•</span> <span className="text-slate-600">{activeUser?.department || 'General'}</span>
                     </p>
                     <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono pt-0.5">
-                      <span>ID: <strong className="text-slate-800">{activeUser?.employeeId || 'EMP1001'}</strong></span>
-                      <span>Manager: <strong className="text-slate-800">{activeUser?.managerName || activeUser?.reportingToName || 'HR Admin'}</strong></span>
+                      <span>ID: <strong className="text-slate-800">{activeUser?.employeeId || '--'}</strong></span>
+                      <span>Manager: <strong className="text-slate-800">{activeUser?.managerName || activeUser?.reportingToName || 'HR Administration'}</strong></span>
                     </div>
                   </div>
                 </div>
@@ -315,29 +341,32 @@ export default function EmployeeDashboardPage() {
                   href="/employee/profile"
                   className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors shrink-0"
                 >
-                  <span>View Profile</span>
-                  <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                  <span>View Profile →</span>
                 </Link>
               </div>
 
-              {/* Compact Attendance Card (4 Cols) */}
+              {/* Compact Attendance Card */}
               <div className="lg:col-span-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Today&apos;s Attendance</span>
                   <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${
-                    isClockedIn ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                    isAttendanceComplete
+                      ? 'bg-slate-100 text-slate-600 border-slate-200'
+                      : isClockedIn
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
                   }`}>
-                    {todayAttendance?.status || (todayAttendance?.checkIn ? (isClockedIn ? 'Clocked In' : 'Completed') : 'Not Marked')}
+                    {isAttendanceComplete ? 'CHECKED OUT' : isClockedIn ? 'CHECKED IN' : 'NOT MARKED'}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono py-1">
                   <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                    <span className="text-[10px] text-slate-400 font-sans block">Check In</span>
+                    <span className="text-[10px] text-slate-400 font-sans block">Clock In</span>
                     <span className="font-bold text-slate-800">{todayAttendance?.checkIn || todayAttendance?.clockIn || '--:--'}</span>
                   </div>
                   <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                    <span className="text-[10px] text-slate-400 font-sans block">Check Out</span>
+                    <span className="text-[10px] text-slate-400 font-sans block">Clock Out</span>
                     <span className="font-bold text-slate-800">{todayAttendance?.checkOut || todayAttendance?.clockOut || '--:--'}</span>
                   </div>
                   <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
@@ -348,37 +377,49 @@ export default function EmployeeDashboardPage() {
 
                 <button
                   onClick={handleAttendanceClockToggle}
-                  disabled={isClockingIn}
-                  className={`w-full inline-flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold shadow-xs transition-all cursor-pointer ${
-                    isClockedIn
-                      ? 'bg-rose-600 hover:bg-rose-500 text-white'
-                      : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                  disabled={isClockingIn || isAttendanceComplete}
+                  className={`w-full inline-flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold shadow-xs transition-all ${
+                    isAttendanceComplete
+                      ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                      : isClockedIn
+                      ? 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer'
+                      : 'bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer'
                   }`}
                 >
                   <Clock className="h-4 w-4" />
-                  <span>{isClockingIn ? 'Updating...' : isClockedIn ? 'Check Out' : 'Check In'}</span>
+                  <span>
+                    {isClockingIn
+                      ? 'Updating...'
+                      : isAttendanceComplete
+                      ? 'Attendance Complete'
+                      : isClockedIn
+                      ? 'Check Out'
+                      : 'Check In'}
+                  </span>
                 </button>
               </div>
             </div>
 
             {/* 6 Responsive KPI Cards */}
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
-              {/* Card 1: Today Attendance */}
+              {/* 1. Today Attendance */}
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
                 <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Attendance</span>
-                  <Clock className="h-4 w-4 text-indigo-600" />
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">ATTENDANCE</span>
+                  <UserCheck className="h-4 w-4 text-indigo-600" />
                 </div>
                 <p className="mt-2 text-base font-extrabold text-slate-900 truncate">
-                  {todayAttendance?.status || (todayAttendance?.checkIn ? 'Present' : 'Not Marked')}
+                  {isAttendanceComplete ? 'Present' : isClockedIn ? 'Present' : 'Not Marked'}
                 </p>
-                <p className="mt-0.5 text-[10px] text-slate-400">Today status</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 font-mono">
+                  {todayAttendance?.workingHours ? `${todayAttendance.workingHours}h today` : '8h 00m expected'}
+                </p>
               </div>
 
-              {/* Card 2: Leave Balance */}
+              {/* 2. Leave Balance */}
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
                 <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Leave Balance</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">LEAVE BALANCE</span>
                   <CalendarDays className="h-4 w-4 text-emerald-600" />
                 </div>
                 <p className="mt-2 text-lg font-black text-emerald-600">
@@ -387,66 +428,78 @@ export default function EmployeeDashboardPage() {
                 <p className="mt-0.5 text-[10px] text-slate-400">Available quota</p>
               </div>
 
-              {/* Card 3: Pending Leave */}
+              {/* 3. Pending Leave */}
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
                 <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pending Leave</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">PENDING LEAVE</span>
                   <CalendarDays className="h-4 w-4 text-amber-600" />
                 </div>
                 <p className="mt-2 text-lg font-black text-amber-600">{pendingLeaveCount}</p>
                 <p className="mt-0.5 text-[10px] text-slate-400">Awaiting approval</p>
               </div>
 
-              {/* Card 4: Latest Payroll */}
+              {/* 4. Latest Payroll */}
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
                 <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Latest Net Salary</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">LATEST PAYROLL</span>
                   <CreditCard className="h-4 w-4 text-indigo-600" />
                 </div>
-                <p className="mt-2 text-base font-extrabold text-slate-900 font-mono truncate">
-                  {latestPayroll?.netSalary !== undefined ? `$${latestPayroll.netSalary.toLocaleString()}` : 'No payroll'}
-                </p>
-                <p className="mt-0.5 text-[10px] text-slate-400">{latestPayroll?.payrollPeriod || 'Latest period'}</p>
+                {latestPayroll?.netSalary !== undefined ? (
+                  <>
+                    <p className="mt-2 text-base font-extrabold text-slate-900 font-mono truncate">
+                      ₹{latestPayroll.netSalary.toLocaleString()}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-slate-400 truncate">{latestPayroll.payrollPeriod || 'Processed'}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-2 text-xs font-bold text-slate-500">No payroll available</p>
+                    <p className="mt-0.5 text-[10px] text-slate-400">No records</p>
+                  </>
+                )}
               </div>
 
-              {/* Card 5: Notifications */}
+              {/* 5. Unread Alerts */}
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
                 <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Unread Alerts</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">UNREAD ALERTS</span>
                   <Bell className="h-4 w-4 text-rose-500" />
                 </div>
                 <p className="mt-2 text-lg font-black text-rose-600">{unreadNotifCount}</p>
-                <p className="mt-0.5 text-[10px] text-slate-400">System notices</p>
+                <p className="mt-0.5 text-[10px] text-slate-400">
+                  {unreadNotifCount === 0 ? "You're all caught up" : 'System notices'}
+                </p>
               </div>
 
-              {/* Card 6: Helpdesk */}
+              {/* 6. Open Tickets */}
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
                 <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Open Tickets</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">OPEN TICKETS</span>
                   <HelpCircle className="h-4 w-4 text-indigo-600" />
                 </div>
                 <p className="mt-2 text-lg font-black text-indigo-600">{helpdeskCounts.open}</p>
-                <p className="mt-0.5 text-[10px] text-slate-400">{helpdeskCounts.total} total created</p>
+                <p className="mt-0.5 text-[10px] text-slate-400">
+                  {helpdeskCounts.open === 0 ? 'No open support tickets' : 'Active HR requests'}
+                </p>
               </div>
             </div>
 
-            {/* 2-Column Content Layout */}
+            {/* 2-Column Content Layout (70% Left / 30% Right) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left Column (8 cols): Leave & Payroll Breakdown */}
+              {/* Left Column (8 cols): Leave Quotas, Leave Requests, Payroll */}
               <div className="lg:col-span-8 space-y-6">
-                {/* Leave Quotas */}
+                {/* 7. My Leave Balance */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
                       <CalendarDays className="h-4 w-4 text-indigo-600" />
-                      <span>My Leave Balances</span>
+                      <span>My Leave Balance</span>
                     </h3>
                     <Link
                       href="/employee/leave"
                       className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800"
                     >
-                      <span>Apply Leave</span>
-                      <ArrowRight className="h-3.5 w-3.5" />
+                      <span>Apply Leave →</span>
                     </Link>
                   </div>
 
@@ -472,15 +525,15 @@ export default function EmployeeDashboardPage() {
                   )}
                 </div>
 
-                {/* Recent Leave Requests */}
+                {/* 10. Recent Leave Requests */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
                       <FileText className="h-4 w-4 text-indigo-600" />
-                      <span>Recent Leave Applications</span>
+                      <span>Recent Leave Requests</span>
                     </h3>
                     <Link href="/employee/leave" className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
-                      View All
+                      View All →
                     </Link>
                   </div>
 
@@ -496,7 +549,7 @@ export default function EmployeeDashboardPage() {
                         <thead>
                           <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[10px]">
                             <th className="pb-2">Leave Type</th>
-                            <th className="pb-2">Dates</th>
+                            <th className="pb-2">Date Range</th>
                             <th className="pb-2">Duration</th>
                             <th className="pb-2">Status</th>
                           </tr>
@@ -511,11 +564,13 @@ export default function EmployeeDashboardPage() {
                               <td className="py-2.5 text-indigo-600 font-bold">{req.durationDays} Days</td>
                               <td className="py-2.5">
                                 <span
-                                  className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                                     req.status === 'Approved'
                                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                       : req.status === 'Rejected'
                                       ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                      : req.status === 'Cancelled'
+                                      ? 'bg-slate-100 text-slate-600 border border-slate-200'
                                       : 'bg-amber-50 text-amber-700 border border-amber-200'
                                   }`}
                                 >
@@ -530,15 +585,15 @@ export default function EmployeeDashboardPage() {
                   )}
                 </div>
 
-                {/* Latest Payroll Preview */}
+                {/* 11. Latest Payroll */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
                       <CreditCard className="h-4 w-4 text-indigo-600" />
-                      <span>Latest Payslip Breakdown</span>
+                      <span>Latest Payroll</span>
                     </h3>
                     <Link href="/employee/payroll" className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
-                      My Payslips
+                      View Payroll →
                     </Link>
                   </div>
 
@@ -550,22 +605,22 @@ export default function EmployeeDashboardPage() {
                       </div>
                       <div className="text-right font-mono">
                         <span className="text-slate-400 block text-[10px]">Net Payout Amount</span>
-                        <span className="text-xl font-extrabold text-emerald-600">${(latestPayroll.netSalary || 0).toLocaleString()}</span>
+                        <span className="text-xl font-extrabold text-emerald-600">₹{(latestPayroll.netSalary || 0).toLocaleString()}</span>
                       </div>
                     </div>
                   ) : (
                     <div className="py-8 text-center text-xs text-slate-400 space-y-1">
                       <CreditCard className="h-8 w-8 text-slate-300 mx-auto" />
-                      <p className="font-semibold text-slate-600">No processed payslips available yet</p>
-                      <p className="text-[11px] text-slate-400">When HR approves your salary, your monthly payslips will be ready here.</p>
+                      <p className="font-semibold text-slate-600">No payroll records available yet.</p>
+                      <p className="text-[11px] text-slate-400">When HR processes your salary, your payslips will appear here.</p>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Right Column (4 cols): Notifications & Support */}
+              {/* Right Column (4 cols): Notifications & Support Tickets */}
               <div className="lg:col-span-4 space-y-6">
-                {/* Notifications Feed */}
+                {/* 8. Recent Notifications */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
@@ -573,7 +628,7 @@ export default function EmployeeDashboardPage() {
                       <span>Recent Notifications</span>
                     </h3>
                     <Link href="/employee/notifications" className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
-                      View All
+                      View All →
                     </Link>
                   </div>
 
@@ -581,13 +636,22 @@ export default function EmployeeDashboardPage() {
                     <div className="py-8 text-center text-xs text-slate-400 space-y-1">
                       <CheckCheck className="h-8 w-8 text-emerald-500 mx-auto" />
                       <p className="font-semibold text-slate-700">No new notifications</p>
-                      <p className="text-[11px] text-slate-400">You&apos;re all caught up!</p>
+                      <p className="text-[11px] text-slate-400">You&apos;re all caught up.</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
                       {notifications.slice(0, 4).map((item) => (
                         <div key={item._id || item.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-xs space-y-1">
-                          <h4 className="font-bold text-slate-900">{item.title}</h4>
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-bold text-slate-900 truncate max-w-[180px]">{item.title}</h4>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                                item.status === 'READ' ? 'bg-slate-100 text-slate-500' : 'bg-rose-50 text-rose-700'
+                              }`}
+                            >
+                              {item.status || 'UNREAD'}
+                            </span>
+                          </div>
                           <p className="text-slate-600 line-clamp-2">{item.message}</p>
                           <span className="text-[10px] text-slate-400 font-mono block pt-0.5">
                             {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Recent'}
@@ -598,22 +662,22 @@ export default function EmployeeDashboardPage() {
                   )}
                 </div>
 
-                {/* Open Helpdesk Support Tickets */}
+                {/* 9. Support Tickets */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
                       <HelpCircle className="h-4 w-4 text-indigo-600" />
-                      <span>Open Support Requests</span>
+                      <span>Support Tickets</span>
                     </h3>
                     <Link href="/employee/helpdesk" className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
-                      Open Helpdesk
+                      Open Helpdesk →
                     </Link>
                   </div>
 
                   {helpdeskTickets.length === 0 ? (
                     <div className="py-8 text-center text-xs text-slate-400 space-y-1">
                       <HelpCircle className="h-8 w-8 text-slate-300 mx-auto" />
-                      <p className="font-semibold text-slate-600">No support tickets created</p>
+                      <p className="font-semibold text-slate-600">No open support tickets</p>
                       <p className="text-[11px] text-slate-400">Submit HR queries or attendance corrections via Helpdesk.</p>
                     </div>
                   ) : (
@@ -622,7 +686,7 @@ export default function EmployeeDashboardPage() {
                         <div key={t.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-xs flex items-center justify-between">
                           <div>
                             <span className="font-mono text-[10px] font-bold text-indigo-600">{t.ticketNumber}</span>
-                            <h4 className="font-bold text-slate-900 truncate max-w-[170px]">{t.subject}</h4>
+                            <h4 className="font-bold text-slate-900 truncate max-w-[150px]">{t.subject}</h4>
                           </div>
                           <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[9px] font-bold text-slate-600 border border-slate-200">
                             {t.status}
