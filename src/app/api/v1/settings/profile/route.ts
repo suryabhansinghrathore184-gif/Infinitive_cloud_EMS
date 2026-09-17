@@ -79,9 +79,25 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { fullName, roleTitle, phone } = body;
+    const {
+      fullName,
+      name,
+      roleTitle,
+      phone,
+      mobile,
+      address,
+      city,
+      state,
+      postalCode,
+      emergencyContact,
+      personalEmail,
+      dob,
+      dateOfBirth,
+      gender,
+    } = body;
 
-    if (!fullName || typeof fullName !== 'string' || !fullName.trim()) {
+    const targetName = fullName || name;
+    if (!targetName || typeof targetName !== 'string' || !targetName.trim()) {
       return NextResponse.json(
         { success: false, message: 'Full name is required and cannot be empty.' },
         { status: 400 }
@@ -92,12 +108,21 @@ export async function PATCH(req: NextRequest) {
     const now = new Date();
 
     const updateFields: any = {
-      name: fullName.trim(),
-      fullName: fullName.trim(),
-      roleTitle: roleTitle ? String(roleTitle).trim() : 'HR Administrator',
-      phone: phone ? String(phone).trim() : '',
+      name: targetName.trim(),
+      fullName: targetName.trim(),
       updatedAt: now,
     };
+
+    if (roleTitle !== undefined) updateFields.roleTitle = String(roleTitle).trim();
+    if (phone !== undefined || mobile !== undefined) updateFields.phone = String(phone || mobile).trim();
+    if (address !== undefined) updateFields.address = String(address).trim();
+    if (city !== undefined) updateFields.city = String(city).trim();
+    if (state !== undefined) updateFields.state = String(state).trim();
+    if (postalCode !== undefined) updateFields.postalCode = String(postalCode).trim();
+    if (emergencyContact !== undefined) updateFields.emergencyContact = String(emergencyContact).trim();
+    if (personalEmail !== undefined) updateFields.personalEmail = String(personalEmail).trim();
+    if (dob !== undefined || dateOfBirth !== undefined) updateFields.dob = String(dob || dateOfBirth).trim();
+    if (gender !== undefined) updateFields.gender = String(gender).trim();
 
     const filter = {
       $or: [{ userId: auth.userId }, { id: auth.userId }, { email: auth.email }],
@@ -111,7 +136,7 @@ export async function PATCH(req: NextRequest) {
       await db.collection('users').insertOne({
         userId: auth.userId,
         email: auth.email,
-        role: auth.role || 'ADMIN',
+        role: auth.role || 'EMPLOYEE',
         organizationId: auth.organizationId,
         avatar: DEFAULT_AVATAR,
         createdAt: now,
@@ -119,7 +144,7 @@ export async function PATCH(req: NextRequest) {
       } as any);
     }
 
-    await logAuditEvent(req, 'UPDATE_ADMIN_PROFILE', {
+    await logAuditEvent(req, 'UPDATE_PROFILE', {
       details: { userId: auth.userId, email: auth.email, updates: updateFields },
     });
 
@@ -127,13 +152,19 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Admin Profile updated successfully.',
+      message: 'Profile updated successfully.',
       data: {
         userId: updatedUser?.userId || auth.userId,
-        fullName: updatedUser?.fullName || updatedUser?.name || fullName,
+        fullName: updatedUser?.fullName || updatedUser?.name || targetName,
         email: updatedUser?.email || auth.email,
         roleTitle: updatedUser?.roleTitle || roleTitle,
         phone: updatedUser?.phone || phone,
+        address: updatedUser?.address || '',
+        city: updatedUser?.city || '',
+        state: updatedUser?.state || '',
+        postalCode: updatedUser?.postalCode || '',
+        emergencyContact: updatedUser?.emergencyContact || '',
+        personalEmail: updatedUser?.personalEmail || '',
         avatar: updatedUser?.avatar || DEFAULT_AVATAR,
         role: updatedUser?.role || auth.role,
         profilePhotoId: updatedUser?.profilePhotoId || null,
