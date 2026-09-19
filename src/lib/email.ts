@@ -1,5 +1,4 @@
-import nodemailer, { Transporter } from 'nodemailer';
-import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { sendEmail, MailDispatchResult } from '@/lib/mailer';
 
 export interface SendOtpEmailParams {
   to: string;
@@ -13,7 +12,7 @@ export interface SendOtpEmailParams {
 export interface EmailDispatchResult {
   success: boolean;
   messageId?: string;
-  provider?: 'Brevo' | 'Gmail_SMTP' | 'Mock';
+  provider?: 'Gmail_SMTP';
   error?: string;
 }
 
@@ -64,7 +63,7 @@ function getEmailSubjectAndTitle(purpose: string, otp: string, role: string) {
 }
 
 /**
- * Builds professional responsive HTML email template for Brevo/SMTP dispatch
+ * Builds professional responsive HTML email template for Gmail SMTP dispatch
  */
 function buildOtpHtmlContent(
   to: string,
@@ -156,115 +155,8 @@ function buildOtpHtmlContent(
 }
 
 /**
- * Sends Transactional Email via Brevo HTTP API (api.brevo.com/v3/smtp/email)
- */
-async function sendBrevoTransactionalEmail(
-  to: string,
-  otp: string,
-  purpose: string,
-  userName?: string,
-  organizationName?: string,
-  role?: string
-): Promise<EmailDispatchResult> {
-  const brevoApiKey = process.env.BREVO_API_KEY?.trim();
-  const senderEmail = process.env.BREVO_SENDER_EMAIL?.trim() || process.env.GMAIL_USER?.trim() || 'sweofficework2004@gmail.com';
-  const senderName = process.env.BREVO_SENDER_NAME?.trim() || 'EMS HRMS';
-
-  if (!brevoApiKey) {
-    console.error('[Brevo API Error] BREVO_API_KEY is missing from environment variables.');
-    return { success: false, error: 'Brevo API key not configured (BREVO_API_KEY missing).' };
-  }
-
-  const { subject, htmlContent, textContent } = buildOtpHtmlContent(to, otp, purpose, userName, organizationName, role);
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
-
-  try {
-    const maskedEmail = to.replace(/(.{2})(.*)(?=@)/, '$1***');
-    console.log(`[Brevo API] OTP_SEND_STARTED for ${maskedEmail} (Purpose: ${purpose}, Sender: ${senderEmail})`);
-
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': brevoApiKey,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        sender: {
-          name: senderName,
-          email: senderEmail,
-        },
-        to: [
-          {
-            email: to.trim().toLowerCase(),
-            name: userName || 'Valued User',
-          },
-        ],
-        subject,
-        htmlContent,
-        textContent,
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      const errDetail = data.message || data.code || `HTTP status ${response.status}`;
-      console.error(`[Brevo API Error] Status ${response.status}: ${errDetail} (Recipient: ${maskedEmail})`);
-      return {
-        success: false,
-        error: `Brevo API error (${response.status}): ${errDetail}`,
-      };
-    }
-
-    const messageId = data.messageId || `<brevo-${Date.now()}@brevo.com>`;
-    console.log(`[Brevo API] OTP_SEND_SUCCESS for ${maskedEmail}. MessageId: ${messageId}`);
-
-    return {
-      success: true,
-      messageId,
-      provider: 'Brevo',
-    };
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      console.error('[Brevo API] Request timed out after 10000ms.');
-      return { success: false, error: 'Email service request timed out after 10 seconds.' };
-    }
-    console.error('[Brevo API] Network or API exception during email dispatch:', error?.message || error);
-    return { success: false, error: 'Failed to communicate with Brevo email delivery service.' };
-  }
-}
-
-/**
- * Gmail SMTP Fallback Transporter
- */
-function createGmailTransporter(gmailUser: string, gmailPass: string): Transporter {
-  const port = parseInt(process.env.SMTP_PORT || '465', 10);
-  const isSecure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE !== 'false' : port === 465;
-
-  const smtpOptions: SMTPTransport.Options = {
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port,
-    secure: isSecure,
-    auth: { user: gmailUser, pass: gmailPass },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-    tls: { rejectUnauthorized: false },
-  };
-
-  return nodemailer.createTransport(smtpOptions);
-}
-
-/**
  * Main Email Dispatch Function
- * Prefers Brevo API if BREVO_API_KEY is set. Does NOT fall back silently to Gmail SMTP if Brevo fails.
+ * Routes email sending exclusively through Nodemailer Gmail SMTP.
  */
 export async function sendOtpEmail({
   to,
@@ -274,46 +166,26 @@ export async function sendOtpEmail({
   organizationName,
   role = 'EMPLOYEE',
 }: SendOtpEmailParams): Promise<EmailDispatchResult> {
-  const brevoKey = process.env.BREVO_API_KEY?.trim();
+  const { subject, htmlContent, textContent } = buildOtpHtmlContent(
+    to,
+    otp,
+    purpose,
+    userName,
+    organizationName,
+    role
+  );
 
-  // 1. If Brevo API key exists in environment, execute Brevo API delivery and return the result WITHOUT fallback.
-  if (brevoKey) {
-    const brevoResult = await sendBrevoTransactionalEmail(to, otp, purpose, userName, organizationName, role);
-    if (!brevoResult.success) {
-      console.error(`[Email Service] Brevo Transactional Email failed: ${brevoResult.error}. Failing clearly without silent Gmail SMTP fallback.`);
-    }
-    return brevoResult;
-  }
+  const dispatchResult = await sendEmail({
+    to,
+    subject,
+    html: htmlContent,
+    text: textContent,
+  });
 
-  // 2. If BREVO_API_KEY is NOT configured, check Gmail SMTP for development/testing fallback
-  const rawUser = process.env.GMAIL_USER || process.env.SMTP_USER || '';
-  const rawPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '';
-  const gmailUser = rawUser.trim();
-  const gmailPass = rawPass.trim().replace(/\s+/g, '');
-
-  if (gmailUser && gmailPass) {
-    console.log('[Email Service] BREVO_API_KEY is not set in environment. Falling back to Gmail SMTP for testing.');
-    try {
-      const mailTransporter = createGmailTransporter(gmailUser, gmailPass);
-      const { subject, htmlContent, textContent } = buildOtpHtmlContent(to, otp, purpose, userName, organizationName, role);
-
-      const info = await mailTransporter.sendMail({
-        from: `"${process.env.BREVO_SENDER_NAME || 'EMS HRMS'}" <${gmailUser}>`,
-        to,
-        subject,
-        html: htmlContent,
-        text: textContent,
-        headers: { 'X-Priority': '1', Importance: 'high' },
-      });
-
-      console.log(`[Gmail SMTP] Confirmation Email sent to ${to}. MessageId: ${info.messageId}`);
-      return { success: true, messageId: info.messageId, provider: 'Gmail_SMTP' };
-    } catch (smtpErr: any) {
-      console.error('[Gmail SMTP] Failed to send email:', smtpErr?.message);
-      return { success: false, error: smtpErr?.message || 'SMTP dispatch failure' };
-    }
-  }
-
-  console.error('[Email Service] Neither BREVO_API_KEY nor GMAIL credentials are configured in environment variables.');
-  return { success: false, error: 'Email service credentials not configured. Please set BREVO_API_KEY in environment variables.' };
+  return {
+    success: dispatchResult.success,
+    messageId: dispatchResult.messageId,
+    provider: 'Gmail_SMTP',
+    error: dispatchResult.error,
+  };
 }

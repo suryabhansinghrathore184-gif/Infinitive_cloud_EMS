@@ -61,8 +61,7 @@ export async function POST(req: NextRequest) {
       }
 
       const hashedInput = hashToken(inputCode);
-      const isMasterOtp = inputCode === '123456';
-      if (otpDoc.otpHash !== hashedInput && !isMasterOtp) {
+      if (otpDoc.otpHash !== hashedInput) {
         await db.collection('auth_otp_tokens').updateOne(
           { _id: otpDoc._id },
           { $inc: { attempts: 1 } }
@@ -141,8 +140,7 @@ export async function POST(req: NextRequest) {
       }
 
       const hashedInput = hashToken(inputCode);
-      const isMasterOtp = inputCode === '123456';
-      if (tokenDoc.hashedOtp !== hashedInput && !isMasterOtp) {
+      if (tokenDoc.hashedOtp !== hashedInput) {
         await db.collection('auth_tokens').updateOne(
           { _id: tokenDoc._id },
           { $inc: { attempts: 1 } }
